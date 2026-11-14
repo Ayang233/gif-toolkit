@@ -1,0 +1,123 @@
+package com.ayang.giftoolkit
+
+import android.graphics.Bitmap
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.ayang.giftoolkit.core.GifFrame
+import com.ayang.giftoolkit.data.SettingsStore
+import com.ayang.giftoolkit.ui.Tool
+import java.io.File
+
+/** 主题模式；Monet 取色跟随系统。 */
+enum class ThemeMode(val label: String) {
+    System("跟随系统"),
+    Light("浅色"),
+    Dark("深色"),
+}
+
+/**
+ * 跨屏共享的状态，只放真正全局的东西。
+ *
+ * 外观三项（主题 / 动态取色 / 玻璃）走 [SettingsStore] 落盘：读的时候取内存里的快照，
+ * 写的时候同时更新快照与磁盘，所以界面立即响应、重启后仍然保留。
+ */
+class AppState(private val store: SettingsStore) {
+
+    private var themeModeState by mutableStateOf(store.themeMode)
+    private var monetEnabledState by mutableStateOf(store.monetEnabled)
+    private var glassEnabledState by mutableStateOf(store.glassEnabled)
+
+    var themeMode: ThemeMode
+        get() = themeModeState
+        set(value) {
+            if (value != themeModeState) {
+                themeModeState = value
+                store.themeMode = value
+            }
+        }
+
+    var monetEnabled: Boolean
+        get() = monetEnabledState
+        set(value) {
+            if (value != monetEnabledState) {
+                monetEnabledState = value
+                store.monetEnabled = value
+            }
+        }
+
+    var glassEnabled: Boolean
+        get() = glassEnabledState
+        set(value) {
+            if (value != glassEnabledState) {
+                glassEnabledState = value
+                store.glassEnabled = value
+            }
+        }
+
+    var libraryToken by mutableIntStateOf(0)
+
+    /** 最近一次导出，供结果页使用。 */
+    var lastResultPath by mutableStateOf<String?>(null)
+    var lastResultMime by mutableStateOf("image/gif")
+}
+
+/**
+ * 单个工具页的表单状态。
+ *
+ * 每个工具页各自 remember 一份，工具之间互不污染 —— 旧版本把所有工具塞进一个
+ * AppState，改过视频参数再进 GIF 编辑会残留，这版修掉了。
+ */
+class ToolForm(private val tool: Tool) {
+    var uris by mutableStateOf<List<Uri>>(emptyList())
+
+    var busy by mutableStateOf(false)
+    var progress by mutableFloatStateOf(0f)
+    var message by mutableStateOf("")
+    var result by mutableStateOf<File?>(null)
+    var resultMime by mutableStateOf("image/gif")
+    var preview by mutableStateOf<List<GifFrame>>(emptyList())
+    var stillPreview by mutableStateOf<Bitmap?>(null)
+
+    // 通用
+    var width by mutableFloatStateOf(360f)
+    var fps by mutableFloatStateOf(12f)
+    var quality by mutableFloatStateOf(255f)
+
+    // 视频
+    var startSec by mutableFloatStateOf(0f)
+    var durationSec by mutableFloatStateOf(3f)
+    var stabilize by mutableStateOf(false)
+    var colorKey by mutableStateOf(false)
+    var keyColor by mutableStateOf(0xFF00B441.toInt())
+    var keyTolerance by mutableFloatStateOf(30f)
+
+    // 图片合成
+    var delayMs by mutableFloatStateOf(120f)
+
+    // 编辑
+    var rotate by mutableFloatStateOf(0f)
+    var mirror by mutableStateOf(false)
+    var flip by mutableStateOf(false)
+    var reverse by mutableStateOf(false)
+    var cropCenter by mutableStateOf(false)
+    var text by mutableStateOf("")
+    var mosaic by mutableStateOf(false)
+    var mosaicPos by mutableIntStateOf(0)
+
+    // 拼图
+    var puzzleCols by mutableIntStateOf(2)
+
+    // 压缩
+    var scale by mutableFloatStateOf(0.7f)
+    var frameStep by mutableFloatStateOf(1f)
+
+    // 播放
+    var playSpeed by mutableFloatStateOf(1f)
+
+    val canRun: Boolean
+        get() = uris.isNotEmpty() && !busy && (tool.acceptsMultiple || uris.size == 1)
+}
