@@ -26,7 +26,12 @@ kotlin {
             implementation("top.yukonga.miuix.kmp:miuix-ui")
             implementation("top.yukonga.miuix.kmp:miuix-preference")
             implementation("top.yukonga.miuix.kmp:miuix-icons")
+            // miuix-material：GlassDefaults / GlassStyle / isRenderEffectSupported 在这里，
+            // glass 模块不会把它们透出来，OS4 化必须显式依赖。
+            implementation("top.yukonga.miuix.kmp:miuix-material")
             implementation("top.yukonga.miuix.kmp:miuix-glass")
+            // 反射 ApplicationInfo.setEnableOnBackInvokedCallback 需要解隐藏 API 豁免
+            implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
             implementation("top.yukonga.miuix.kmp:miuix-glass-icons")
             implementation("top.yukonga.miuix.kmp:miuix-nav")
         }
@@ -48,8 +53,8 @@ android {
         // 33：miuix-blur 的下限，也是 OS4 玻璃（RuntimeShader）能正常工作且不降级的起点
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {

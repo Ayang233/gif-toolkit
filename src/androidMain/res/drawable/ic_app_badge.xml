@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用内使用的图标徽章（关于页）。
+     不复用 @mipmap/ic_launcher：那是 AdaptiveIconDrawable，
+     在 Compose 里自绘时不会自动套用桌面遮罩，圆角会与周围控件对不上。
+     与桌面图标同一套图形，但这里不做 0.88 安全区缩放——
+     徽章没有遮罩风险，主体要占满，才不会显得空。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 描边：白底徽章放在浅灰页面（#F7F7F7）上时，不描边就只剩一条蓝色浮着；
+         1/108 的极细线在 76dp 尺寸下约 0.7dp，只在浅色下"托"出边界，深色下几乎看不见。 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#14000000"
+        android:strokeWidth="1"
+        android:pathData="M26,2 H82 A24,24 0 0 1 106,26 V82 A24,24 0 0 1 82,106 H26 A24,24 0 0 1 2,82 V26 A24,24 0 0 1 26,2 Z" />
+    <path
+        android:fillColor="#3482FF"
+        android:fillType="evenOdd"
+        android:pathData="M22,34 H86 A8,8 0 0 1 94,42 V66 A8,8 0 0 1 86,74 H22 A8,8 0 0 1 14,66 V42 A8,8 0 0 1 22,34 Z M19,37 H25 V42 H19 Z M31,37 H37 V42 H31 Z M43,37 H49 V42 H43 Z M55,37 H61 V42 H55 Z M67,37 H73 V42 H67 Z M79,37 H85 V42 H79 Z" />
+    <path
+        android:pathData="M24,63 L34,54 L44,64 L54,54 L64,64 L74,56 L84,61"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

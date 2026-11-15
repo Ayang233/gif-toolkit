@@ -1,6 +1,8 @@
 package com.ayang.giftoolkit.data
 
 import android.content.Context
+import com.ayang.giftoolkit.BackAnimation
+import com.ayang.giftoolkit.BackExitDirection
 import com.ayang.giftoolkit.ThemeMode
 
 /**
@@ -45,9 +47,35 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean(KEY_GLASS, value).apply()
         }
 
+    /** AMOLED 纯黑：深色模式下页面底用纯黑，省电且和 HyperOS 的 AMOLED 开关一致。 */
+    var amoledEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AMOLED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_AMOLED, value).apply()
+        }
+
+    var backAnimation: BackAnimation
+        get() = prefs.getString(KEY_BACK_ANIM, null)
+            ?.let { saved -> BackAnimation.entries.firstOrNull { it.name == saved } }
+            ?: BackAnimation.Miuix
+        set(value) {
+            prefs.edit().putString(KEY_BACK_ANIM, value.name).apply()
+        }
+
+    var backExitDirection: BackExitDirection
+        get() = prefs.getString(KEY_BACK_DIRECTION, null)
+            ?.let { saved -> BackExitDirection.entries.firstOrNull { it.name == saved } }
+            ?: BackExitDirection.FollowGesture
+        set(value) {
+            prefs.edit().putString(KEY_BACK_DIRECTION, value.name).apply()
+        }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_MONET = "monet_enabled"
         const val KEY_GLASS = "glass_enabled"
+        const val KEY_AMOLED = "amoled_enabled"
+        const val KEY_BACK_ANIM = "back_animation"
+        const val KEY_BACK_DIRECTION = "back_exit_direction"
     }
 }

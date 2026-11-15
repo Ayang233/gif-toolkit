@@ -5,10 +5,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import com.ayang.giftoolkit.ui.ContentBackdropBox
+import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.Tool
@@ -30,29 +37,39 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HomeScreen(onOpen: (Tool) -> Unit) {
     val scrollBehavior = MiuixScrollBehavior()
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageTopBar(
                 title = "GIF 助手",
-                largeTitle = "GIF 助手",
+                glass = glass,
+                isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            // 底部留出玻璃底栏的高度，滚到末尾时最后一行不会被胶囊压住
-            contentPadding = PaddingValues(top = 2.dp, bottom = 128.dp),
-        ) {
-            Tool.grouped.forEach { (group, tools) ->
-                item(key = "h_$group") { GroupHeader(group) }
-                item(key = "c_$group") {
-                    GroupCard {
-                        tools.forEach { tool ->
-                            ToolRow(tool, onOpen)
+        ContentBackdropBox(glass) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
+                // 底部留出玻璃底栏的高度，滚到末尾时最后一行不会被胶囊压住。
+                contentPadding = PaddingValues(
+                    top = padding.calculateTopPadding() + 2.dp,
+                    bottom = 128.dp,
+                ),
+            ) {
+                Tool.grouped.forEach { (group, tools) ->
+                    item(key = "h_$group") { GroupHeader(group) }
+                    item(key = "c_$group") {
+                        GroupCard {
+                            tools.forEach { tool ->
+                                ToolRow(tool, onOpen)
+                            }
                         }
                     }
                 }

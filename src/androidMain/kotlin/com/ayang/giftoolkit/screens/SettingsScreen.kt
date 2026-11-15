@@ -4,80 +4,73 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.AppState
-import com.ayang.giftoolkit.ThemeMode
+import com.ayang.giftoolkit.ui.ContentBackdropBox
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
-import com.ayang.giftoolkit.ui.SegmentedControl
-import com.ayang.giftoolkit.ui.SwitchRow
+import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Background
 import top.yukonga.miuix.kmp.icon.extended.Info
-import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Theme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
 fun SettingsScreen(
     app: AppState,
+    onOpenTheme: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
-    val modes = ThemeMode.entries
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageTopBar(
                 title = "设置",
-                largeTitle = "设置",
+                glass = glass,
+                isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = 2.dp, bottom = 128.dp),
-        ) {
-            // 主题：三段式分段控件，比"点一下轮换到下一个"直观得多，
-            // 也和系统「主题设置」页的形态一致。直接放在页面底色上（不进卡片），
-            // 浅灰凹槽在白色页面上才读得出来。
-            item { GroupHeader("主题") }
-            item {
-                SegmentedControl(
-                    options = modes.map { it.label },
-                    selectedIndex = modes.indexOf(app.themeMode).coerceAtLeast(0),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                    onSelect = { index -> app.themeMode = modes[index] },
-                )
-            }
-
+        // 正文在录制层里，顶栏画在录制层外面（兄弟节点）——
+        // 这个结构调整是为玻璃服务的前提，不是随手加的 Box。
+        ContentBackdropBox(glass) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                // 顶部留白改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到
+                contentPadding = PaddingValues(
+                    top = padding.calculateTopPadding() + 2.dp,
+                    bottom = padding.calculateBottomPadding() + 128.dp,
+                ),
+            ) {
             item { GroupHeader("外观") }
             item {
                 GroupCard {
-                    SwitchRow(
-                        title = "动态取色",
-                        summary = "用 Monet 从壁纸生成整套配色",
-                        checked = app.monetEnabled,
-                        onChange = { app.monetEnabled = it },
-                        icon = MiuixIcons.Background,
-                    )
-                    SwitchRow(
-                        title = "玻璃材质",
-                        summary = "底栏使用 OS4 玻璃，低端机可关",
-                        checked = app.glassEnabled,
-                        onChange = { app.glassEnabled = it },
-                        icon = MiuixIcons.Layers,
+                    // 主题相关全部收进独立页：设置首页只留入口，
+                    // 和 KernelSU / InstallerX 的组织方式一致，也避免这页越堆越长。
+                    ArrowPreference(
+                        title = "主题",
+                        summary = "主题模式、AMOLED、玻璃与预测性返回",
+                        startAction = { LeadingIcon(MiuixIcons.Theme) },
+                        onClick = onOpenTheme,
                     )
                 }
             }
@@ -95,7 +88,7 @@ fun SettingsScreen(
                     )
                 }
             }
-
+            }
         }
     }
 }

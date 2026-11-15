@@ -6,12 +6,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.ayang.giftoolkit.ui.ContentBackdropBox
+import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
@@ -35,11 +41,15 @@ fun LicensesScreen(
     onOpen: (Int) -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageTopBar(
                 title = "开源许可",
-                largeTitle = "开源许可",
+                glass = glass,
+                isScrolled = isScrolled,
                 subtitle = "共 ${thirdPartyLibraries.size} 个第三方组件",
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
@@ -50,12 +60,13 @@ fun LicensesScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        ContentBackdropBox(glass) {
+            LazyColumn(
+                state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = 32.dp),
         ) {
             item { GroupHeader("第三方组件") }
             item {
@@ -71,6 +82,7 @@ fun LicensesScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -82,6 +94,9 @@ fun LicenseDetailScreen(
 ) {
     val context = LocalContext.current
     val scrollBehavior = MiuixScrollBehavior()
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
     val entry = thirdPartyLibraries.getOrNull(index)
     val body = remember(index) {
         entry?.let {
@@ -95,9 +110,10 @@ fun LicenseDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageTopBar(
                 title = entry?.name ?: "开源许可",
-                largeTitle = entry?.name ?: "开源许可",
+                glass = glass,
+                isScrolled = isScrolled,
                 subtitle = entry?.license ?: "",
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
@@ -108,10 +124,11 @@ fun LicenseDetailScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        ContentBackdropBox(glass) {
+            LazyColumn(
+                state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         ) {
@@ -123,6 +140,7 @@ fun LicenseDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+        }
         }
     }
 }

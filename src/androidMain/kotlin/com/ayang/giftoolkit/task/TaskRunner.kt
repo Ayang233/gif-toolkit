@@ -201,32 +201,36 @@ suspend fun previewBitmap(context: Context, tool: Tool, f: ToolForm): Bitmap? = 
     runCatching {
         when (tool) {
             Tool.VIDEO_TO_GIF, Tool.MVIMG_TO_GIF -> {
-                val target = if (tool == Tool.MVIMG_TO_GIF) {
-                    MotionPhoto.extractVideo(context, uri)?.let { Uri.fromFile(it) } ?: return@runCatching null
+                val extracted = if (tool == Tool.MVIMG_TO_GIF) {
+                    MotionPhoto.extractVideo(context, uri) ?: return@runCatching null
                 } else {
-                    uri
+                    null
                 }
-                val retriever = MediaMetadataRetriever()
+                val target = extracted?.let { Uri.fromFile(it) } ?: uri
                 try {
-                    retriever.setDataSource(context, target)
-                    retriever.getFrameAtTime(
-                        (f.startSec * 1_000_000).toLong(),
-                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                    )?.let { bmp ->
-                        val scale = f.width / bmp.width.coerceAtLeast(1)
-                        if (scale < 1f) {
-                            Bitmap.createScaledBitmap(
-                                bmp,
-                                f.width.toInt(),
-                                (bmp.height * scale).toInt().coerceAtLeast(1),
-                                true,
-                            )
-                        } else {
-                            bmp
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, target)
+                        val meta = MediaTools.readVideoMeta(retriever)
+                        retriever.getFrameAtTime(
+                            (f.startSec * 1_000_000).toLong(),
+                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        )?.let { raw ->
+                            // 预览必须和导出走同一条「定向 + 短边缩放」的路径，
+                            // 否则会出现"预览是竖的、导出是横的"这种对不上的情况
+                            val oriented = MediaTools.orientForDisplay(raw, meta)
+                            val fitted = MediaTools.fitShortSide(oriented, f.width.toInt())
+                            val out = fitted.copy(Bitmap.Config.ARGB_8888, false)
+                            if (oriented !== raw) oriented.recycle()
+                            if (fitted !== oriented) fitted.recycle()
+                            out
                         }
+                    } finally {
+                        retriever.release()
                     }
                 } finally {
-                    retriever.release()
+                    // 动态照片的临时视频只看一帧，用完就删，别留在 filesDir 里
+                    extracted?.delete()
                 }
             }
 

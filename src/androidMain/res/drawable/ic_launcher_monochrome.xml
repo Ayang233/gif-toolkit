@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 单色层：系统按主题整块上色，只保留"胶片条 + 齿孔"的剪影。
+     波浪不加——同色会糊成一条，反而破坏剪影。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M30.96,39.6 H77.03999999999999 A5.76,5.76 0 0 1 82.8,45.36 V62.64000000000001 A5.76,5.76 0 0 1 77.03999999999999,68.4 H30.96 A5.76,5.76 0 0 1 25.2,62.64000000000001 V45.36 A5.76,5.76 0 0 1 30.96,39.6 Z M28.8,41.76 H33.12 V45.36 H28.8 Z M37.44,41.76 H41.76 V45.36 H37.44 Z M46.08,41.76 H50.4 V45.36 H46.08 Z M54.72,41.76 H59.04 V45.36 H54.72 Z M63.36,41.76 H67.68 V45.36 H63.36 Z M72.0,41.76 H76.32 V45.36 H72.0 Z" />
+</vector>

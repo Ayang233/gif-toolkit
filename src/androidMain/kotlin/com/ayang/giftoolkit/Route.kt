@@ -3,7 +3,9 @@ package com.ayang.giftoolkit
 import top.yukonga.miuix.kmp.nav.core.NavKey
 
 /**
- * 四个目的地：根页面（内含三个 tab）、工具页、关于页、开源许可（列表 / 全文）。
+ * 五个目的地：根页面（内含三个 tab）、工具页、主题设置、关于页、开源许可（列表 / 全文）。
+ *
+ * 主题设置是独立页：设置页只留一行入口，和 KernelSU / InstallerX 的组织方式一致。
  *
  * 关于页与许可是 2.1 新增：设置里不再把「版本 / 隐私 / 导出位置」摊在同一页，
  * 而是收成一行入口，点进去才是独立的关于页（参考 KernelSU 的做法）。
@@ -13,6 +15,7 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 sealed interface Route : NavKey {
     data object Root : Route
     data class Tool(val id: String) : Route
+    data object Theme : Route
     data object About : Route
     data object Licenses : Route
     data class License(val index: Int) : Route

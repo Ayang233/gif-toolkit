@@ -14,10 +14,15 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
+import kotlin.math.roundToInt
 
 object MediaTools {
+
+    /** 方向诊断日志的 tag：`adb logcat -s GifOrientation` 就能看到每段视频的实际旋转情况。 */
+    private const val TAG = "GifOrientation"
 
     fun outputDir(context: Context): File = File(context.filesDir, "outputs").apply { mkdirs() }
 
@@ -49,6 +54,62 @@ object MediaTools {
         context.contentResolver.openInputStream(uri)?.use { GifDecoder.decode(it) } ?: emptyList()
     } catch (e: Exception) { emptyList() }
 
+    /**
+     * 视频轨道元数据。`rotation` 是把解码帧转正所需顺时针角度。
+     *
+     * [width] / [height] 是**编码**尺寸（未旋转），不是显示尺寸。
+     */
+    data class VideoMeta(val width: Int, val height: Int, val rotation: Int) {
+        val displayWidth: Int get() = if (rotation % 180 == 0) width else height
+        val displayHeight: Int get() = if (rotation % 180 == 0) height else width
+    }
+
+    fun readVideoMeta(retriever: MediaMetadataRetriever): VideoMeta {
+        val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+            ?.toIntOrNull() ?: 0
+        val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+            ?.toIntOrNull() ?: 0
+        val rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+            ?.toIntOrNull() ?: 0
+        return VideoMeta(w, h, ((rot % 360) + 360) % 360)
+    }
+
+    /**
+     * 把解码帧转成实际显示方向。
+     *
+     * 不能无条件按元数据旋转：`getFrameAtTime` 返回的是解码器输出，
+     * 部分机型/容器下它**已经**把旋转应用过了，再转一次就会把竖屏视频转成横的
+     * （这正是「竖屏视频导出后变横屏」的成因之一）。
+     *
+     * 判据只有 90/270 有意义：此时编码尺寸与显示尺寸互换。
+     * 若帧宽高已经等于「显示尺寸」，说明解码器已转正，直接返回原图。
+     */
+    fun orientForDisplay(bmp: Bitmap, meta: VideoMeta): Bitmap {
+        if (meta.rotation % 360 == 0) return bmp
+        val alreadyApplied = meta.rotation % 180 != 0 &&
+            meta.width > 0 && meta.height > 0 &&
+            bmp.width == meta.height && bmp.height == meta.width
+        if (alreadyApplied) return bmp
+        val m = Matrix().apply { postRotate(meta.rotation.toFloat()) }
+        return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+    }
+
+    /**
+     * 按**短边**缩放到 [shortSide]，与界面上「分辨率（短边）」的措辞保持一致。
+     * 短边已经不超过目标值时原样返回（不放大），始终保持比例，不裁切。
+     */
+    fun fitShortSide(bmp: Bitmap, shortSide: Int): Bitmap {
+        val minSide = minOf(bmp.width, bmp.height).coerceAtLeast(1)
+        if (shortSide <= 0 || minSide <= shortSide) return bmp
+        val scale = shortSide.toFloat() / minSide
+        return Bitmap.createScaledBitmap(
+            bmp,
+            (bmp.width * scale).roundToInt().coerceAtLeast(1),
+            (bmp.height * scale).roundToInt().coerceAtLeast(1),
+            true,
+        )
+    }
+
     fun videoFrames(
         context: Context,
         uri: Uri,
@@ -64,39 +125,37 @@ object MediaTools {
         try {
             r.setDataSource(context, uri)
             val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-            // 竖拍视频的解码帧不带方向，不读这个元数据就会输出横过来的画面
-            val rotation = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
-                ?.toIntOrNull() ?: 0
+            val meta = readVideoMeta(r)
             val stop = if (endMs > 0L) minOf(endMs, duration) else duration
             val start = startMs.coerceAtLeast(0L).coerceAtMost(stop)
             if (stop <= start) return emptyList()
             val step = 1000.0 / fps.coerceIn(1, 30)
+            val frameDelay = (1000.0 / fps).toInt()
             var t = start.toDouble()
-            var last: Bitmap? = null
+            var previous: Bitmap? = null
+            var logged = false
             while (t < stop && out.size < maxFrames) {
                 val frame = r.getFrameAtTime((t * 1000).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)
-                val bmp = frame ?: last
-                if (bmp != null) {
-                    val oriented = if (rotation == 0 || rotation % 360 == 0) bmp else {
-                        val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-                        Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
-                    }
-                    val scale = width.toFloat() / oriented.width.coerceAtLeast(1)
-                    val target = if (scale < 1f) {
-                        Bitmap.createScaledBitmap(
-                            oriented,
-                            width,
-                            (oriented.height * scale).toInt().coerceAtLeast(1),
-                            true,
+                val src = frame ?: previous
+                if (src != null) {
+                    val oriented = orientForDisplay(src, meta)
+                    val fitted = fitShortSide(oriented, width)
+                    // 输出帧独占一份位图：下面的回收不会影响已经进结果的帧
+                    val target = fitted.copy(Bitmap.Config.ARGB_8888, false)
+                    if (!logged) {
+                        logged = true
+                        Log.d(
+                            TAG,
+                            "video ${meta.width}x${meta.height} rot=${meta.rotation} " +
+                                "frame=${src.width}x${src.height} out=${target.width}x${target.height}",
                         )
-                    } else {
-                        oriented.copy(Bitmap.Config.ARGB_8888, false)
                     }
-                    out.add(GifFrame(target, (1000.0 / fps).toInt()))
-                    if (oriented !== bmp) oriented.recycle()
-                    if (frame != null && last != null && last != frame) last.recycle()
-                    last = frame ?: last
+                    out.add(GifFrame(target, frameDelay))
+                    if (oriented !== src) oriented.recycle()
+                    if (fitted !== oriented) fitted.recycle()
                 }
+                if (frame != null && previous != null && previous !== frame) previous.recycle()
+                previous = frame ?: previous
                 onProgress(((t - start) / (stop - start) * 100).toInt().coerceIn(0, 100))
                 t += step
             }

@@ -21,10 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,22 +49,24 @@ import com.ayang.giftoolkit.core.GifFrame
 import com.ayang.giftoolkit.core.MediaTools
 import com.ayang.giftoolkit.task.previewBitmap
 import com.ayang.giftoolkit.task.runTask
+import com.ayang.giftoolkit.ui.ContentBackdropBox
 import com.ayang.giftoolkit.ui.Gap
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.NoteText
+import com.ayang.giftoolkit.ui.PageTopBar
 import com.ayang.giftoolkit.ui.PreviewStage
 import com.ayang.giftoolkit.ui.PrimaryActionBar
 import com.ayang.giftoolkit.ui.SliderRow
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.Tool
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
@@ -84,6 +88,9 @@ fun ToolScreen(
     val scope = rememberCoroutineScope()
     val form = remember(tool.id) { ToolForm(tool) }
     val scrollBehavior = MiuixScrollBehavior()
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
     val pickOne = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -110,11 +117,12 @@ fun ToolScreen(
 
     Scaffold(
         topBar = {
-            top.yukonga.miuix.kmp.basic.TopAppBar(
+            PageTopBar(
                 title = tool.title,
-                largeTitle = tool.title,
-                subtitle = tool.summary,
+                glass = glass,
+                isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
+                subtitle = tool.summary,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
@@ -139,12 +147,17 @@ fun ToolScreen(
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        // 正文进录制层，顶栏在它外面采样（兄弟节点）—— 这是玻璃不闪退的前提
+        ContentBackdropBox(glass) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+                contentPadding = PaddingValues(
+                    top = padding.calculateTopPadding() + 4.dp,
+                    bottom = padding.calculateBottomPadding() + 12.dp,
+                ),
             ) {
                 item {
                     GroupHeader("素材")
@@ -202,16 +215,6 @@ fun ToolScreen(
                 item {
                     GroupHeader("参数")
                     GroupCard { ParamPanel(tool, form) }
-                }
-
-                if (form.busy) {
-                    item {
-                        Gap()
-                        LinearProgressIndicator(
-                            progress = form.progress,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        )
-                    }
                 }
 
                 if (form.message.isNotBlank()) {

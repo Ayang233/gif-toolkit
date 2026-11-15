@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +25,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.AppState
 import com.ayang.giftoolkit.core.MediaTools
+import com.ayang.giftoolkit.ui.ContentBackdropBox
+import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
@@ -59,33 +64,42 @@ fun LibraryScreen(app: AppState) {
     }
 
     Box(Modifier.fillMaxSize()) {
+        val glass = rememberGlassScope()
+        val listState = rememberLazyListState()
+        val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
         Scaffold(
             topBar = {
-                TopAppBar(
+                PageTopBar(
                     title = "我的作品",
-                    largeTitle = "我的作品",
-                    subtitle = "共 ${files.size} 个导出文件",
+                    glass = glass,
+                    isScrolled = isScrolled,
                     scrollBehavior = scrollBehavior,
+                    subtitle = "共 ${files.size} 个导出文件",
                 )
             },
         ) { padding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(top = 2.dp, bottom = 132.dp),
-            ) {
-                if (files.isEmpty()) {
-                    item {
-                        NoteText("还没有导出过文件。回到首页挑一个功能，生成结果会出现在这里。")
-                    }
-                } else {
-                    item { GroupHeader("本地导出") }
-                    item {
-                        GroupCard {
-                            files.forEach { file ->
-                                FileRow(file = file, onClick = { actionTarget = file })
+            ContentBackdropBox(glass) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(
+                        top = padding.calculateTopPadding() + 2.dp,
+                        bottom = 132.dp,
+                    ),
+                ) {
+                    if (files.isEmpty()) {
+                        item {
+                            NoteText("还没有导出过文件。回到首页挑一个功能，生成结果会出现在这里。")
+                        }
+                    } else {
+                        item { GroupHeader("本地导出") }
+                        item {
+                            GroupCard {
+                                files.forEach { file ->
+                                    FileRow(file = file, onClick = { actionTarget = file })
+                                }
                             }
                         }
                     }

@@ -15,7 +15,10 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-PINNED_REF="19b5b831"
+# 上游 d8efe18 = 顶栏折叠标题居中修复 + band 渐变改为三次平滑 fade。
+# 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
+# 脚本会保留当前 HEAD 继续，不会把已有源码切走。
+PINNED_REF="d8efe18"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,9 +36,14 @@ fi
 
 echo "==> 切换到 $REF"
 if ! git -C "$TARGET" checkout --quiet "$REF" 2>/dev/null; then
-  echo "!! 找不到 $REF，退回到上游 main"
-  git -C "$TARGET" fetch --quiet origin main
-  git -C "$TARGET" checkout --quiet main
+  echo "!! 本地没有 $REF，尝试从上游 main 拉取"
+  if git -C "$TARGET" fetch --quiet origin main && git -C "$TARGET" checkout --quiet main; then
+    echo "!! 已退回到上游 main（可能落后于 $REF）"
+  else
+    # 受限网络：fetch 本身就会失败。此时保留现有源码，不要让脚本中断。
+    echo "!! 拉取失败（网络受限？），保留当前提交：$(git -C "$TARGET" rev-parse --short HEAD)"
+    echo "!! 如需 $REF，请在能联网的环境执行：git -C \"$TARGET\" fetch origin 后再重跑本脚本"
+  fi
 fi
 
 BUILD_CONFIG="$TARGET/build-logic/src/main/kotlin/BuildConfig.kt"

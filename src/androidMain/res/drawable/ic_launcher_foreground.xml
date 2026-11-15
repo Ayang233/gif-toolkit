@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标前景：蓝色胶片条（六枚齿孔挖空）+ 白色波浪。
+     主体按 0.72 缩放居中，这个值是算出来的，不是随手写的：
+     桌面可能用直径 72dp 的圆形遮罩，横向长条在圆内的可用宽度是 2*sqrt(r^2 - h^2)，
+     r=36、h=14.4 时上限约 66dp；胶片条原始宽 80，缩到 0.72 后是 57.6，两端还留 4dp 余量。
+     0.8 以上在圆形遮罩下两端就会被切掉（已实测）。
+     波浪用白色而不是挖空：挖空要把描边转成填充轮廓，维护成本不划算；
+     这里的白等价于背景色 #FFFFFF，换底色要同步这一笔。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#3482FF"
+        android:fillType="evenOdd"
+        android:pathData="M30.96,39.6 H77.03999999999999 A5.76,5.76 0 0 1 82.8,45.36 V62.64000000000001 A5.76,5.76 0 0 1 77.03999999999999,68.4 H30.96 A5.76,5.76 0 0 1 25.2,62.64000000000001 V45.36 A5.76,5.76 0 0 1 30.96,39.6 Z M28.8,41.76 H33.12 V45.36 H28.8 Z M37.44,41.76 H41.76 V45.36 H37.44 Z M46.08,41.76 H50.4 V45.36 H46.08 Z M54.72,41.76 H59.04 V45.36 H54.72 Z M63.36,41.76 H67.68 V45.36 H63.36 Z M72.0,41.76 H76.32 V45.36 H72.0 Z" />
+    <path
+        android:pathData="M32.4,60.48 L39.6,54.0 L46.8,61.2 L54.0,54.0 L61.2,61.2 L68.4,55.44 L75.6,59.04"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

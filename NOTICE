@@ -1,6 +1,14 @@
 gif-toolkit
 Copyright 2026 gif-toolkit contributors
 
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.
+
+本工程自身以 GPL-3.0 分发；下列第三方组件仍按各自的原始许可分发，
+其许可不因本工程的整体许可而改变。
+
 This product includes software developed by the compose-miuix-ui contributors
 (https://github.com/compose-miuix-ui/miuix), licensed under the Apache License 2.0.
 

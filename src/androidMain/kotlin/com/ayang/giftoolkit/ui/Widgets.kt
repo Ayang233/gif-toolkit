@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,12 +20,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -33,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
@@ -56,13 +61,26 @@ fun GroupHeader(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
+ * AMOLED 纯黑开关。
+ *
+ * 只在深色模式生效：页面底纯黑、卡片近黑。不叠加到浅色上，
+ * 因为浅色 + 纯黑页面是另一套设计（HyperOS 的 AMOLED 也只作用于深色）。
+ */
+val LocalAmoled = compositionLocalOf { false }
+
+/**
  * 卡片底色 = 库的 `surfaceContainer`。
  *
  * 静态配色下它就是纯白（页面 #F7F7F7 / 卡片 #FFF），和 KernelSU、Updater 完全一致。
  * 不要拿 `surface` 当卡片色：Monet 下它会被映射成和页面同一个值，卡片直接消失。
  */
 @Composable
-fun cardColor(): Color = MiuixTheme.colorScheme.surfaceContainer
+fun cardColor(): Color {
+    val card = MiuixTheme.colorScheme.surfaceContainer
+    val dark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    // AMOLED：卡片用近黑，纯黑页面上仍能读出"卡片浮起"的层次
+    return if (LocalAmoled.current && dark) Color(0xFF0D0D0D) else card
+}
 
 /**
  * 页面底色：由卡片色**算深一点**得到（浅色叠 3.5% 黑，深色叠 18% 黑）。
@@ -74,6 +92,8 @@ fun cardColor(): Color = MiuixTheme.colorScheme.surfaceContainer
  */
 @Composable
 fun pageColor(): Color {
+    val dark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    if (LocalAmoled.current && dark) return Color.Black
     val card = cardColor()
     val shade = if (card.luminance() < 0.5f) {
         Color.Black.copy(alpha = 0.18f)
@@ -92,6 +112,9 @@ fun GroupCard(
     Card(
         modifier = modifier.padding(horizontal = 12.dp),
         insideMargin = PaddingValues(0.dp),
+        // 走 cardColor() 而不是库默认的 surfaceContainer：
+        // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
+        colors = CardDefaults.defaultColors(color = cardColor()),
     ) {
         content()
     }
@@ -289,10 +312,12 @@ fun PreviewStage(
 /**
  * 页面底部的主操作区。
  *
- * 旧版是「整块白色 + 1px 分隔线 + 默认灰按钮」，既不像按钮也不像底栏。
- * 现在：底色与页面一致（`background`，和根容器同一个色号），只留一颗主色按钮。
- * 圆角 16dp / 高 50dp 是照 Miuix 自家 App（Updater）的主按钮量的，不是胶囊形。
- * 生成中把进度条压在按钮上方，按钮文本带百分比。
+ * 两处参考实现带来的改动：
+ * 1. **进度画在按钮内部**（底轨 + 从左向右的进度填充），不再单独拉一条进度条 ——
+ *    同一个任务只在一处体现状态。
+ * 2. **不铺实心底栏，改用渐变遮罩**：实心色块会在页面上切出一条"带子"，
+ *    完全不加又会像刚才那样让列表内容从按钮底下穿过去（文字压在按钮上）。
+ *    所以垫一层从透明到页面色的竖向渐变，内容滚到附近自然淡出，看不到接缝。
  */
 @Composable
 fun PrimaryActionBar(
@@ -302,33 +327,86 @@ fun PrimaryActionBar(
     progress: Float = 0f,
     onClick: () -> Unit,
 ) {
+    val sideGap = 12.dp
+    val background = pageColor()
+    // 通栏控件左右留白要参与圆角安全区推导：屏幕圆角是圆弧，
+    // 距离底部越近，水平方向的可用宽度越窄，贴边会被切掉一角。
+    val bottomGap = safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + 4.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(pageColor())
+            // 渐变遮罩：最上面完全透明，到按钮所在高度时已经是纯页面色。
+            // 放在最外层，这样连导航栏内边距也一起盖住，底部不会漏出别的颜色。
+            .background(
+                Brush.verticalGradient(
+                    0f to background.copy(alpha = 0f),
+                    0.55f to background,
+                    1f to background,
+                ),
+            )
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp)
-            .padding(top = 8.dp, bottom = 12.dp),
+            .padding(start = sideGap, end = sideGap, top = 20.dp)
+            .padding(bottom = bottomGap),
+    ) {
+        ProgressActionButton(
+            text = text,
+            enabled = enabled,
+            busy = busy,
+            progress = progress,
+            onClick = onClick,
+        )
+    }
+}
+
+/**
+ * 自带进度的主按钮。
+ *
+ * 没有直接用 Miuix 的 `Button` + 外部进度条：那样进度和按钮是两个图形，
+ * 生成中的状态要在两处同时读。这里底轨就是按钮本身，进度从左往右铺，
+ * 文案后面跟百分比，一眼能看出"这个按钮正在执行"。
+ */
+@Composable
+private fun ProgressActionButton(
+    text: String,
+    enabled: Boolean,
+    busy: Boolean,
+    progress: Float,
+    onClick: () -> Unit,
+) {
+    val primary = MiuixTheme.colorScheme.primary
+    val shape = RoundedCornerShape(14.dp)
+    // 禁用态不能用 primary.copy(alpha = …)：半透明会让底下的列表文字透上来。
+    // 改成和页面色做不透明混合，颜色更浅、但仍然挡住背景。
+    val track = if (enabled) primary else lerp(pageColor(), primary, 0.35f)
+    val trackContent = if (enabled) {
+        MiuixTheme.colorScheme.onPrimary
+    } else {
+        lerp(pageColor(), MiuixTheme.colorScheme.onPrimary, 0.55f)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .clip(shape)
+            .background(track)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         if (busy) {
-            LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            // 白色半透明填充压在底轨上：既是进度，也不影响按钮文字的可读性
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .background(lerp(Color.Transparent, Color.White, 0.22f)),
             )
         }
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            cornerRadius = 16.dp,
-            colors = ButtonDefaults.buttonColorsPrimary(),
-            insideMargin = PaddingValues(0.dp),
-        ) {
-            Text(
-                text = if (busy) "$text ${(progress * 100).toInt()}%" else text,
-                style = MiuixTheme.textStyles.button,
-            )
-        }
+        Text(
+            text = if (busy) "$text ${(progress * 100).toInt()}%" else text,
+            style = MiuixTheme.textStyles.button,
+            color = trackContent,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
     }
 }
 

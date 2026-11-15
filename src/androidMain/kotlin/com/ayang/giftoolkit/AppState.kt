@@ -20,6 +20,27 @@ enum class ThemeMode(val label: String) {
 }
 
 /**
+ * 预测性返回动画档位。
+ *
+ * [None] 不只是"不做动画"：它同时会把系统级预测性返回关掉（`enableOnBackInvokedCallback` 置 false），
+ * 让返回变成和传统系统一致的行为。其余档位只改页面转场的视觉，系统手势由系统自己画。
+ */
+enum class BackAnimation(val label: String, val summary: String) {
+    Miuix("Miuix", "左右滑入，下层视差后退，和系统设置页一致"),
+    Aosp("AOSP", "进入页缩放淡入，当前页轻微后退"),
+    Scale("缩放", "按手势方向缩放并平移"),
+    Classic("经典", "通栏平移，下层不视差"),
+    None("无", "关闭预测性返回，退回传统返回动画"),
+}
+
+/** 缩放档位下页面退出的方向。 */
+enum class BackExitDirection(val label: String) {
+    FollowGesture("跟随手势"),
+    AlwaysRight("始终向右"),
+    AlwaysLeft("始终向左"),
+}
+
+/**
  * 跨屏共享的状态，只放真正全局的东西。
  *
  * 外观三项（主题 / 动态取色 / 玻璃）走 [SettingsStore] 落盘：读的时候取内存里的快照，
@@ -30,6 +51,9 @@ class AppState(private val store: SettingsStore) {
     private var themeModeState by mutableStateOf(store.themeMode)
     private var monetEnabledState by mutableStateOf(store.monetEnabled)
     private var glassEnabledState by mutableStateOf(store.glassEnabled)
+    private var amoledEnabledState by mutableStateOf(store.amoledEnabled)
+    private var backAnimationState by mutableStateOf(store.backAnimation)
+    private var backExitDirectionState by mutableStateOf(store.backExitDirection)
 
     var themeMode: ThemeMode
         get() = themeModeState
@@ -55,6 +79,33 @@ class AppState(private val store: SettingsStore) {
             if (value != glassEnabledState) {
                 glassEnabledState = value
                 store.glassEnabled = value
+            }
+        }
+
+    var amoledEnabled: Boolean
+        get() = amoledEnabledState
+        set(value) {
+            if (value != amoledEnabledState) {
+                amoledEnabledState = value
+                store.amoledEnabled = value
+            }
+        }
+
+    var backAnimation: BackAnimation
+        get() = backAnimationState
+        set(value) {
+            if (value != backAnimationState) {
+                backAnimationState = value
+                store.backAnimation = value
+            }
+        }
+
+    var backExitDirection: BackExitDirection
+        get() = backExitDirectionState
+        set(value) {
+            if (value != backExitDirectionState) {
+                backExitDirectionState = value
+                store.backExitDirection = value
             }
         }
 

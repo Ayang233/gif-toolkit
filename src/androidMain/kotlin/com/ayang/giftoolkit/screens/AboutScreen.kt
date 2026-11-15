@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.R
+import com.ayang.giftoolkit.ui.ContentBackdropBox
+import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
@@ -50,6 +56,9 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val scrollBehavior = MiuixScrollBehavior()
+    val glass = rememberGlassScope()
+    val listState = rememberLazyListState()
+    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
     val version = remember {
         runCatching {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -59,9 +68,10 @@ fun AboutScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageTopBar(
                 title = "关于",
-                largeTitle = "关于",
+                glass = glass,
+                isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -75,12 +85,13 @@ fun AboutScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        ContentBackdropBox(glass) {
+            LazyColumn(
+                state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = 32.dp),
         ) {
             // 顶部：图标 + 名称 + 版本，居中摆在页面底色上（不进卡片），与内核管理器的关于页同构
             item {
@@ -90,7 +101,7 @@ fun AboutScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Image(
-                        painter = painterResource(R.drawable.ic_launcher),
+                        painter = painterResource(R.drawable.ic_app_badge),
                         contentDescription = null,
                         modifier = Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)),
                     )
@@ -133,6 +144,7 @@ fun AboutScreen(
                     )
                 }
             }
+        }
         }
     }
 }

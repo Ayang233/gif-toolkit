@@ -128,5 +128,5 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 
 ## 许可证
 
-[Apache License 2.0](LICENSE)。第三方组件与致谢见 [NOTICE](NOTICE)，
+[GNU General Public License v3.0](LICENSE)。1.0 及更早的版本按 Apache-2.0 发布，已发出的副本不受本次变更影响。第三方组件与致谢见 [NOTICE](NOTICE)，
 应用内「设置 → 关于 → 开源许可」也可以查看完整许可文本。
