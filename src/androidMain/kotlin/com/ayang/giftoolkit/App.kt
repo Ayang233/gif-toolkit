@@ -52,9 +52,7 @@ import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
-import com.ayang.giftoolkit.ui.LocalNavBarTier
-import com.ayang.giftoolkit.ui.LocalPanelTier
-import com.ayang.giftoolkit.ui.LocalTopBarTier
+import com.ayang.giftoolkit.ui.LocalSurfaceTier
 import com.ayang.giftoolkit.ui.SurfaceTier
 import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.cardColor
@@ -108,24 +106,18 @@ fun GifApp() {
     }
     val controller = remember(mode) { ThemeController(colorSchemeMode = mode) }
 
-    // 表面档位：用户偏好 × 设备能力，一次算清，往下只用结果（AGENTS.md 硬约束）。
-    // 之前只判 isRenderEffectSupported()，漏了 AGSL —— 能模糊但 AGSL 不可用的机型上，
-    // 玻璃材质层会被画成黑块，这是真机黑块的候选原因之一。
+    // 表面档位：用户选择 × 设备能力，一次算清，往下只用结果（AGENTS.md 硬约束）。
+    // 注意 Miuix 的两个能力检测其实只是版本号判断（SDK≥31 / SDK≥33），本工程 minSdk 33
+    // 所以恒为真 —— 它检测不出某台 GPU 上模糊会不会翻车，这也是为什么必须留给用户
+    // 一个「实色」退路。
     val ceiling = remember { deviceSurfaceCeiling() }
-    val masterOn = app.glassEnabled
-    val topTier = if (masterOn) app.topBarTier.clampedBy(ceiling) else SurfaceTier.Solid
-    val navTier = if (masterOn) app.navBarTier.clampedBy(ceiling) else SurfaceTier.Solid
-    val panelTier = if (masterOn) app.panelTier.clampedBy(ceiling) else SurfaceTier.Solid
-    // 只要有一个组件还在采样背景，内容区就得挂录制层
-    val needBackdrop = topTier != SurfaceTier.Solid ||
-        navTier != SurfaceTier.Solid ||
-        panelTier != SurfaceTier.Solid
+    val tier = app.glassTier.clampedBy(ceiling)
+    // 实色档不采样背景，也就没必要每帧整屏录制
+    val needBackdrop = tier != SurfaceTier.Solid
 
     CompositionLocalProvider(
         LocalGlassEnabled provides needBackdrop,
-        LocalTopBarTier provides topTier,
-        LocalNavBarTier provides navTier,
-        LocalPanelTier provides panelTier,
+        LocalSurfaceTier provides tier,
         LocalAmoled provides app.amoledEnabled,
     ) {
         AnimatedMiuixTheme(controller) {
@@ -269,12 +261,12 @@ fun GifApp() {
                         tab = index
                         scope.launch { pagerState.animateToTab(index) }
                     },
-                    backdrop = if (navTier == SurfaceTier.Solid) null else backdrop,
+                    backdrop = if (tier == SurfaceTier.Solid) null else backdrop,
                     // 实色档由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 主色指示器，
                     // 不会塌回通栏白底条。
                     height = 60.dp,
-                    alpha = if (navTier == SurfaceTier.Light) 0.9f else 1f,
-                    material = if (navTier == SurfaceTier.Light) null else GlassNavigationBarDefaults.material(),
+                    alpha = if (tier == SurfaceTier.Light) 0.9f else 1f,
+                    material = if (tier == SurfaceTier.Light) null else GlassNavigationBarDefaults.material(),
                     indicatorColor = MiuixTheme.colorScheme.primary.copy(
                         alpha = if (darkBar) 0.22f else 0.15f,
                     ),

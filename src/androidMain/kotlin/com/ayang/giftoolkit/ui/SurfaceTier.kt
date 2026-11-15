@@ -22,12 +22,13 @@ enum class SurfaceTier(val label: String, val summary: String) {
     Glass("玻璃", "采样背景并模糊，带边缘光"),
 
     /**
-     * 采样背景但减弱：模糊带更淡、玻璃材质层去掉。
+     * 不用渐进模糊带：顶栏改为「渐变遮罩压掉内容」，底栏去掉玻璃材质层。
      *
-     * 存在的意义是给 AGSL 不可用、或用户嫌模糊费电的设备一个中间态 ——
-     * 没有这一档，关掉玻璃就是从"高级"直接跌到"朴素白底"。
+     * 这一档要解决的是**模糊失效**而不是"模糊太浓"：渐进带依赖 runtime shader，
+     * 个别机型上它会静默退化，底下的图标/标题就变成一块硬边色斑。
+     * 轻玻璃完全绕开那条路径，零 AGSL 依赖。
      */
-    Light("轻玻璃", "淡模糊，去掉玻璃材质层"),
+    Light("轻玻璃", "不模糊，只用渐变把内容压掉"),
 
     /** 不采样背景。仍然是浮起胶囊 + 阴影 + 主色指示器，不是塌成通栏。 */
     Solid("实色", "不采样背景，用不透明底色"),
@@ -51,14 +52,14 @@ fun SurfaceTier.clampedBy(ceiling: SurfaceTier): SurfaceTier =
     if (ordinal > ceiling.ordinal) ceiling else this
 
 /**
- * 三个组件的当前档位。
+ * 当前全局档位。
  *
- * 弹层故意和顶栏、底栏分开：工具页底部的操作区如果也模糊，会和内容抢注意力，
- * 所以经常需要"顶栏玻璃、弹层实色"这种组合。
+ * 一个开关就够：曾经想过给顶栏 / 底栏 / 弹层各配一档，实测是过度设计 ——
+ * 三个下拉互相牵连，用户要理解"为什么顶栏玻璃、底栏实色才好看"，
+ * 而真正需要区分的场景（工具页底部操作区太花）在实践里几乎不出现。
+ * 所以收敛成一个「玻璃质感」，用户选完就完事。
  */
-val LocalTopBarTier = compositionLocalOf { SurfaceTier.Glass }
-val LocalNavBarTier = compositionLocalOf { SurfaceTier.Glass }
-val LocalPanelTier = compositionLocalOf { SurfaceTier.Glass }
+val LocalSurfaceTier = compositionLocalOf { SurfaceTier.Glass }
 
-/** 任一组件还在采样背景，页面就需要挂录制层。 */
+/** 还在采样背景，页面就需要挂录制层。 */
 val LocalGlassEnabled = compositionLocalOf { false }

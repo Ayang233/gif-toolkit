@@ -67,21 +67,25 @@ fun PageTopBar(
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
     // 档位来自 SurfaceTier 的单一决策点，这里不再自己判能力（AGENTS.md 硬约束）。
-    val tier = LocalTopBarTier.current
+    val tier = LocalSurfaceTier.current
     if (glass.enabled && tier != SurfaceTier.Solid) {
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
-            progressiveBlur = true,
+            // 只有「玻璃」档才走渐进模糊带。
+            //
+            // 这条带是顶栏最脆弱的一环：它靠 runtime shader 把多个模糊层级按渐变混合，
+            // AGSL 在个别机型上失效时不会报错，而是退化成「内容几乎原样 + 一层压暗」——
+            // 底下滚过去的图标/分组标题就成了一块硬边色斑（实机黑块的真正来源）。
+            // 「轻玻璃」干脆不用它：不模糊，只靠 bandBrush 的渐变把内容压掉，
+            // 零 AGSL 依赖，观感接近系统设置页的顶栏。
+            progressiveBlur = tier == SurfaceTier.Glass,
             backdrop = glass.contentBackdrop,
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
             style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
-            // 轻玻璃：保留模糊带但压到 ~70% 浓度，同时去掉按钮投影 ——
-            // 这一档面向「AGSL 不可用」或「嫌模糊费电」的设备，
-            // 目的是让关掉玻璃不等于跌回朴素白底。
-            backgroundAlpha = if (tier == SurfaceTier.Light) { { 0.7f } } else { { 1f } },
+            backgroundAlpha = if (tier == SurfaceTier.Light) { { 0.92f } } else { { 1f } },
             buttonShadow = if (tier == SurfaceTier.Light) null else GlassShadows.Regular,
             navigationIcon = navigationIcon,
             actions = actions,

@@ -46,8 +46,12 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
+import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
+import top.yukonga.miuix.kmp.material.GlassDefaults
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -144,8 +148,54 @@ fun LeadingIcon(icon: ImageVector, tint: androidx.compose.ui.graphics.Color = Mi
     )
 }
 
-/** 滑块行：走官方 SliderPreference，标题 / 数值 / 滑块的排版与系统设置页一致。 */
+/**
+ * 下拉选择行。
+ *
+ * 玻璃档走 [GlassDropdownPreference]：弹出的是 Scaffold 托管的**玻璃浮层**，
+ * 和 InstallerX 的 `InstallerMiuixSpinnerPreference` 同一个做法；
+ * 普通 `WindowDropdownPreference` 弹出来是白底卡片，一眼就不是 OS4。
+ *
+ * 注意 backdrop 必须**不含弹层宿主**：库把浮层挂在最外层 Scaffold 上，
+ * 正好在录制层之外 —— 一旦浮层落进录制层，它就会采样到自己（参见 AGENTS.md 第 1 条）。
+ */
 @Composable
+fun DropdownRow(
+    items: List<String>,
+    selectedIndex: Int,
+    title: String,
+    glass: GlassScope,
+    onSelect: (Int) -> Unit,
+    summary: String? = null,
+    enabled: Boolean = true,
+) {
+    val tier = LocalSurfaceTier.current
+    val backdrop = glass.contentBackdrop
+    if (tier != SurfaceTier.Solid && backdrop != null) {
+        GlassDropdownPreference(
+            onSelectedIndexChange = onSelect,
+            items = items,
+            selectedIndex = selectedIndex,
+            title = title,
+            backdrop = backdrop,
+            summary = summary,
+            enabled = enabled,
+            visuals = GlassPopupDefaults.visuals(
+                style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
+            ),
+        )
+    } else {
+        WindowDropdownPreference(
+            items = items,
+            selectedIndex = selectedIndex,
+            title = title,
+            summary = summary,
+            enabled = enabled,
+            onSelectedIndexChange = onSelect,
+        )
+    }
+}
+
+/** 滑块行：走官方 SliderPreference，标题 / 数值 / 滑块的排版与系统设置页一致。 */@Composable
 fun SliderRow(
     label: String,
     valueText: String,

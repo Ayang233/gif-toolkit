@@ -51,13 +51,10 @@ class AppState(private val store: SettingsStore) {
 
     private var themeModeState by mutableStateOf(store.themeMode)
     private var monetEnabledState by mutableStateOf(store.monetEnabled)
-    private var glassEnabledState by mutableStateOf(store.glassEnabled)
+    private var glassTierState by mutableStateOf(store.glassTier)
     private var amoledEnabledState by mutableStateOf(store.amoledEnabled)
     private var backAnimationState by mutableStateOf(store.backAnimation)
     private var backExitDirectionState by mutableStateOf(store.backExitDirection)
-    private var topBarTierState by mutableStateOf(store.topBarTier)
-    private var navBarTierState by mutableStateOf(store.navBarTier)
-    private var panelTierState by mutableStateOf(store.panelTier)
 
     var themeMode: ThemeMode
         get() = themeModeState
@@ -74,15 +71,6 @@ class AppState(private val store: SettingsStore) {
             if (value != monetEnabledState) {
                 monetEnabledState = value
                 store.monetEnabled = value
-            }
-        }
-
-    var glassEnabled: Boolean
-        get() = glassEnabledState
-        set(value) {
-            if (value != glassEnabledState) {
-                glassEnabledState = value
-                store.glassEnabled = value
             }
         }
 
@@ -113,31 +101,13 @@ class AppState(private val store: SettingsStore) {
             }
         }
 
-    /** 顶栏 / 底栏 / 弹层三组材质档位，见 [com.ayang.giftoolkit.ui.SurfaceTier]。 */
-    var topBarTier: SurfaceTier
-        get() = topBarTierState
+    /** 玻璃质感档位，见 [com.ayang.giftoolkit.ui.SurfaceTier]。 */
+    var glassTier: SurfaceTier
+        get() = glassTierState
         set(value) {
-            if (value != topBarTierState) {
-                topBarTierState = value
-                store.topBarTier = value
-            }
-        }
-
-    var navBarTier: SurfaceTier
-        get() = navBarTierState
-        set(value) {
-            if (value != navBarTierState) {
-                navBarTierState = value
-                store.navBarTier = value
-            }
-        }
-
-    var panelTier: SurfaceTier
-        get() = panelTierState
-        set(value) {
-            if (value != panelTierState) {
-                panelTierState = value
-                store.panelTier = value
+            if (value != glassTierState) {
+                glassTierState = value
+                store.glassTier = value
             }
         }
 

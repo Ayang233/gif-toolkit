@@ -42,40 +42,20 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean(KEY_MONET, value).apply()
         }
 
-    var glassEnabled: Boolean
-        get() = prefs.getBoolean(KEY_GLASS, true)
-        set(value) {
-            prefs.edit().putBoolean(KEY_GLASS, value).apply()
-        }
-
     /**
-     * 三个组件的材质档位。
+     * 玻璃质感档位：玻璃 / 轻玻璃 / 实色。
      *
-     * 粒度和 HyperOS「桌面设置里 Dock 与搜索栏各自配质感」一致：
-     * 用户可能想要顶栏玻璃、但觉得弹层模糊太花。
-     * 默认都是 [SurfaceTier.Glass]，实际渲染前会被设备能力钳制一次。
+     * 取代了原来那个 `glassEnabled` 布尔开关 —— 关掉玻璃就是选「实色」，
+     * 没必要让"关不关"和"多浓"变成两个互相牵制的开关。
+     * 旧版本存过 `glass_enabled = false` 的用户，这里做一次性兜底映射。
      */
-    var topBarTier: SurfaceTier
-        get() = readTier(KEY_TOP_TIER)
+    var glassTier: SurfaceTier
+        get() = prefs.getString(KEY_TIER, null)
+            ?.let { saved -> SurfaceTier.entries.firstOrNull { it.name == saved } }
+            ?: if (prefs.getBoolean(KEY_GLASS, true)) SurfaceTier.Glass else SurfaceTier.Solid
         set(value) {
-            prefs.edit().putString(KEY_TOP_TIER, value.name).apply()
+            prefs.edit().putString(KEY_TIER, value.name).apply()
         }
-
-    var navBarTier: SurfaceTier
-        get() = readTier(KEY_NAV_TIER)
-        set(value) {
-            prefs.edit().putString(KEY_NAV_TIER, value.name).apply()
-        }
-
-    var panelTier: SurfaceTier
-        get() = readTier(KEY_PANEL_TIER)
-        set(value) {
-            prefs.edit().putString(KEY_PANEL_TIER, value.name).apply()
-        }
-
-    private fun readTier(key: String): SurfaceTier = prefs.getString(key, null)
-        ?.let { saved -> SurfaceTier.entries.firstOrNull { it.name == saved } }
-        ?: SurfaceTier.Glass
 
     /** AMOLED 纯黑：深色模式下页面底用纯黑，省电且和 HyperOS 的 AMOLED 开关一致。 */
     var amoledEnabled: Boolean
@@ -103,12 +83,11 @@ class SettingsStore(context: Context) {
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_MONET = "monet_enabled"
-        const val KEY_GLASS = "glass_enabled"
         const val KEY_AMOLED = "amoled_enabled"
         const val KEY_BACK_ANIM = "back_animation"
         const val KEY_BACK_DIRECTION = "back_exit_direction"
-        const val KEY_TOP_TIER = "surface_tier_top"
-        const val KEY_NAV_TIER = "surface_tier_nav"
-        const val KEY_PANEL_TIER = "surface_tier_panel"
+        const val KEY_TIER = "surface_tier"
+        /** 1.1 及更早版本的布尔开关，只用于迁移，不再写入。 */
+        const val KEY_GLASS = "glass_enabled"
     }
 }

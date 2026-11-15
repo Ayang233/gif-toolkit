@@ -60,6 +60,7 @@ import com.ayang.giftoolkit.ui.PrimaryActionBar
 import com.ayang.giftoolkit.ui.SliderRow
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.Tool
+import com.ayang.giftoolkit.ui.GlassScope
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,7 +72,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import com.ayang.giftoolkit.ui.DropdownRow
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Clear
@@ -217,7 +218,7 @@ fun ToolScreen(
 
                 item {
                     GroupHeader("参数")
-                    GroupCard { ParamPanel(tool, form) }
+                    GroupCard { ParamPanel(tool, form, glass) }
                 }
 
                 if (form.message.isNotBlank()) {
@@ -248,7 +249,7 @@ fun ToolScreen(
 }
 
 @Composable
-private fun ParamPanel(tool: Tool, form: ToolForm) {
+private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
     Column(Modifier.fillMaxWidth()) {
         when (tool) {
             Tool.VIDEO_TO_GIF, Tool.MVIMG_TO_GIF -> {
@@ -307,11 +308,12 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
                 if (form.mosaic) {
                     // 五个位置用"点一下轮换到下一个"太笨：看不见还有哪些选项，也退不回去。
                     // 换成 Miuix 的锚定下拉（KernelSU 设置里选"启用（默认）"就是这种弹窗）。
-                    WindowDropdownPreference(
+                    DropdownRow(
                         items = watermarkNames,
                         selectedIndex = form.mosaicPos % watermarkNames.size,
                         title = "水印位置",
-                        onSelectedIndexChange = { form.mosaicPos = it },
+                        glass = glass,
+                        onSelect = { form.mosaicPos = it },
                     )
                 }
                 SubtitleField(form)
@@ -333,11 +335,12 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
             Tool.GIF_PUZZLE -> {
                 // 列数是离散档位，用弹窗选比滑块自然；2 个素材时列数固定为 2，不必给选项
                 if (form.uris.size > 2) {
-                    WindowDropdownPreference(
+                    DropdownRow(
                         items = puzzleColsItems,
                         selectedIndex = (form.puzzleCols - 2).coerceIn(0, puzzleColsItems.lastIndex),
                         title = "宫格列数",
-                        onSelectedIndexChange = { form.puzzleCols = it + 2 },
+                        glass = glass,
+                        onSelect = { form.puzzleCols = it + 2 },
                     )
                 }
                 NoteText("把 2~4 个 GIF 拼成宫格同时播放，以最短的那个帧数为准。")
