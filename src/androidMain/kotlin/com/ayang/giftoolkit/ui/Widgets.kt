@@ -1,6 +1,8 @@
 package com.ayang.giftoolkit.ui
 
 import android.graphics.Bitmap
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,9 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +43,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SliderPreference
@@ -49,15 +54,18 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Photos
 
-/** 分组标题，卡片之间的灰色小字。 */
+/**
+ * 分组标题。
+ *
+ * 直接用库里的 [SmallTitle] 而不是自写 Text：官方样式是 `subtitle` 字号 +
+ * `PaddingValues(28.dp, 8.dp)` + `onBackgroundVariant` 颜色。
+ * 之前自写的是 `footnote1` + 16dp 缩进，字号偏小、缩进也比 OS4 少 12dp ——
+ * 这正是"看着不像系统设置页"的一个具体来源。卡片外边距 12dp + 标题缩进 28dp
+ * 才能让标题和卡片内文字（12+16）对齐。
+ */
 @Composable
 fun GroupHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
-        style = MiuixTheme.textStyles.footnote1,
-        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-    )
+    top.yukonga.miuix.kmp.basic.SmallTitle(text = text, modifier = modifier)
 }
 
 /**
@@ -312,12 +320,12 @@ fun PreviewStage(
 /**
  * 页面底部的主操作区。
  *
- * 两处参考实现带来的改动：
- * 1. **进度画在按钮内部**（底轨 + 从左向右的进度填充），不再单独拉一条进度条 ——
- *    同一个任务只在一处体现状态。
+ * 三条决定都来自参考实现：
+ * 1. **进度画在按钮内部**（轨道是按钮本身，填充从左往右铺），不再单独拉一条进度条。
  * 2. **不铺实心底栏，改用渐变遮罩**：实心色块会在页面上切出一条"带子"，
- *    完全不加又会像刚才那样让列表内容从按钮底下穿过去（文字压在按钮上）。
- *    所以垫一层从透明到页面色的竖向渐变，内容滚到附近自然淡出，看不到接缝。
+ *    完全不加又会让人文字从按钮底下穿过去。
+ * 3. **生成中仍可点击 = 取消任务**，文案直接写「取消生成 · 45%」，
+ *    比禁用掉按钮更符合"我在等一个可以中断的任务"的直觉。
  */
 @Composable
 fun PrimaryActionBar(
@@ -326,6 +334,7 @@ fun PrimaryActionBar(
     busy: Boolean = false,
     progress: Float = 0f,
     onClick: () -> Unit,
+    onCancel: () -> Unit = {},
 ) {
     val sideGap = 12.dp
     val background = pageColor()
@@ -348,64 +357,92 @@ fun PrimaryActionBar(
             .padding(start = sideGap, end = sideGap, top = 20.dp)
             .padding(bottom = bottomGap),
     ) {
-        ProgressActionButton(
+        ActionButton(
             text = text,
             enabled = enabled,
             busy = busy,
             progress = progress,
             onClick = onClick,
+            onCancel = onCancel,
         )
     }
 }
 
 /**
- * 自带进度的主按钮。
+ * 主按钮本体。
  *
- * 没有直接用 Miuix 的 `Button` + 外部进度条：那样进度和按钮是两个图形，
- * 生成中的状态要在两处同时读。这里底轨就是按钮本身，进度从左往右铺，
- * 文案后面跟百分比，一眼能看出"这个按钮正在执行"。
+ * 生成中：轨道换成 `secondaryVariant`（浅），填充是 `primary`，文字色在填充扫过 45%
+ * 时从 `onSecondaryContainer` 切到 `onPrimary` —— 这一条是关键，否则填充扫到一半时
+ * 文字会同时压在两块底色上、谁都读不清。我们之前用「白 22% 叠浅蓝 + 灰白字」，
+ * 恰好落在这个最差区间里。
+ *
+ * 空闲：轨道直接是 `primary`，禁用态改成与页面色不透明混合，
+ * 而不是 `alpha` —— 半透明会让底下的列表文字透上来。
  */
 @Composable
-private fun ProgressActionButton(
+private fun ActionButton(
     text: String,
     enabled: Boolean,
     busy: Boolean,
     progress: Float,
     onClick: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     val primary = MiuixTheme.colorScheme.primary
-    val shape = RoundedCornerShape(14.dp)
-    // 禁用态不能用 primary.copy(alpha = …)：半透明会让底下的列表文字透上来。
-    // 改成和页面色做不透明混合，颜色更浅、但仍然挡住背景。
-    val track = if (enabled) primary else lerp(pageColor(), primary, 0.35f)
-    val trackContent = if (enabled) {
-        MiuixTheme.colorScheme.onPrimary
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (busy) progress.coerceIn(0f, 1f) else 0f,
+        animationSpec = tween(durationMillis = 300),
+        label = "actionButtonProgress",
+    )
+
+    val colors = if (busy) {
+        ProgressButtonDefaults.progressButtonColors(
+            trackColor = MiuixTheme.colorScheme.secondaryVariant,
+            progressColor = primary,
+            contentColor = if (animatedProgress < 0.45f) {
+                MiuixTheme.colorScheme.onSecondaryContainer
+            } else {
+                MiuixTheme.colorScheme.onPrimary
+            },
+        )
     } else {
-        lerp(pageColor(), MiuixTheme.colorScheme.onPrimary, 0.55f)
+        ProgressButtonDefaults.progressButtonColors(
+            trackColor = primary,
+            progressColor = primary,
+            contentColor = MiuixTheme.colorScheme.onPrimary,
+            disabledTrackColor = lerp(pageColor(), primary, 0.35f),
+            disabledProgressColor = lerp(pageColor(), primary, 0.35f),
+            disabledContentColor = lerp(pageColor(), MiuixTheme.colorScheme.onPrimary, 0.55f),
+        )
     }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .clip(shape)
-            .background(track)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
+
+    val label = if (busy) {
+        "取消生成 · ${(animatedProgress * 100).toInt()}%"
+    } else {
+        text
+    }
+
+    ProgressButton(
+        progress = if (busy) animatedProgress else 0f,
+        onClick = { if (busy) onCancel() else onClick() },
+        // 生成中必须保持 enabled：它现在承担的是「取消」，不是不可用的占位
+        enabled = if (busy) true else enabled,
+        colors = colors,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         if (busy) {
-            // 白色半透明填充压在底轨上：既是进度，也不影响按钮文字的可读性
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .background(lerp(Color.Transparent, Color.White, 0.22f)),
+            InfiniteProgressIndicator(
+                color = colors.contentColor,
+                size = 16.dp,
+                strokeWidth = 2.dp,
+                orbitingDotSize = 1.5.dp,
             )
+            Spacer(Modifier.width(10.dp))
         }
         Text(
-            text = if (busy) "$text ${(progress * 100).toInt()}%" else text,
+            text = label,
             style = MiuixTheme.textStyles.button,
-            color = trackContent,
-            modifier = Modifier.padding(horizontal = 12.dp),
+            color = colors.contentColor,
         )
     }
 }

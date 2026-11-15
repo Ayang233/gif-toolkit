@@ -22,6 +22,7 @@ import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.SurfaceTier
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.Icon
@@ -111,11 +112,42 @@ fun ThemeScreen(
                     GroupCard {
                         SwitchRow(
                             title = "玻璃材质",
-                            summary = "顶栏与底栏使用 OS4 玻璃，低端机可关",
+                            summary = "总开关。关掉后下面三个组件都按实色渲染",
                             checked = app.glassEnabled,
                             onChange = { app.glassEnabled = it },
                         )
+                        // 组件级三档：粒度和 HyperOS「桌面设置里 Dock 与搜索栏各自配质感」一致。
+                        // 用下拉而不是分段控件：三个选项是离散档位，和上面「主题模式」的交互统一。
+                        val tiers = SurfaceTier.entries
+                        WindowDropdownPreference(
+                            items = tiers.map { it.label },
+                            selectedIndex = tiers.indexOf(app.topBarTier).coerceAtLeast(0),
+                            title = "顶栏质感",
+                            summary = app.topBarTier.summary,
+                            enabled = app.glassEnabled,
+                            onSelectedIndexChange = { app.topBarTier = tiers[it] },
+                        )
+                        WindowDropdownPreference(
+                            items = tiers.map { it.label },
+                            selectedIndex = tiers.indexOf(app.navBarTier).coerceAtLeast(0),
+                            title = "底栏质感",
+                            summary = app.navBarTier.summary,
+                            enabled = app.glassEnabled,
+                            onSelectedIndexChange = { app.navBarTier = tiers[it] },
+                        )
+                        WindowDropdownPreference(
+                            items = tiers.map { it.label },
+                            selectedIndex = tiers.indexOf(app.panelTier).coerceAtLeast(0),
+                            title = "弹层质感",
+                            summary = app.panelTier.summary,
+                            enabled = app.glassEnabled,
+                            onSelectedIndexChange = { app.panelTier = tiers[it] },
+                        )
                     }
+                }
+                item {
+                    // 档位会被设备能力钳制，说清楚，免得用户以为设置没生效
+                    NoteText("设备不支持模糊或玻璃着色器时，实际档位会自动降到可用的一档。")
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

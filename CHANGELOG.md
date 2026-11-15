@@ -2,6 +2,32 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.2 — 未发布
+
+对准「完整 Miuix OS4 化」的第一批：主操作区、表面层级、底栏。
+
+**修复**
+
+- 生成中的进度填充画在按钮中间：父级 `Box` 是 `contentAlignment = Center`，
+  进度块被水平居中（25% 的填充出现在 37.5%~62.5%），且不受圆角约束
+- 生成中按钮显示成"禁用"：`busy` 时 `enabled` 为 false，轨道走禁用色，文字对比度极低
+
+**界面**
+
+- 主按钮换成 `ProgressButton`（自制进度轨道，填充画在 shape 内部，两端跟随圆角），
+  文字色随填充扫过 45% 从 `onSecondaryContainer` 切到 `onPrimary`
+- 生成中点击按钮 = 取消任务，文案「取消生成 · 45%」；取消不留半成品文件
+- 底栏：左右 24dp、高度 60dp、指示器改主色（15%/22%）、选中图标与文字用主色
+- 一级页切换改用 EaseInOut + 时长随距离增长的手动滚动，指示器与页面同时起步
+- 顶栏 / 底栏 / 弹层支持**组件级三档质感**（玻璃 / 轻玻璃 / 实色），互相独立
+- 分组标题改用库里的 `SmallTitle`（`subtitle` 字号、28dp 缩进），与卡片内文字对齐
+
+**工程**
+
+- 新增 `ui/SurfaceTier.kt`：档位判断与设备能力钳制的唯一入口，
+  页面不再自己调 `isRenderEffectSupported()`（此前 `App.kt`、`GlassScope`、`Widgets.kt` 各判各的）
+- 新增 `ui/ProgressButton.kt`，移植自 compose-miuix-ui 生态（Apache-2.0，见文件头）
+
 ## 1.1 — 2026-11-15
 
 OS4 Miuix 化的一版：界面骨架重做、补齐主题设置与预测性返回、换图标、换许可证。

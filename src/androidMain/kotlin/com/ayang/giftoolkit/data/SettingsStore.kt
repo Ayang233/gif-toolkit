@@ -4,6 +4,7 @@ import android.content.Context
 import com.ayang.giftoolkit.BackAnimation
 import com.ayang.giftoolkit.BackExitDirection
 import com.ayang.giftoolkit.ThemeMode
+import com.ayang.giftoolkit.ui.SurfaceTier
 
 /**
  * 外观设置的持久层。
@@ -47,6 +48,35 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean(KEY_GLASS, value).apply()
         }
 
+    /**
+     * 三个组件的材质档位。
+     *
+     * 粒度和 HyperOS「桌面设置里 Dock 与搜索栏各自配质感」一致：
+     * 用户可能想要顶栏玻璃、但觉得弹层模糊太花。
+     * 默认都是 [SurfaceTier.Glass]，实际渲染前会被设备能力钳制一次。
+     */
+    var topBarTier: SurfaceTier
+        get() = readTier(KEY_TOP_TIER)
+        set(value) {
+            prefs.edit().putString(KEY_TOP_TIER, value.name).apply()
+        }
+
+    var navBarTier: SurfaceTier
+        get() = readTier(KEY_NAV_TIER)
+        set(value) {
+            prefs.edit().putString(KEY_NAV_TIER, value.name).apply()
+        }
+
+    var panelTier: SurfaceTier
+        get() = readTier(KEY_PANEL_TIER)
+        set(value) {
+            prefs.edit().putString(KEY_PANEL_TIER, value.name).apply()
+        }
+
+    private fun readTier(key: String): SurfaceTier = prefs.getString(key, null)
+        ?.let { saved -> SurfaceTier.entries.firstOrNull { it.name == saved } }
+        ?: SurfaceTier.Glass
+
     /** AMOLED 纯黑：深色模式下页面底用纯黑，省电且和 HyperOS 的 AMOLED 开关一致。 */
     var amoledEnabled: Boolean
         get() = prefs.getBoolean(KEY_AMOLED, false)
@@ -77,5 +107,8 @@ class SettingsStore(context: Context) {
         const val KEY_AMOLED = "amoled_enabled"
         const val KEY_BACK_ANIM = "back_animation"
         const val KEY_BACK_DIRECTION = "back_exit_direction"
+        const val KEY_TOP_TIER = "surface_tier_top"
+        const val KEY_NAV_TIER = "surface_tier_nav"
+        const val KEY_PANEL_TIER = "surface_tier_panel"
     }
 }

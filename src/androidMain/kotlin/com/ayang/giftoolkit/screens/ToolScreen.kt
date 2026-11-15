@@ -144,6 +144,9 @@ fun ToolScreen(
                         if (form.result != null) onExported()
                     }
                 },
+                // 生成中点按钮 = 取消。只置标记，真正的中断发生在 TaskRunner 的
+                // 逐帧检查点里 —— 阻塞解码靠 Job.cancel() 是打断不了的。
+                onCancel = { form.cancelRequested = true },
             )
         },
     ) { padding ->

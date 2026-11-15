@@ -4,26 +4,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.material.GlassDefaults
+import top.yukonga.miuix.kmp.material.GlassShadows
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-
-/**
- * 全局「是否启用 OS4 玻璃」。
- *
- * 三个条件同时成立才算开：系统设置里开着、系统版本够、硬件支持 RenderEffect。
- * 任何一条不满足就整体退回普通 Miuix —— 不能让某个页面单独尝鲜，
- * 否则会出现「顶栏是玻璃、底栏是实心」的割裂，也正是需求里说的那种不一致。
- */
-val LocalGlassEnabled = compositionLocalOf { false }
 
 /**
  * 一个页面自己的玻璃作用域。
@@ -74,7 +66,9 @@ fun PageTopBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
-    if (glass.enabled) {
+    // 档位来自 SurfaceTier 的单一决策点，这里不再自己判能力（AGENTS.md 硬约束）。
+    val tier = LocalTopBarTier.current
+    if (glass.enabled && tier != SurfaceTier.Solid) {
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
@@ -84,6 +78,11 @@ fun PageTopBar(
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
             style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
+            // 轻玻璃：保留模糊带但压到 ~70% 浓度，同时去掉按钮投影 ——
+            // 这一档面向「AGSL 不可用」或「嫌模糊费电」的设备，
+            // 目的是让关掉玻璃不等于跌回朴素白底。
+            backgroundAlpha = if (tier == SurfaceTier.Light) { { 0.7f } } else { { 1f } },
+            buttonShadow = if (tier == SurfaceTier.Light) null else GlassShadows.Regular,
             navigationIcon = navigationIcon,
             actions = actions,
         )

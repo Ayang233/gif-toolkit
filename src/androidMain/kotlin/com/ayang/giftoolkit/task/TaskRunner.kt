@@ -18,9 +18,20 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/** 用户主动取消。单独一个类型，好和真正的失败区分开（失败要显示原因，取消不用）。 */
+private class TaskCancelled : Exception("cancelled")
+
+/** 协作式取消检查点：解码是阻塞循环，靠这个函数在每帧回调里中断。 */
+private fun ToolForm.checkCancelled() {
+    if (cancelRequested) throw TaskCancelled()
+}
+
 /** 执行一个工具任务，结果写回 [f]。所有 IO 都在 IO 线程。 */
 suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dispatchers.IO) {
+    // 上一次的半成品要清掉，否则取消后残留的文件会被当成"上次结果"
+    var createdFile: java.io.File? = null
     try {
+        f.cancelRequested = false
         f.busy = true
         f.progress = 0.05f
         f.message = "正在处理…"
@@ -31,7 +42,7 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
             Tool.GIF_SPLIT -> "zip"
             else -> "gif"
         }
-        val out = MediaTools.newFile(context, tool.id, ext)
+        val out = MediaTools.newFile(context, tool.id, ext).also { createdFile = it }
         var frames: List<GifFrame> = emptyList()
 
         when (tool) {
@@ -43,8 +54,9 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
                     endMs = ((f.startSec + f.durationSec) * 1000).toLong(),
                     fps = f.fps.toInt(),
                     width = f.width.toInt(),
-                ) { f.progress = 0.05f + it / 200f }
+                ) { f.progress = 0.05f + it / 200f; f.checkCancelled() }
                 if (frames.isEmpty()) error("无法读取该视频，换一个文件试试")
+                f.checkCancelled()
                 f.progress = 0.65f
                 frames = settle(frames, f)
                 GifTasks.writeGif(frames, out, f.quality.toInt())
@@ -60,9 +72,10 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
                     endMs = 0L,
                     fps = f.fps.toInt(),
                     width = f.width.toInt(),
-                ) { f.progress = 0.05f + it / 200f }
+                ) { f.progress = 0.05f + it / 200f; f.checkCancelled() }
                 video.delete()
                 if (frames.isEmpty()) error("无法读取动态照片内嵌视频")
+                f.checkCancelled()
                 f.progress = 0.65f
                 frames = settle(frames, f)
                 GifTasks.writeGif(frames, out, f.quality.toInt())
@@ -133,6 +146,8 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
                 if (src.isEmpty()) error("无法读取该 GIF")
                 ZipOutputStream(FileOutputStream(out)).use { zip ->
                     src.forEachIndexed { index, frame ->
+                        // 逐帧检查：拆帧是最容易被中途叫停的一步
+                        f.checkCancelled()
                         zip.putNextEntry(ZipEntry("frame_%03d.png".format(index + 1)))
                         frame.bitmap.compress(Bitmap.CompressFormat.PNG, 100, zip)
                         zip.closeEntry()
@@ -160,6 +175,8 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
             }
         }
 
+        // 编码阶段结束时再确认一次：用户在写盘途中点了取消，产物不该留下
+        f.checkCancelled()
         f.resultMime = when (tool) {
             Tool.GIF_TO_VIDEO -> "video/mp4"
             Tool.GIF_SPLIT -> "application/zip"
@@ -172,6 +189,14 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
         f.result = out
         f.progress = 1f
         f.message = "已生成 ${out.name} · ${formatSize(out.length())}"
+        f.busy = false
+    } catch (e: TaskCancelled) {
+        // 取消不是失败：不弹错误、不留半成品
+        createdFile?.delete()
+        f.preview = emptyList()
+        f.stillPreview = null
+        f.message = "已取消"
+        f.progress = 0f
         f.busy = false
     } catch (e: Exception) {
         f.message = "失败：${e.message ?: "未知错误"}"

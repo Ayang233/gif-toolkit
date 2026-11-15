@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.ayang.giftoolkit.core.GifFrame
 import com.ayang.giftoolkit.data.SettingsStore
+import com.ayang.giftoolkit.ui.SurfaceTier
 import com.ayang.giftoolkit.ui.Tool
 import java.io.File
 
@@ -54,6 +55,9 @@ class AppState(private val store: SettingsStore) {
     private var amoledEnabledState by mutableStateOf(store.amoledEnabled)
     private var backAnimationState by mutableStateOf(store.backAnimation)
     private var backExitDirectionState by mutableStateOf(store.backExitDirection)
+    private var topBarTierState by mutableStateOf(store.topBarTier)
+    private var navBarTierState by mutableStateOf(store.navBarTier)
+    private var panelTierState by mutableStateOf(store.panelTier)
 
     var themeMode: ThemeMode
         get() = themeModeState
@@ -109,6 +113,34 @@ class AppState(private val store: SettingsStore) {
             }
         }
 
+    /** 顶栏 / 底栏 / 弹层三组材质档位，见 [com.ayang.giftoolkit.ui.SurfaceTier]。 */
+    var topBarTier: SurfaceTier
+        get() = topBarTierState
+        set(value) {
+            if (value != topBarTierState) {
+                topBarTierState = value
+                store.topBarTier = value
+            }
+        }
+
+    var navBarTier: SurfaceTier
+        get() = navBarTierState
+        set(value) {
+            if (value != navBarTierState) {
+                navBarTierState = value
+                store.navBarTier = value
+            }
+        }
+
+    var panelTier: SurfaceTier
+        get() = panelTierState
+        set(value) {
+            if (value != panelTierState) {
+                panelTierState = value
+                store.panelTier = value
+            }
+        }
+
     var libraryToken by mutableIntStateOf(0)
 
     /** 最近一次导出，供结果页使用。 */
@@ -132,6 +164,15 @@ class ToolForm(private val tool: Tool) {
     var resultMime by mutableStateOf("image/gif")
     var preview by mutableStateOf<List<GifFrame>>(emptyList())
     var stillPreview by mutableStateOf<Bitmap?>(null)
+
+    /**
+     * 用户点了「取消」。
+     *
+     * 不用 `Job.cancel()`：解码循环是阻塞调用，协程取消只在挂起点生效，
+     * 视频解码那种 for 循环根本轮不到检查。这里改成协作式标记，
+     * 由 [com.ayang.giftoolkit.task.runTask] 在进度回调里逐帧检查。
+     */
+    var cancelRequested by mutableStateOf(false)
 
     // 通用
     var width by mutableFloatStateOf(360f)
