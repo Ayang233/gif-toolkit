@@ -51,7 +51,6 @@ import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
 import top.yukonga.miuix.kmp.material.GlassDefaults
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -163,44 +162,30 @@ fun DropdownRow(
     items: List<String>,
     selectedIndex: Int,
     title: String,
-    glass: GlassScope,
     onSelect: (Int) -> Unit,
     summary: String? = null,
     enabled: Boolean = true,
 ) {
-    val tier = LocalSurfaceTier.current
-    val backdrop = glass.contentBackdrop
-    if (tier != SurfaceTier.Solid && backdrop != null) {
-        GlassDropdownPreference(
-            onSelectedIndexChange = onSelect,
-            items = items,
-            selectedIndex = selectedIndex,
-            title = title,
-            // 传 null 而不是页面录制层：库里这时走**不透明底色**
-            // （containerColor 纯白 / #2C2C2C），描边与投影照旧 ——
-            // 也就是 InstallerX 主题页里那个边缘清晰的实心白卡。
-            //
-            // 为什么不让弹层采样：弹层挂在录制层**外面**，坐标要靠
-            // `localPositionOf` 反算，采样区一旦偏移，背景内容就被抹成一块脏斑
-            // （实机与模拟器上都能复现：弹层中部一坨发灰的糊影）。
-            // 顶栏/底栏是贴边采样的，没有这个问题；弹层为了"透一点"去冒这个险不值。
-            backdrop = null,
-            summary = summary,
-            enabled = enabled,
-            visuals = GlassPopupDefaults.visuals(
-                style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
-            ),
-        )
-    } else {
-        WindowDropdownPreference(
-            items = items,
-            selectedIndex = selectedIndex,
-            title = title,
-            summary = summary,
-            enabled = enabled,
-            onSelectedIndexChange = onSelect,
-        )
-    }
+    GlassDropdownPreference(
+        onSelectedIndexChange = onSelect,
+        items = items,
+        selectedIndex = selectedIndex,
+        title = title,
+        // 传 null 而不是页面录制层：库里这时走**不透明底色**
+        // （containerColor 纯白 / #2C2C2C），描边与投影照旧 ——
+        // 也就是 InstallerX 主题页里那个边缘清晰的实心白卡。
+        //
+        // 为什么不让弹层采样：弹层挂在录制层**外面**，坐标要靠
+        // `localPositionOf` 反算，采样区一旦偏移，背景内容就被抹成一块脏斑
+        // （实机与模拟器上都能复现：弹层中部一坨发灰的糊影）。
+        // 顶栏/底栏是贴边采样的，没有这个问题；弹层为了"透一点"去冒这个险不值。
+        backdrop = null,
+        summary = summary,
+        enabled = enabled,
+        visuals = GlassPopupDefaults.visuals(
+            style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
+        ),
+    )
 }
 
 /** 滑块行：走官方 SliderPreference，标题 / 数值 / 滑块的排版与系统设置页一致。 */@Composable

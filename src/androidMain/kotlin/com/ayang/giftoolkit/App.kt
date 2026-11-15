@@ -52,12 +52,9 @@ import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
-import com.ayang.giftoolkit.ui.LocalSurfaceTier
-import com.ayang.giftoolkit.ui.SurfaceTier
+import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.cardColor
-import com.ayang.giftoolkit.ui.clampedBy
-import com.ayang.giftoolkit.ui.deviceSurfaceCeiling
 import com.ayang.giftoolkit.ui.pageColor
 import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
 import com.ayang.giftoolkit.ui.Tool
@@ -106,18 +103,13 @@ fun GifApp() {
     }
     val controller = remember(mode) { ThemeController(colorSchemeMode = mode) }
 
-    // 表面档位：用户选择 × 设备能力，一次算清，往下只用结果（AGENTS.md 硬约束）。
-    // 注意 Miuix 的两个能力检测其实只是版本号判断（SDK≥31 / SDK≥33），本工程 minSdk 33
-    // 所以恒为真 —— 它检测不出某台 GPU 上模糊会不会翻车，这也是为什么必须留给用户
-    // 一个「实色」退路。
-    val ceiling = remember { deviceSurfaceCeiling() }
-    val tier = app.glassTier.clampedBy(ceiling)
-    // 实色档不采样背景，也就没必要每帧整屏录制
-    val needBackdrop = tier != SurfaceTier.Solid
+    // 玻璃只有一个决策点：用户开关 && 设备能力。
+    // Miuix 的能力检测只是版本号判断（SDK>=31），查不出某台 GPU 上模糊会不会翻车，
+    // 所以"关掉玻璃"必须一直留给用户当降级手段。
+    val glassEnabled = app.glassEnabled && isGlassSupported()
 
     CompositionLocalProvider(
-        LocalGlassEnabled provides needBackdrop,
-        LocalSurfaceTier provides tier,
+        LocalGlassEnabled provides glassEnabled,
         LocalAmoled provides app.amoledEnabled,
     ) {
         AnimatedMiuixTheme(controller) {
@@ -168,7 +160,7 @@ fun GifApp() {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .then(if (needBackdrop) Modifier.layerBackdrop(backdrop) else Modifier),
+                        .then(if (glassEnabled) Modifier.layerBackdrop(backdrop) else Modifier),
                 ) {
                     // 转场档位来自主题设置；圆角裁剪半径取设备真实屏幕圆角 ——
                     // 之前没传 effects，默认 cornerClipRadius = 0.dp，等于把圆角裁剪关掉了。
@@ -261,12 +253,10 @@ fun GifApp() {
                         tab = index
                         scope.launch { pagerState.animateToTab(index) }
                     },
-                    backdrop = if (tier == SurfaceTier.Solid) null else backdrop,
-                    // 实色档由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 主色指示器，
+                    // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 主色指示器，
                     // 不会塌回通栏白底条。
+                    backdrop = if (glassEnabled) backdrop else null,
                     height = 60.dp,
-                    alpha = if (tier == SurfaceTier.Light) 0.9f else 1f,
-                    material = if (tier == SurfaceTier.Light) null else GlassNavigationBarDefaults.material(),
                     indicatorColor = MiuixTheme.colorScheme.primary.copy(
                         alpha = if (darkBar) 0.22f else 0.15f,
                     ),

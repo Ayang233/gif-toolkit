@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.ayang.giftoolkit.core.GifFrame
 import com.ayang.giftoolkit.data.SettingsStore
-import com.ayang.giftoolkit.ui.SurfaceTier
 import com.ayang.giftoolkit.ui.Tool
 import java.io.File
 
@@ -51,7 +50,7 @@ class AppState(private val store: SettingsStore) {
 
     private var themeModeState by mutableStateOf(store.themeMode)
     private var monetEnabledState by mutableStateOf(store.monetEnabled)
-    private var glassTierState by mutableStateOf(store.glassTier)
+    private var glassEnabledState by mutableStateOf(store.glassEnabled)
     private var amoledEnabledState by mutableStateOf(store.amoledEnabled)
     private var backAnimationState by mutableStateOf(store.backAnimation)
     private var backExitDirectionState by mutableStateOf(store.backExitDirection)
@@ -101,13 +100,13 @@ class AppState(private val store: SettingsStore) {
             }
         }
 
-    /** 玻璃质感档位，见 [com.ayang.giftoolkit.ui.SurfaceTier]。 */
-    var glassTier: SurfaceTier
-        get() = glassTierState
+    /** 玻璃材质开关（顶栏 / 底栏是否模糊），见 [com.ayang.giftoolkit.ui.GlassSupport]。 */
+    var glassEnabled: Boolean
+        get() = glassEnabledState
         set(value) {
-            if (value != glassTierState) {
-                glassTierState = value
-                store.glassTier = value
+            if (value != glassEnabledState) {
+                glassEnabledState = value
+                store.glassEnabled = value
             }
         }
 

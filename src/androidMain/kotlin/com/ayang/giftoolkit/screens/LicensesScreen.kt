@@ -52,11 +52,7 @@ fun LicensesScreen(
                 isScrolled = isScrolled,
                 subtitle = "共 ${thirdPartyLibraries.size} 个第三方组件",
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
-                    }
-                },
+                onBack = onBack,
             )
         },
     ) { padding ->
@@ -116,11 +112,7 @@ fun LicenseDetailScreen(
                 isScrolled = isScrolled,
                 subtitle = entry?.license ?: "",
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
-                    }
-                },
+                onBack = onBack,
             )
         },
     ) { padding ->

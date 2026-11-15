@@ -4,7 +4,6 @@ import android.content.Context
 import com.ayang.giftoolkit.BackAnimation
 import com.ayang.giftoolkit.BackExitDirection
 import com.ayang.giftoolkit.ThemeMode
-import com.ayang.giftoolkit.ui.SurfaceTier
 
 /**
  * 外观设置的持久层。
@@ -43,18 +42,19 @@ class SettingsStore(context: Context) {
         }
 
     /**
-     * 玻璃质感档位：玻璃 / 轻玻璃 / 实色。
+     * 玻璃材质开关：顶栏与底栏是否采样背景做模糊。
      *
-     * 取代了原来那个 `glassEnabled` 布尔开关 —— 关掉玻璃就是选「实色」，
-     * 没必要让"关不关"和"多浓"变成两个互相牵制的开关。
-     * 旧版本存过 `glass_enabled = false` 的用户，这里做一次性兜底映射。
+     * 1.2 开发期间这里一度是三档枚举（玻璃 / 轻玻璃 / 实色），后来按参考实现收敛成开关 ——
+     * 中间档属于库的内部渲染路径，不该暴露给用户。旧的两种存法都做一次性映射：
+     * `surface_tier=Glass` 或更早的 `glass_enabled=true` 都视为开。
      */
-    var glassTier: SurfaceTier
-        get() = prefs.getString(KEY_TIER, null)
-            ?.let { saved -> SurfaceTier.entries.firstOrNull { it.name == saved } }
-            ?: if (prefs.getBoolean(KEY_GLASS, true)) SurfaceTier.Glass else SurfaceTier.Solid
+    var glassEnabled: Boolean
+        get() {
+            prefs.getString(KEY_TIER, null)?.let { return it == TIER_GLASS }
+            return prefs.getBoolean(KEY_GLASS, true)
+        }
         set(value) {
-            prefs.edit().putString(KEY_TIER, value.name).apply()
+            prefs.edit().putBoolean(KEY_GLASS, value).apply()
         }
 
     /** AMOLED 纯黑：深色模式下页面底用纯黑，省电且和 HyperOS 的 AMOLED 开关一致。 */
@@ -87,7 +87,9 @@ class SettingsStore(context: Context) {
         const val KEY_BACK_ANIM = "back_animation"
         const val KEY_BACK_DIRECTION = "back_exit_direction"
         const val KEY_TIER = "surface_tier"
-        /** 1.1 及更早版本的布尔开关，只用于迁移，不再写入。 */
+        /** 枚举档位时代的取值，只用于迁移。 */
+        const val TIER_GLASS = "Glass"
+        /** 布尔开关（1.1 与本版都用它），是当前真正的存储键。 */
         const val KEY_GLASS = "glass_enabled"
     }
 }

@@ -73,15 +73,7 @@ fun AboutScreen(
                 glass = glass,
                 isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        top.yukonga.miuix.kmp.basic.Icon(
-                            MiuixIcons.Back,
-                            "返回",
-                            Modifier.size(24.dp),
-                        )
-                    }
-                },
+                onBack = onBack,
             )
         },
     ) { padding ->

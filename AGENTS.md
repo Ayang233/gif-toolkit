@@ -17,7 +17,10 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 ├── data/SettingsStore.kt 外观设置持久层（SharedPreferences）
 ├── ui/
 │   ├── ToolCatalog.kt    十个工具的元数据（id / 标题 / 说明 / 分组 / 图标 / 按钮文案）
-│   ├── Widgets.kt        分组卡片、行、分段控件、预览舞台、主操作条、pageColor/cardColor
+│   ├── Widgets.kt        分组卡片、行、下拉、预览舞台、主操作条、pageColor/cardColor
+│   ├── GlassScope.kt     页面玻璃作用域 + PageTopBar（玻璃/普通两态）
+│   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
+│   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
 │   └── LicenseCatalog.kt 第三方组件清单
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 关于 / 开源许可
 ├── task/TaskRunner.kt    任务分发 + 进度 + 预览取帧
@@ -45,21 +48,35 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 2. **颜色一律走 `ui/Widgets.kt` 的 `pageColor()` / `cardColor()`。**
    Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个值，
    直接用主题角色会让页面和卡片糊成一片。
-3. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow`。**
-   `TabRow` 的未选中项会各画一圈 1dp 描边，渲染成"一排小按钮"。
+3. **玻璃只有一个决策点：`ui/GlassSupport.kt` 的 `LocalGlassEnabled`。**
+   页面里不许再出现 `isRenderEffectSupported()` 之类的判断 —— 一度 `App.kt`、`GlassScope`、
+   `Widgets.kt` 各判各的，就出过「顶栏玻璃、底栏实心」的割裂。
+   **另外：Miuix 的 `isRenderEffectSupported()` 只是 `SDK_INT >= 31`**，
+   它查不出某台 GPU 上模糊会不会翻车（真机上出现过「内容不糊开、只被压暗」），
+   所以"关掉玻璃"这个开关必须一直留给用户。
+4. **弹层（Popover / Dropdown / BottomSheet）不要采样背景。**
+   `GlassDropdownPreference` 的 `backdrop` 传 `null`：弹层挂在录制层**外面**，
+   采样坐标靠 `localPositionOf` 反算，偏一点就把背景抹成一块脏斑（实机可复现）。
+   传 `null` 时库走不透明底色 + 描边 + 投影，才是参考实现那个观感。
+5. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow` 去做"分段"。**
+   库里其实有三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`），
+   它们都是**可横向滚动的页签**，不是「一整条凹槽 + 一个滑块」的分段控件；
+   `TabRowWithContour` 还会额外画 5dp 轮廓 padding，看起来像一排小按钮。
+   离散选项（2~4 个）优先用 `DropdownRow`（玻璃浮层下拉）。
    滑块取色也不能用 `colorScheme.background`（Monet 下不是白色），要取 `cardColor()`。
-4. **卡片内不加 `HorizontalDivider`。** 靠 56dp 最小行高 + 16dp 内边距区分，这与 KernelSU / HyperOS 设置页一致。
-5. **不要引入 `androidx.compose.material3`。** 会和 Miuix 的设计语言打架，且显著增大包体。
+6. **卡片内不加 `HorizontalDivider`。** 靠 56dp 最小行高 + 16dp 内边距区分，这与 KernelSU / HyperOS 设置页一致。
+7. **不要引入 `androidx.compose.material3`。** 会和 Miuix 的设计语言打架，且显著增大包体。
 
 ## 常见改动怎么下手
 
 | 要做的事 | 改哪里 |
 | --- | --- |
 | 加一个工具 | `ToolCatalog` 加枚举项和图标 → `TaskRunner` 加分支 → `ToolScreen.ParamPanel` 加参数行 |
-| 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` 加行 |
+| 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` / `ThemeScreen` 加行 |
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件 |
 | 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
-| 加离散选项 | 用 `WindowDropdownPreference`（锚定下拉），不要做"点一下轮换到下一个" |
+| 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
+| 加弹层 | 选择面板用 `WindowBottomSheet`、确认用 `WindowDialog`；两者都是系统窗口，天然在录制层外 |
 
 ## 产物与版本约定
 

@@ -124,11 +124,7 @@ fun ToolScreen(
                 isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
                 subtitle = tool.summary,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
-                    }
-                },
+                onBack = onBack,
             )
         },
         // 主操作放在 Scaffold 的 bottomBar 里：内容区自动让出高度，
@@ -312,7 +308,6 @@ private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
                         items = watermarkNames,
                         selectedIndex = form.mosaicPos % watermarkNames.size,
                         title = "水印位置",
-                        glass = glass,
                         onSelect = { form.mosaicPos = it },
                     )
                 }
@@ -339,7 +334,6 @@ private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
                         items = puzzleColsItems,
                         selectedIndex = (form.puzzleCols - 2).coerceIn(0, puzzleColsItems.lastIndex),
                         title = "宫格列数",
-                        glass = glass,
                         onSelect = { form.puzzleCols = it + 2 },
                     )
                 }

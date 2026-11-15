@@ -19,17 +19,23 @@
 - 生成中点击按钮 = 取消任务，文案「取消生成 · 45%」；取消不留半成品文件
 - 底栏：左右 24dp、高度 60dp、指示器改主色（15%/22%）、选中图标与文字用主色
 - 一级页切换改用 EaseInOut + 时长随距离增长的手动滚动，指示器与页面同时起步
-- 新增「玻璃质感」一档设置：玻璃 / 轻玻璃 / 实色。轻玻璃不进渐进模糊带，
-  只用渐变遮罩压掉内容；实色则不采样背景，浮起胶囊与主色指示器仍在
+- 「玻璃材质」收敛成**一个开关**：顶栏与底栏采样背景做模糊，关掉后仍保留浮起胶囊与阴影
 - 所有下拉换成玻璃浮层（`GlassDropdownPreference`，和 InstallerX 的主题下拉一致）；
   弹层**不采样背景**，走库里的不透明底色 + 描边 + 投影，边缘清晰不发灰
+- 顶栏返回键统一走 `PageTopBar(onBack = …)`，玻璃档下包成 `GlassIconButton`，
+  尺寸/材质/投影从顶栏上下文继承，不再是页面里手写的裸图标按钮
+- 作品页文件操作从「手搓居中弹卡」换成 `WindowBottomSheet`（拖拽手柄、下拉关闭、返回手势联动）
+- 作品页空态改为居中图标 + 两行说明
 - 分组标题改用库里的 `SmallTitle`（`subtitle` 字号、28dp 缩进），与卡片内文字对齐
 
 **工程**
 
-- 新增 `ui/SurfaceTier.kt`：档位判断与设备能力钳制的唯一入口，
+- 新增 `ui/GlassSupport.kt`：玻璃开关与能力检测的唯一入口（`LocalGlassEnabled`），
   页面不再自己调 `isRenderEffectSupported()`（此前 `App.kt`、`GlassScope`、`Widgets.kt` 各判各的）
 - 新增 `ui/ProgressButton.kt`，移植自 compose-miuix-ui 生态（Apache-2.0，见文件头）
+- 主按钮禁用态改用库自带的 `disabledPrimaryButton` / `disabledOnPrimaryButton`
+- `AGENTS.md` 补两条硬约束（玻璃单一决策点、弹层不采样背景），并修正「不要用 TabRow」那条
+  过于笼统的结论（库里三个页签组件都不是分段控件）
 
 ## 1.1 — 2026-11-15
 

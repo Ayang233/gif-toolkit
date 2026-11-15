@@ -5,16 +5,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.material.GlassDefaults
-import top.yukonga.miuix.kmp.material.GlassShadows
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -55,39 +60,52 @@ fun rememberGlassScope(enabled: Boolean = LocalGlassEnabled.current): GlassScope
  * 颜色与间距都交给 Miuix 自己的两套实现，调用方不要再叠 padding，
  * 否则玻璃的 band 会和标题错位（大标题折叠动画按顶栏自身高度计算）。
  */
+/**
+ * 页面顶栏。
+ *
+ * 返回键统一走 [onBack]，不再让每个页面自己写一个 `IconButton` —— 玻璃档下要包成
+ * [GlassIconButton] 才能拿到 OS4 那种「图标浮在小玻璃胶囊里」的观感，
+ * 而它的大小/材质/投影全都从 `LocalGlassTopAppBarContext` 继承，
+ * 页面里手写一个裸 `IconButton` 是拿不到这些的（这也是之前顶栏不像 OS4 的原因之一）。
+ */
 @Composable
 fun PageTopBar(
     title: String,
     glass: GlassScope,
     isScrolled: Boolean,
+    onBack: (() -> Unit)? = null,
     scrollBehavior: top.yukonga.miuix.kmp.basic.ScrollBehavior? = null,
     largeTitle: String = title,
     subtitle: String = "",
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
-    // 档位来自 SurfaceTier 的单一决策点，这里不再自己判能力（AGENTS.md 硬约束）。
-    val tier = LocalSurfaceTier.current
-    if (glass.enabled && tier != SurfaceTier.Solid) {
+    val backIcon: @Composable () -> Unit = {
+        if (onBack != null) {
+            if (glass.enabled) {
+                GlassIconButton(onClick = onBack) {
+                    Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
+                }
+            } else {
+                IconButton(onClick = onBack) {
+                    Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
+                }
+            }
+        } else {
+            navigationIcon()
+        }
+    }
+    if (glass.enabled) {
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
-            // 只有「玻璃」档才走渐进模糊带。
-            //
-            // 这条带是顶栏最脆弱的一环：它靠 runtime shader 把多个模糊层级按渐变混合，
-            // AGSL 在个别机型上失效时不会报错，而是退化成「内容几乎原样 + 一层压暗」——
-            // 底下滚过去的图标/分组标题就成了一块硬边色斑（实机黑块的真正来源）。
-            // 「轻玻璃」干脆不用它：不模糊，只靠 bandBrush 的渐变把内容压掉，
-            // 零 AGSL 依赖，观感接近系统设置页的顶栏。
-            progressiveBlur = tier == SurfaceTier.Glass,
+            progressiveBlur = true,
             backdrop = glass.contentBackdrop,
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
             style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
-            backgroundAlpha = if (tier == SurfaceTier.Light) { { 0.92f } } else { { 1f } },
-            buttonShadow = if (tier == SurfaceTier.Light) null else GlassShadows.Regular,
-            navigationIcon = navigationIcon,
+            navigationIcon = backIcon,
             actions = actions,
         )
     } else {
@@ -96,7 +114,7 @@ fun PageTopBar(
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
-            navigationIcon = navigationIcon,
+            navigationIcon = backIcon,
             actions = actions,
         )
     }

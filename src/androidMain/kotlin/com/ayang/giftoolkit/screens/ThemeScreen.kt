@@ -23,7 +23,6 @@ import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.PageTopBar
-import com.ayang.giftoolkit.ui.SurfaceTier
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.Icon
@@ -62,11 +61,7 @@ fun ThemeScreen(
                 glass = glass,
                 isScrolled = isScrolled,
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
-                    }
-                },
+                onBack = onBack,
             )
         },
     ) { padding ->
@@ -90,7 +85,6 @@ fun ThemeScreen(
                             items = modes.map { it.label },
                             selectedIndex = modes.indexOf(app.themeMode).coerceAtLeast(0),
                             title = "主题模式",
-                            glass = glass,
                             onSelect = { app.themeMode = modes[it] },
                         )
                         SwitchRow(
@@ -111,24 +105,19 @@ fun ThemeScreen(
                 item { GroupHeader("界面") }
                 item {
                     GroupCard {
-                        // 一个下拉就够：玻璃 / 轻玻璃 / 实色。
-                        // 曾经按顶栏·底栏·弹层分成三个，实测是过度设计 ——
-                        // 用户要理解"为什么顶栏玻璃、底栏实色才好看"，而真正需要
-                        // 区分粒度的场景几乎不出现。关玻璃 = 选实色，不再单设总开关。
-                        val tiers = SurfaceTier.entries
-                        DropdownRow(
-                            items = tiers.map { it.label },
-                            selectedIndex = tiers.indexOf(app.glassTier).coerceAtLeast(0),
-                            title = "玻璃质感",
-                            summary = app.glassTier.summary,
-                            glass = glass,
-                            onSelect = { app.glassTier = tiers[it] },
+                        // 只有一个开关：顶栏与底栏采样背景做模糊，关掉就是不透明胶囊 + 渐变遮罩。
+                        // 曾经试过三档、甚至按组件分三组，都不如一个开关 ——
+                        // 中间档属于库的渲染路径，不该让用户去理解。
+                        SwitchRow(
+                            title = "玻璃材质",
+                            summary = "顶栏与底栏使用模糊玻璃；关掉后仍保留浮起胶囊与阴影",
+                            checked = app.glassEnabled,
+                            onChange = { app.glassEnabled = it },
                         )
                     }
                 }
                 item {
-                    // 档位会被设备能力钳制，说清楚，免得用户以为设置没生效
-                    NoteText("设备不支持模糊或玻璃着色器时，实际档位会自动降到可用的一档。部分机型上模糊会失效，选「实色」可规避。")
+                    NoteText("个别机型上系统模糊会失效（内容不再糊开，只被压暗），此时关掉玻璃即可规避。")
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -140,7 +129,6 @@ fun ThemeScreen(
                                 selectedIndex = animations.indexOf(app.backAnimation).coerceAtLeast(0),
                                 title = "预测性返回动画",
                                 summary = app.backAnimation.summary,
-                                glass = glass,
                                 onSelect = { app.backAnimation = animations[it] },
                             )
                             // 退出方向只对「缩放」有意义：其余档位要么跟随手势物理方向，
@@ -151,7 +139,6 @@ fun ThemeScreen(
                                     items = directions.map { it.label },
                                     selectedIndex = directions.indexOf(app.backExitDirection).coerceAtLeast(0),
                                     title = "退出方向",
-                                    glass = glass,
                                     onSelect = { app.backExitDirection = directions[it] },
                                 )
                             }
