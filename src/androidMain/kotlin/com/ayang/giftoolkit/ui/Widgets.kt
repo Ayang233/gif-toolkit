@@ -176,7 +176,15 @@ fun DropdownRow(
             items = items,
             selectedIndex = selectedIndex,
             title = title,
-            backdrop = backdrop,
+            // 传 null 而不是页面录制层：库里这时走**不透明底色**
+            // （containerColor 纯白 / #2C2C2C），描边与投影照旧 ——
+            // 也就是 InstallerX 主题页里那个边缘清晰的实心白卡。
+            //
+            // 为什么不让弹层采样：弹层挂在录制层**外面**，坐标要靠
+            // `localPositionOf` 反算，采样区一旦偏移，背景内容就被抹成一块脏斑
+            // （实机与模拟器上都能复现：弹层中部一坨发灰的糊影）。
+            // 顶栏/底栏是贴边采样的，没有这个问题；弹层为了"透一点"去冒这个险不值。
+            backdrop = null,
             summary = summary,
             enabled = enabled,
             visuals = GlassPopupDefaults.visuals(
@@ -460,9 +468,6 @@ private fun ActionButton(
             trackColor = primary,
             progressColor = primary,
             contentColor = MiuixTheme.colorScheme.onPrimary,
-            disabledTrackColor = lerp(pageColor(), primary, 0.35f),
-            disabledProgressColor = lerp(pageColor(), primary, 0.35f),
-            disabledContentColor = lerp(pageColor(), MiuixTheme.colorScheme.onPrimary, 0.55f),
         )
     }
 
