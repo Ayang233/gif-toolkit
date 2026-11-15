@@ -8,6 +8,11 @@
 
 **下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上）
 
+文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
+
+> 要改这个项目（尤其用 AI 协作）请先读 [AGENTS.md](AGENTS.md)：里面是目录地图、常用命令，
+> 以及 5 条违反就会出事的硬约束（玻璃节点、配色推导、分段控件、卡片无分割线、不引入 Material）。
+
 | 主页 | 工具页 | 设置 | 关于 |
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
@@ -49,6 +54,9 @@
 - Android SDK Platform 37、Build-Tools 37.0.0
 - 一把能跑 `gradlew` 的 shell（Git Bash / zsh / bash 均可）
 
+SDK 路径可以写进 `local.properties`（`sdk.dir=/path/to/Android/Sdk`），也可以只设 `ANDROID_HOME` 环境变量——
+两种方式都验证过。
+
 ### 步骤
 
 ```bash
@@ -66,6 +74,8 @@ cd gif-toolkit
 并打上 composite build 必需的一处上游补丁——Miuix 的 `build-logic` 在配置阶段调用 git 取版本号，
 而子构建的工作目录是宿主工程（不是 git 仓库），不打补丁会直接 exit 128。
 脚本可重复执行，已打过会跳过。
+
+没准备 Miuix 时，Gradle 同步会直接给出带克隆命令的报错，不会只丢一句「找不到项目」。
 
 不想用脚本的话，手动克隆后给
 `miuix/build-logic/src/main/kotlin/BuildConfig.kt` 里的 `getGitVersionCode()` 和 `getGitHashShort()`
