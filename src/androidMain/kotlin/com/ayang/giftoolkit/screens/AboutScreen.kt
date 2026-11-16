@@ -4,41 +4,28 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.R
-import com.ayang.giftoolkit.ui.ContentBackdropBox
-import com.ayang.giftoolkit.ui.PageTopBar
-import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
+import com.ayang.giftoolkit.ui.Os4ListPage
+import com.ayang.giftoolkit.ui.rememberAppVersion
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Link
-import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.glass.Link
+import top.yukonga.miuix.kmp.icon.glass.NotesOutline
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -55,88 +42,66 @@ fun AboutScreen(
     onOpenLicenses: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scrollBehavior = MiuixScrollBehavior()
     val glass = rememberGlassScope()
-    val listState = rememberLazyListState()
-    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
-    val version = remember {
-        runCatching {
-            val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            "${info.versionName}（${info.longVersionCode}）"
-        }.getOrDefault("—")
-    }
+    val version = rememberAppVersion()
 
-    Scaffold(
-        topBar = {
-            PageTopBar(
-                title = "关于",
-                glass = glass,
-                isScrolled = isScrolled,
-                scrollBehavior = scrollBehavior,
-                onBack = onBack,
-            )
-        },
-    ) { padding ->
-        ContentBackdropBox(glass) {
-            LazyColumn(
-                state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = 32.dp),
-        ) {
-            // 顶部：图标 + 名称 + 版本，居中摆在页面底色上（不进卡片），与内核管理器的关于页同构
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_app_badge),
-                        contentDescription = null,
-                        modifier = Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)),
-                    )
-                    Text("GIF 助手", style = MiuixTheme.textStyles.title3)
-                    Text(
-                        text = version,
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
-            }
-
-            item { GroupHeader("应用") }
-            item {
-                GroupCard {
-                    ArrowPreference(
-                        title = "查看源代码",
-                        summary = SOURCE_URL.ifBlank { "仓库尚未公开" },
-                        startAction = { LeadingIcon(MiuixIcons.Link) },
-                        onClick = {
-                            if (SOURCE_URL.isBlank()) {
-                                Toast.makeText(context, "源代码仓库还没公开", Toast.LENGTH_SHORT).show()
-                            } else {
-                                runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(SOURCE_URL),
-                                        ),
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    ArrowPreference(
-                        title = "开源许可",
-                        summary = "本应用使用的第三方组件",
-                        startAction = { LeadingIcon(MiuixIcons.Notes) },
-                        onClick = onOpenLicenses,
-                    )
-                }
+    Os4ListPage(
+        title = "关于",
+        glass = glass,
+        onBack = onBack,
+        reserveNavBar = false,
+        extraBottom = 32.dp,
+    ) {
+        // 顶部：图标 + 名称 + 版本，居中摆在页面底色上（不进卡片），与内核管理器的关于页同构
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_app_badge),
+                    contentDescription = null,
+                    modifier = Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)),
+                )
+                Text("GIF 助手", style = MiuixTheme.textStyles.title3)
+                Text(
+                    text = version,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
             }
         }
+
+        item { GroupHeader("应用") }
+        item {
+            GroupCard {
+                ArrowPreference(
+                    title = "查看源代码",
+                    summary = SOURCE_URL.ifBlank { "仓库尚未公开" },
+                    startAction = { LeadingIcon(MiuixIcons.Glass.Light.Link) },
+                    onClick = {
+                        if (SOURCE_URL.isBlank()) {
+                            Toast.makeText(context, "源代码仓库还没公开", Toast.LENGTH_SHORT).show()
+                        } else {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(SOURCE_URL),
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                )
+                ArrowPreference(
+                    title = "开源许可",
+                    summary = "本应用使用的第三方组件",
+                    startAction = { LeadingIcon(MiuixIcons.Glass.Light.NotesOutline) },
+                    onClick = onOpenLicenses,
+                )
+            }
         }
     }
 }

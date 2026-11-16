@@ -18,7 +18,7 @@ MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
 # 上游 d8efe18 = 顶栏折叠标题居中修复 + band 渐变改为三次平滑 fade。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="d8efe18"
+PINNED_REF="ac0af467"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,56 +1,41 @@
 package com.ayang.giftoolkit.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.AppState
 import com.ayang.giftoolkit.core.MediaTools
-import com.ayang.giftoolkit.ui.ContentBackdropBox
-import com.ayang.giftoolkit.ui.PageTopBar
-import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
+import com.ayang.giftoolkit.ui.IconSizes
 import com.ayang.giftoolkit.ui.LeadingIcon
-import com.ayang.giftoolkit.ui.NoteText
+import com.ayang.giftoolkit.ui.Os4ListPage
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.ChevronForward
-import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.Download
-import top.yukonga.miuix.kmp.icon.extended.File
-import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.Share
+import top.yukonga.miuix.kmp.icon.glass.FolderOutline
+import top.yukonga.miuix.kmp.icon.glass.ChevronForward
+import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.Download
+import top.yukonga.miuix.kmp.icon.glass.File
+import top.yukonga.miuix.kmp.icon.glass.Share
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.io.File
@@ -64,7 +49,6 @@ fun LibraryScreen(app: AppState) {
     // 面板的 show 与"当前文件"要分开：关闭时先收起面板，等退场动画跑完再清文件，
     // 否则退场过程中标题和条目会瞬间变空
     var sheetVisible by remember { mutableStateOf(false) }
-    val scrollBehavior = MiuixScrollBehavior()
     val files = remember(app.libraryToken) {
         MediaTools.outputDir(context).listFiles()
             ?.filter { it.isFile }
@@ -74,74 +58,52 @@ fun LibraryScreen(app: AppState) {
 
     Box(Modifier.fillMaxSize()) {
         val glass = rememberGlassScope()
-        val listState = rememberLazyListState()
-        val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
-        Scaffold(
-            topBar = {
-                PageTopBar(
-                    title = "我的作品",
-                    glass = glass,
-                    isScrolled = isScrolled,
-                    scrollBehavior = scrollBehavior,
-                    subtitle = "共 ${files.size} 个导出文件",
-                )
-            },
-        ) { padding ->
-            ContentBackdropBox(glass) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(
-                        top = padding.calculateTopPadding() + 2.dp,
-                        bottom = 132.dp,
-                    ),
-                ) {
-                    if (files.isEmpty()) {
-                        item {
-                            // 空态居中：之前是一段左对齐的灰字，看起来像"页面没加载完"。
-                            // 这里只做最小版（图标 + 两行说明），插画留给确认过的新设计。
-                            Box(
-                                modifier = Modifier
-                                    .fillParentMaxWidth()
-                                    .padding(horizontal = 32.dp, vertical = 96.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Folder,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(44.dp),
-                                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                    Spacer(Modifier.height(12.dp))
-                                    Text(
-                                        text = "还没有导出过文件",
-                                        style = MiuixTheme.textStyles.body1,
-                                        color = MiuixTheme.colorScheme.onBackground,
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(
-                                        text = "回到「工具」挑一个功能，生成结果会出现在这里",
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            }
+        Os4ListPage(
+            title = "我的作品",
+            glass = glass,
+            subtitle = "共 ${files.size} 个导出文件",
+        ) {
+            if (files.isEmpty()) {
+                item {
+                    // 空态居中：之前是一段左对齐的灰字，看起来像"页面没加载完"。
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 96.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = MiuixIcons.Glass.FolderOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(IconSizes.Empty),
+                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "还没有导出过文件",
+                                style = MiuixTheme.textStyles.body1,
+                                color = MiuixTheme.colorScheme.onBackground,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = "回到「工具」挑一个功能，生成结果会出现在这里",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                textAlign = TextAlign.Center,
+                            )
                         }
-                    } else {
-                        item { GroupHeader("本地导出") }
-                        item {
-                            GroupCard {
-                                files.forEach { file ->
-                                    FileRow(file = file, onClick = {
-                                        actionTarget = file
-                                        sheetVisible = true
-                                    })
-                                }
-                            }
+                    }
+                }
+            } else {
+                item { GroupHeader("本地导出") }
+                item {
+                    GroupCard {
+                        files.forEach { file ->
+                            FileRow(file = file, onClick = {
+                                actionTarget = file
+                                sheetVisible = true
+                            })
                         }
                     }
                 }
@@ -187,10 +149,10 @@ private fun FileRow(
     BasicComponent(
         title = file.name,
         summary = "${formatSize(file.length())} · ${formatTime(file.lastModified())}",
-        startAction = { LeadingIcon(MiuixIcons.File) },
+        startAction = { LeadingIcon(MiuixIcons.Glass.Light.File) },
         endActions = {
             Icon(
-                imageVector = MiuixIcons.ChevronForward,
+                imageVector = MiuixIcons.Glass.Light.ChevronForward,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
@@ -226,12 +188,12 @@ private fun FileActionSheet(
     ) {
         BasicComponent(
             title = "保存到相册",
-            startAction = { LeadingIcon(MiuixIcons.Download) },
+            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Download) },
             onClick = onSave,
         )
         BasicComponent(
             title = "分享",
-            startAction = { LeadingIcon(MiuixIcons.Share) },
+            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Share) },
             onClick = onShare,
         )
         BasicComponent(
@@ -239,7 +201,7 @@ private fun FileActionSheet(
             titleColor = BasicComponentDefaults.titleColor(
                 color = MiuixTheme.colorScheme.error,
             ),
-            startAction = { LeadingIcon(MiuixIcons.Delete, MiuixTheme.colorScheme.error) },
+            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Delete, MiuixTheme.colorScheme.error) },
             onClick = onDelete,
         )
     }

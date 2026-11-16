@@ -1,30 +1,13 @@
 package com.ayang.giftoolkit.screens
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.dp
-import com.ayang.giftoolkit.ui.ContentBackdropBox
-import com.ayang.giftoolkit.ui.PageTopBar
-import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
+import com.ayang.giftoolkit.ui.LeadingIcon
+import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.Tool
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 主页：单列工具列表。
@@ -36,41 +19,17 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun HomeScreen(onOpen: (Tool) -> Unit) {
-    val scrollBehavior = MiuixScrollBehavior()
     val glass = rememberGlassScope()
-    val listState = rememberLazyListState()
-    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
-    Scaffold(
-        topBar = {
-            PageTopBar(
-                title = "GIF 助手",
-                glass = glass,
-                isScrolled = isScrolled,
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { padding ->
-        ContentBackdropBox(glass) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
-                // 底部留出玻璃底栏的高度，滚到末尾时最后一行不会被胶囊压住。
-                contentPadding = PaddingValues(
-                    top = padding.calculateTopPadding() + 2.dp,
-                    bottom = 128.dp,
-                ),
-            ) {
-                Tool.grouped.forEach { (group, tools) ->
-                    item(key = "h_$group") { GroupHeader(group) }
-                    item(key = "c_$group") {
-                        GroupCard {
-                            tools.forEach { tool ->
-                                ToolRow(tool, onOpen)
-                            }
-                        }
+    Os4ListPage(
+        title = "GIF 助手",
+        glass = glass,
+    ) {
+        Tool.grouped.forEach { (group, tools) ->
+            item(key = "h_$group") { GroupHeader(group) }
+            item(key = "c_$group") {
+                GroupCard {
+                    tools.forEach { tool ->
+                        ToolRow(tool, onOpen)
                     }
                 }
             }
@@ -83,15 +42,7 @@ private fun ToolRow(tool: Tool, onOpen: (Tool) -> Unit) {
     ArrowPreference(
         title = tool.title,
         summary = tool.summary,
-        startAction = {
-            Icon(
-                imageVector = tool.icon,
-                contentDescription = null,
-                // Miuix 的行内间距是 8dp，线框图标再补 4dp 才不至于和标题粘在一起
-                modifier = Modifier.padding(end = 4.dp).size(24.dp),
-                tint = MiuixTheme.colorScheme.onBackground,
-            )
-        },
+        startAction = { LeadingIcon(tool.icon) },
         onClick = { onOpen(tool) },
     )
 }

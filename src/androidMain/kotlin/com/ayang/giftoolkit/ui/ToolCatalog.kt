@@ -2,16 +2,16 @@ package com.ayang.giftoolkit.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Album
-import top.yukonga.miuix.kmp.icon.extended.ConvertFile
-import top.yukonga.miuix.kmp.icon.extended.Edit
-import top.yukonga.miuix.kmp.icon.extended.GridView
-import top.yukonga.miuix.kmp.icon.extended.Merge
-import top.yukonga.miuix.kmp.icon.extended.Photos
-import top.yukonga.miuix.kmp.icon.extended.Play
-import top.yukonga.miuix.kmp.icon.extended.Recording
-import top.yukonga.miuix.kmp.icon.extended.VerticalSplit
-import top.yukonga.miuix.kmp.icon.extended.ZoomOut
+import top.yukonga.miuix.kmp.icon.glass.Album
+import top.yukonga.miuix.kmp.icon.glass.Compress
+import top.yukonga.miuix.kmp.icon.glass.ConvertFile
+import top.yukonga.miuix.kmp.icon.glass.ConvertToGif
+import top.yukonga.miuix.kmp.icon.glass.Edit
+import top.yukonga.miuix.kmp.icon.glass.GridView
+import top.yukonga.miuix.kmp.icon.glass.Merge
+import top.yukonga.miuix.kmp.icon.glass.MotionPhoto
+import top.yukonga.miuix.kmp.icon.glass.Play
+import top.yukonga.miuix.kmp.icon.glass.VerticalSplit
 
 /** 一个工具入口。id 是路由参数，也是导出文件的命名前缀。 */
 enum class Tool(
@@ -36,19 +36,25 @@ enum class Tool(
     GIF_PLAYER("player", "GIF 播放", "调速、逐帧浏览", "输出", false, "image/gif"),
     ;
 
-    /** 列表行里对应的符号。用 extended 线框集 —— glass 定色图标是给玻璃底栏用的，放在白底列表上偏重。 */
+    /**
+     * 列表行里对应的符号。
+     *
+     * 用官方 **Glass 定色族**（HyperOS 图标集，28dp 画布）：这十个符号库里都有现成的，
+     * 不需要自绘。之前用的是 `extended` 线框集，两套混在一起看，线条粗细和图标留白都不一致 ——
+     * 这正是"图标风格不统一"最直接的来源。
+     */
     val icon: ImageVector
         get() = when (this) {
-            VIDEO_TO_GIF -> MiuixIcons.Recording
-            MVIMG_TO_GIF -> MiuixIcons.Photos
-            IMAGES_TO_GIF -> MiuixIcons.Album
-            GIF_EDIT -> MiuixIcons.Edit
-            GIF_COMPRESS -> MiuixIcons.ZoomOut
-            GIF_CONNECT -> MiuixIcons.Merge
-            GIF_PUZZLE -> MiuixIcons.GridView
-            GIF_SPLIT -> MiuixIcons.VerticalSplit
-            GIF_TO_VIDEO -> MiuixIcons.ConvertFile
-            GIF_PLAYER -> MiuixIcons.Play
+            VIDEO_TO_GIF -> MiuixIcons.Glass.ConvertToGif
+            MVIMG_TO_GIF -> MiuixIcons.Glass.MotionPhoto
+            IMAGES_TO_GIF -> MiuixIcons.Glass.Album
+            GIF_EDIT -> MiuixIcons.Glass.Edit
+            GIF_COMPRESS -> MiuixIcons.Glass.Compress
+            GIF_CONNECT -> MiuixIcons.Glass.Merge
+            GIF_PUZZLE -> MiuixIcons.Glass.GridView
+            GIF_SPLIT -> MiuixIcons.Glass.VerticalSplit
+            GIF_TO_VIDEO -> MiuixIcons.Glass.ConvertFile
+            GIF_PLAYER -> MiuixIcons.Glass.Play
         }
 
     /** 工具页里主按钮的文案。 */

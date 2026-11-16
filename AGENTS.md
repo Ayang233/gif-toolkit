@@ -11,18 +11,21 @@ UI 全部基于 [Miuix](https://github.com/compose-miuix-ui/miuix)，**不引入
 
 ```
 src/androidMain/kotlin/com/ayang/giftoolkit/
-├── App.kt                主题装配、NavDisplay 路由、玻璃底栏、退出确认
+├── App.kt                主题装配、NavDisplay 路由、玻璃底栏/宽屏侧栏、退出确认
 ├── Route.kt              路由定义（Root / Tool / About / Licenses / License）
 ├── AppState.kt           全局状态 + 每个工具一份 ToolForm（表单状态）
 ├── data/SettingsStore.kt 外观设置持久层（SharedPreferences）
 ├── ui/
 │   ├── ToolCatalog.kt    十个工具的元数据（id / 标题 / 说明 / 分组 / 图标 / 按钮文案）
-│   ├── Widgets.kt        分组卡片、行、下拉、预览舞台、主操作条、pageColor/cardColor
+│   ├── Widgets.kt        分组卡片、行、下拉、预览舞台、主操作条、pageColor/cardColor、图标尺寸
+│   ├── PageChrome.kt     页面骨架 Os4ListPage + pageScrollModifiers + pageContentPadding
+│   ├── Adaptive.kt       宽屏判定（阈值与官方 AdaptiveUtils 一致）
 │   ├── GlassScope.kt     页面玻璃作用域 + PageTopBar（玻璃/普通两态）
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
+│   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
 │   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
 │   └── LicenseCatalog.kt 第三方组件清单
-├── screens/              主页 / 工具页 / 作品页 / 设置 / 关于 / 开源许可
+├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
 ├── task/TaskRunner.kt    任务分发 + 进度 + 预览取帧
 └── core/                 GifCodec / GifTasks / MediaTools / Stabilizer / ColorKey / MotionPhoto
 ```
@@ -66,6 +69,21 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    滑块取色也不能用 `colorScheme.background`（Monet 下不是白色），要取 `cardColor()`。
 6. **卡片内不加 `HorizontalDivider`。** 靠 56dp 最小行高 + 16dp 内边距区分，这与 KernelSU / HyperOS 设置页一致。
 7. **不要引入 `androidx.compose.material3`。** 会和 Miuix 的设计语言打架，且显著增大包体。
+8. **`GlassNavigationRail` 必须叠放在内容之上，不能进 `Row` 当兄弟。**
+   它的根节点是 `BoxWithConstraints(fillMaxSize())`，自己决定面板位置（左边距 12dp + 宽 250dp）。
+   一旦用 `Row` + `weight` 排列，它会吃掉整行宽度，内容被挤成 0 宽 —— 实机上就是"侧栏在、内容全白"。
+   正确结构：`Box { Box(fillMaxSize + padding(start = 侧栏宽) + layerBackdrop) { NavDisplay } ; Rail }`。
+   官方 `AppContent` 也是这个结构（`useGlassSidebar` 分支）。
+9. **内边距只走 `pageContentPadding()`。** 页面里不要再手写 `+2.dp` 或固定 `128.dp` 底部留白：
+   底栏是浮层、不占 Scaffold 槽位，高度由 `LocalBottomBarClearance` 单点下发（`App.kt` 算）。
+   二级页（工具页 / 主题 / 关于 / 许可）要传 `reserveNavBar = false` —— 那时底栏已淡出，
+   再预留 100dp 会在列表末尾留一块空带。
+10. **图标只用官方 Glass 族，不自绘、不混 `extended`。**
+    `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
+    `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
+    Glass 族是 **28dp 画布**（`buildHyperOSIcon` 里 `defaultWidth = 28.dp`），
+    塞进 24dp 槽位会明显偏小；列表统一 26dp（`IconSizes.Row`）。
+    注意新版权重/命名变化：`Glass.Folder` / `Glass.Settings` 已改名成 `*Outline` / `*Fill`。
 
 ## 常见改动怎么下手
 
@@ -73,7 +91,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | --- | --- |
 | 加一个工具 | `ToolCatalog` 加枚举项和图标 → `TaskRunner` 加分支 → `ToolScreen.ParamPanel` 加参数行 |
 | 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` / `ThemeScreen` 加行 |
-| 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件 |
+| 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
 | 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
 | 加弹层 | 选择面板用 `WindowBottomSheet`、确认用 `WindowDialog`；两者都是系统窗口，天然在录制层外 |
@@ -87,8 +105,10 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
+1. 基线是 Miuix `ac0af467`（2026-11-16）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
+   的默认值有没有变 —— 这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
+2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。
    `scripts/setup-miuix.sh` 会把这两件事都做掉。
-2. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed`，而 `api.github.com` 仍然可用；
+3. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed`，而 `api.github.com` 仍然可用；
    必要时可走 REST API（blobs → tree → commit → refs）推送，但远端与本地 commit SHA 会不同源。

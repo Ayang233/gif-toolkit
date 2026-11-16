@@ -77,6 +77,14 @@ fun PageTopBar(
     scrollBehavior: top.yukonga.miuix.kmp.basic.ScrollBehavior? = null,
     largeTitle: String = title,
     subtitle: String = "",
+    /**
+     * 大标题是否可展开。
+     *
+     * 宽屏下必须传 `false`：平板/横屏的顶栏是「居中窄标题」，没有大标题这一档
+     * （官方 `AdaptiveTopAppBar` 传的就是 `expandable = !isWideScreen`）。
+     * 手机上传 `true`，于是「滚动 → 大标题收起成小标题」这套折叠动画照常工作。
+     */
+    expandable: Boolean = true,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
@@ -99,6 +107,7 @@ fun PageTopBar(
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
+            expandable = expandable,
             progressiveBlur = true,
             backdrop = glass.contentBackdrop,
             largeTitle = largeTitle,
@@ -111,6 +120,7 @@ fun PageTopBar(
     } else {
         TopAppBar(
             title = title,
+            expandable = expandable,
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,

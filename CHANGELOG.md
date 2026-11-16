@@ -2,7 +2,47 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
-## 1.2.1 — 未发布
+## 1.3 — 未发布
+
+对齐 Miuix `ac0af467`（OS4 Glass），整体而非局部：底栏、顶栏、图标、内边距、宽屏。
+
+**基线**
+
+- Miuix 依赖从 `d8efe18` 前进到 `ac0af467`（含 `GlassNavigationRail`、新底栏间距规则）；
+  `scripts/setup-miuix.sh` 的 `PINNED_REF` 同步更新
+- 从该提交自行编译官方 example 并实机运行，按实际观感取参数（不再靠截图推测）
+
+**界面**
+
+- 底栏参数交还库：`defaultWindowInsetsPadding = true`、高度回默认 54dp、指示器与选中色用
+  库的默认值。此前手算 `maxOf(24, inset+8)` 并关掉库的内边距，同一台设备上比官方高出 6~8dp
+- 一级页切换改用库的 `springAnimateToPage` + `PagerNavigationSpringSpec`，
+  松手吸附与点击切页共用同一套弹簧参数（原来是手写 EaseInOut，两种手感不一致）
+- 滚动统一走 `pageScrollModifiers()`：`overScrollVertical` 把下拉过冲喂给顶栏，
+  band 才会跟手；补上 `scrollEndHaptic` 的边界触感
+- 顶栏大标题：宽屏下 `expandable = false`（居中窄标题），与官方一致
+- **图标体系统一到官方 Glass 族**：10 个工具入口用定色档（`ConvertToGif` / `MotionPhoto` /
+  `Album` / `Edit` / `Compress` / `Merge` / `GridView` / `VerticalSplit` / `ConvertFile` / `Play`），
+  设置、关于、作品等次级入口用同族的细线档（`Glass.Light.*`），底栏用 `All` / `FolderOutline` /
+  `SettingsOutline`。尺寸统一到 26dp（Glass 是 28dp 画布，需按视觉大小换算）
+- 卡片之间补 12dp 下间距（官方是 `padding(horizontal = 12).padding(bottom = 12)`），
+  分组边界终于看得出来
+- 设置页大标题下加版本号副标题，对齐官方设置页的第二行
+- 六页统一到一个页面骨架（`Os4ListPage`）：把「Scaffold + 玻璃顶栏 + 录制层 + 懒列表」
+  固定成唯一写法，内边距由 `pageContentPadding()` 单点算，不再每页手写 `+2dp` 与固定 128dp
+
+**新增**
+
+- 宽屏（≥840dp，或横向 ≥600dp）改用玻璃侧栏 `GlassNavigationRail`，底栏让位；
+  侧栏叠放在内容之上（它自身是 `fillMaxSize` 的，放进 Row 会把内容挤成 0 宽）
+- 删掉 `SegmentedControl`（全项目零调用的死代码）
+
+**工程**
+
+- 记录三条新的硬约束到 `AGENTS.md`：截图判断不了玻璃要真机/实机、二级页不该为底栏留白、
+  侧栏必须叠放
+
+## 1.2.1 — 2026-11-16
 
 1.2 的两处收尾。
 

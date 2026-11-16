@@ -159,3 +159,35 @@ F 宽屏 Rail（依赖 A/B/D 全部稳定）
 4. 宽屏（`wm size 2560x1600` + `wm density 240`）：Rail 出现、底栏消失、内容不拉伸、Rail 玻璃不偏移。
 5. 业务回归：10 个工具的生成链路各跑一次（至少视频转 GIF / 图片合成 / 压缩 / 转视频）。
 6. 崩溃回归：连续滚动 + 开关玻璃 + 进出工具页 20 次，观察 logcat 无 `prepareTreeImpl`。
+
+---
+
+## 9. 实施结果与方案偏差（2026-11-16 回填）
+
+已按方案完成，实机（API 34 / swiftshader，1080×2400@420、2560×1600@240）逐页验证。
+截图见 `_archive/screenshots/os4-gif/`。
+
+### 与方案不一致的地方（都是实测推翻了纸面判断）
+
+1. **`GlassNavigationRail` 不能放进 `Row`。** 方案里写的是「Row 里放 Rail + 内容」，
+   实际它的根节点是 `BoxWithConstraints(fillMaxSize())`，自己决定面板位置 —— 放进 Row 会吃掉整行宽度，
+   内容被挤成 0 宽，实机表现为「侧栏在、右侧一片空白」。改为**叠放在内容之上**，
+   内容用 `padding(start = ExpandedWidth + Margin)` 让位。官方 `AppContent` 也是这个结构。
+2. **`ui/AppIcon.kt` 没有单独建。** 图标规范只有「尺寸表 + LeadingIcon」两件事，
+   放进 `ui/Widgets.kt` 的 `IconSizes` 与 `LeadingIcon` 更省事，不值得多一个文件。
+3. **删除 `SegmentedControl` 已执行**（确认零调用）。
+4. **工具页 `extraBottom = 20.dp`**：结果卡原本贴着主操作条，补一点呼吸。
+
+### 实测确认的关键事实
+
+- 顶栏玻璃胶囊**只在 `isContentScrolled` 为真时出现**（库的 `floating = isContentScrolled`）。
+  第一次巡检没看到胶囊，是因为滑动起点落在滑块上被吃掉、页面其实没滚 —— 不是实现问题。
+- 浅色下渐进模糊带清楚可见（内容被糊成软块）；深色下内容本身就是深色，糊了也接近纯色，
+  看起来"没有带子"是正常的。
+- 玻璃关掉后底栏仍是浮起胶囊 + 描边 + 阴影，不会塌回通栏白底条。
+- 业务链路复测：推入两张 JPG → 图片合成 GIF → 生成 `images2gif_*.gif`（3 KB）→ 作品页收录。
+
+### 仍未验证
+
+- 真机上的模糊质感与底栏跟手感（模拟器是 swiftshader，只能判结构/布局/配色）。
+- 12 个方向样本的视频转 GIF（缺素材，1.2 起就挂着）。

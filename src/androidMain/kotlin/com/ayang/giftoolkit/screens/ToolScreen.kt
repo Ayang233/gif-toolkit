@@ -10,23 +10,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,18 +43,16 @@ import com.ayang.giftoolkit.core.GifFrame
 import com.ayang.giftoolkit.core.MediaTools
 import com.ayang.giftoolkit.task.previewBitmap
 import com.ayang.giftoolkit.task.runTask
-import com.ayang.giftoolkit.ui.ContentBackdropBox
-import com.ayang.giftoolkit.ui.Gap
+import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.NoteText
-import com.ayang.giftoolkit.ui.PageTopBar
+import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.PreviewStage
 import com.ayang.giftoolkit.ui.PrimaryActionBar
 import com.ayang.giftoolkit.ui.SliderRow
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.Tool
-import com.ayang.giftoolkit.ui.GlassScope
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -68,14 +60,10 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import com.ayang.giftoolkit.ui.DropdownRow
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Clear
+import top.yukonga.miuix.kmp.icon.glass.Clear
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
 
@@ -88,10 +76,7 @@ fun ToolScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val form = remember(tool.id) { ToolForm(tool) }
-    val scrollBehavior = MiuixScrollBehavior()
     val glass = rememberGlassScope()
-    val listState = rememberLazyListState()
-    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
     val pickOne = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -116,17 +101,14 @@ fun ToolScreen(
         form.stillPreview = previewBitmap(context, tool, form)
     }
 
-    Scaffold(
-        topBar = {
-            PageTopBar(
-                title = tool.title,
-                glass = glass,
-                isScrolled = isScrolled,
-                scrollBehavior = scrollBehavior,
-                subtitle = tool.summary,
-                onBack = onBack,
-            )
-        },
+    Os4ListPage(
+        title = tool.title,
+        glass = glass,
+        subtitle = tool.summary,
+        onBack = onBack,
+        reserveNavBar = false,
+        // 底部主操作条自带渐变遮罩，再给结果卡留一点呼吸，别贴着按钮
+        extraBottom = 20.dp,
         // 主操作放在 Scaffold 的 bottomBar 里：内容区自动让出高度，
         // 不会再出现"参数滑块贴着按钮"或者滚动到头还要被压住的情况。
         bottomBar = {
@@ -146,106 +128,93 @@ fun ToolScreen(
                 onCancel = { form.cancelRequested = true },
             )
         },
-    ) { padding ->
-        // 正文进录制层，顶栏在它外面采样（兄弟节点）—— 这是玻璃不闪退的前提
-        ContentBackdropBox(glass) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(
-                    top = padding.calculateTopPadding() + 4.dp,
-                    bottom = padding.calculateBottomPadding() + 12.dp,
-                ),
-            ) {
-                item {
-                    GroupHeader("素材")
-                    GroupCard {
-                        BasicComponent(
-                            title = if (tool.acceptsMultiple) "选择多个文件" else "选择文件",
-                            summary = when {
-                                form.uris.isEmpty() -> "点击从系统文件选择器导入"
-                                tool.acceptsMultiple -> "已选择 ${form.uris.size} 个文件"
-                                else -> "已选择 1 个文件"
-                            },
-                            endActions = {
-                                if (form.uris.isNotEmpty()) {
-                                    IconButton(onClick = {
-                                        form.uris = emptyList()
-                                        form.stillPreview = null
-                                        form.result = null
-                                        form.message = ""
-                                    }) {
-                                        Icon(MiuixIcons.Clear, "清除", Modifier.size(19.dp))
-                                    }
-                                }
-                            },
-                            onClick = {
-                                if (tool.acceptsMultiple) pickMany.launch(tool.mime)
-                                else pickOne.launch(tool.mime)
-                            },
-                        )
-                    }
-                }
-
-                item {
-                    GroupHeader("预览")
-                    GroupCard {
-                        Box(Modifier.padding(12.dp)) {
-                            val still = form.stillPreview
-                            if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
-                                AnimatedPreview(form.preview, form.playSpeed)
-                            } else {
-                                PreviewStage(
-                                    bitmap = still,
-                                    // 有素材就按素材真实比例显示，不再强行套 4:3 留白；
-                                    // 空态用 16:9，省下来的高度正好给下面的参数区。
-                                    aspect = if (still != null) {
-                                        still.width.toFloat() / still.height.coerceAtLeast(1)
-                                    } else {
-                                        16f / 9f
-                                    },
+    ) {
+        item {
+            GroupHeader("素材")
+            GroupCard {
+                BasicComponent(
+                    title = if (tool.acceptsMultiple) "选择多个文件" else "选择文件",
+                    summary = when {
+                        form.uris.isEmpty() -> "点击从系统文件选择器导入"
+                        tool.acceptsMultiple -> "已选择 ${form.uris.size} 个文件"
+                        else -> "已选择 1 个文件"
+                    },
+                    endActions = {
+                        if (form.uris.isNotEmpty()) {
+                            IconButton(onClick = {
+                                form.uris = emptyList()
+                                form.stillPreview = null
+                                form.result = null
+                                form.message = ""
+                            }) {
+                                Icon(
+                                    imageVector = MiuixIcons.Glass.Light.Clear,
+                                    contentDescription = "清除",
+                                    modifier = Modifier.size(19.dp),
                                 )
                             }
                         }
-                    }
-                }
+                    },
+                    onClick = {
+                        if (tool.acceptsMultiple) pickMany.launch(tool.mime)
+                        else pickOne.launch(tool.mime)
+                    },
+                )
+            }
+        }
 
-                item {
-                    GroupHeader("参数")
-                    GroupCard { ParamPanel(tool, form, glass) }
-                }
-
-                if (form.message.isNotBlank()) {
-                    item {
-                        Gap(8)
-                        NoteText(form.message)
-                    }
-                }
-
-                form.result?.let { file ->
-                    item {
-                        GroupHeader("结果")
-                        ResultCard(
-                            file = file,
-                            mime = form.resultMime,
-                            previewFrames = form.preview,
-                            onShared = { MediaTools.share(context, file, form.resultMime) },
-                            onSaved = {
-                                MediaTools.saveToGallery(context, file, form.resultMime, file.name)
-                                form.message = "已保存到相册：${file.name}"
+        item {
+            GroupHeader("预览")
+            GroupCard {
+                Box(Modifier.padding(12.dp)) {
+                    val still = form.stillPreview
+                    if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
+                        AnimatedPreview(form.preview, form.playSpeed)
+                    } else {
+                        PreviewStage(
+                            bitmap = still,
+                            // 有素材就按素材真实比例显示，不再强行套 4:3 留白；
+                            // 空态用 16:9，省下来的高度正好给下面的参数区。
+                            aspect = if (still != null) {
+                                still.width.toFloat() / still.height.coerceAtLeast(1)
+                            } else {
+                                16f / 9f
                             },
                         )
                     }
                 }
             }
         }
+
+        item {
+            GroupHeader("参数")
+            GroupCard { ParamPanel(tool, form) }
+        }
+
+        if (form.message.isNotBlank()) {
+            item { NoteText(form.message) }
+        }
+
+        form.result?.let { file ->
+            item {
+                GroupHeader("结果")
+                ResultCard(
+                    file = file,
+                    mime = form.resultMime,
+                    previewFrames = form.preview,
+                    onShared = { MediaTools.share(context, file, form.resultMime) },
+                    onSaved = {
+                        MediaTools.saveToGallery(context, file, form.resultMime, file.name)
+                        form.message = "已保存到相册：${file.name}"
+                    },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
+private fun ParamPanel(tool: Tool, form: ToolForm) {
     Column(Modifier.fillMaxWidth()) {
         when (tool) {
             Tool.VIDEO_TO_GIF, Tool.MVIMG_TO_GIF -> {
@@ -326,7 +295,7 @@ private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
                 }
             }
 
-            // 这三个工具没有可调参数，不留说明段落 —— 卡片本身就够表达
+            // 这三个工具没有可调参数，卡片本身就够表达，不留说明段落
             Tool.GIF_CONNECT -> Unit
             Tool.GIF_PUZZLE -> {
                 // 列数是离散档位，用弹窗选比滑块自然；2 个素材时列数固定为 2，不必给选项
