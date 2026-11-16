@@ -27,13 +27,5 @@ fun rememberWideLayout(): Boolean {
     }
 }
 
-/** 侧边栏是否默认展开成「图标 + 文字」。阈值同官方 `shouldExpandNavigationRail`。 */
-@Composable
-fun rememberExpandNavigationRail(): Boolean {
-    val windowInfo = LocalWindowInfo.current
-    val density = LocalDensity.current
-    return with(density) { windowInfo.containerSize.width.toDp() >= 1200.dp }
-}
-
 /** 宽屏标记，页面骨架据此决定顶栏是否还允许大标题展开。 */
 val LocalWideLayout = compositionLocalOf { false }
