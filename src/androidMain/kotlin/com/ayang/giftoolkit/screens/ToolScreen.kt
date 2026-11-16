@@ -326,7 +326,8 @@ private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
                 }
             }
 
-            Tool.GIF_CONNECT -> NoteText("按选择顺序把多个 GIF 连接成一个；尺寸不同会自动等比居中，可能出现留黑。")
+            // 这三个工具没有可调参数，不留说明段落 —— 卡片本身就够表达
+            Tool.GIF_CONNECT -> Unit
             Tool.GIF_PUZZLE -> {
                 // 列数是离散档位，用弹窗选比滑块自然；2 个素材时列数固定为 2，不必给选项
                 if (form.uris.size > 2) {
@@ -337,9 +338,8 @@ private fun ParamPanel(tool: Tool, form: ToolForm, glass: GlassScope) {
                         onSelect = { form.puzzleCols = it + 2 },
                     )
                 }
-                NoteText("把 2~4 个 GIF 拼成宫格同时播放，以最短的那个帧数为准。")
             }
-            Tool.GIF_SPLIT -> NoteText("把 GIF 的每一帧导出为 PNG，并打包成一个 zip。")
+            Tool.GIF_SPLIT -> Unit
 
             Tool.GIF_TO_VIDEO -> SliderRow("视频帧率", "${form.fps.toInt()} fps", form.fps, 5f..30f, steps = 24) {
                 form.fps = it

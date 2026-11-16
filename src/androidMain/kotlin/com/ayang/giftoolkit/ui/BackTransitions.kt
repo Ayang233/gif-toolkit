@@ -10,9 +10,8 @@ import top.yukonga.miuix.kmp.nav.transition.navGraphicsTransition
 /**
  * 把设置里的档位映射成实际的页面转场。
  *
- * 四个档位都是基于 Miuix 公开的 [navGraphicsTransition] 自己写的。
- * 工程从这一版起改为 GPL-3.0，与 KernelSU / InstallerX 许可兼容，
- * 但这里仍保留自写实现——参考的只是"效果长什么样"，不引入对方的代码维护负担。
+ * 五个档位里四个是基于 Miuix 公开的 [navGraphicsTransition] 自己写的
+ * （参考的只是"效果长什么样"，不引入对方的代码维护负担）。
  *
  * 共同约定：`relativeDepth` 为负表示正在进入/退出，为正表示被覆盖。
  * 所有读写都发生在 `graphicsLayer` 的延迟读取块里，动画过程不触发重组。
@@ -23,7 +22,11 @@ fun backTransition(
 ): NavTransition = when (animation) {
     // 库自带预设：进入页从右侧滑入，被覆盖页视差后退四分之一宽
     BackAnimation.Miuix -> NavTransitions.MiuixDefault
-    BackAnimation.None -> NavTransitions.None
+    // 「无」只关掉**预测性返回**这一层（手势预览、跟手位移），
+    // 页面切换本身仍然走 Miuix 默认转场 —— 不能退化成 NavTransitions.None，
+    // 那会让所有二级页面进出变成硬切，看起来像卡住了。
+    // 系统级的预测性返回在 GifApplication 里用 hidden API 关，和这里互不影响。
+    BackAnimation.None -> NavTransitions.MiuixDefault
     BackAnimation.Aosp -> AospScaleTransition
     BackAnimation.Classic -> ClassicSlideTransition
     BackAnimation.Scale -> scaleTransition(exitDirection)

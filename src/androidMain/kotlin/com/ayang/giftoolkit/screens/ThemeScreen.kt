@@ -110,14 +110,11 @@ fun ThemeScreen(
                         // 中间档属于库的渲染路径，不该让用户去理解。
                         SwitchRow(
                             title = "玻璃材质",
-                            summary = "顶栏与底栏使用模糊玻璃；关掉后仍保留浮起胶囊与阴影",
+                            summary = "顶栏与底栏使用模糊玻璃",
                             checked = app.glassEnabled,
                             onChange = { app.glassEnabled = it },
                         )
                     }
-                }
-                item {
-                    NoteText("个别机型上系统模糊会失效（内容不再糊开，只被压暗），此时关掉玻璃即可规避。")
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -143,12 +140,6 @@ fun ThemeScreen(
                                 )
                             }
                         }
-                    }
-                    item {
-                        NoteText(
-                            "选「无」会同时关闭系统级预测性返回（下次启动应用生效）。" +
-                                "部分系统不支持该开关，此时开关不生效。",
-                        )
                     }
                 }
             }
