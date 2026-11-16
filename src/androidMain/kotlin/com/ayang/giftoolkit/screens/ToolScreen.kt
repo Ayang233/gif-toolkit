@@ -135,7 +135,7 @@ fun ToolScreen(
                 BasicComponent(
                     title = if (tool.acceptsMultiple) "选择多个文件" else "选择文件",
                     summary = when {
-                        form.uris.isEmpty() -> "点击从系统文件选择器导入"
+                        form.uris.isEmpty() -> "从系统文件选择器导入"
                         tool.acceptsMultiple -> "已选择 ${form.uris.size} 个文件"
                         else -> "已选择 1 个文件"
                     },
@@ -235,7 +235,7 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
                 SliderRow("色彩数量", "${form.quality.toInt()} 色", form.quality, 32f..255f) {
                     form.quality = it
                 }
-                SwitchRow("防抖", "估计帧间位移并平滑轨迹，减轻手抖", form.stabilize) {
+                SwitchRow("防抖", "减少画面抖动", form.stabilize) {
                     form.stabilize = it
                 }
                 SwitchRow("色度抠图", "把选定颜色抠成透明背景", form.colorKey) {
@@ -265,9 +265,10 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
                 SliderRow("旋转", "${form.rotate.toInt()}°", form.rotate, 0f..270f, steps = 3) {
                     form.rotate = it
                 }
-                SwitchRow("水平镜像", "左右翻转", form.mirror) { form.mirror = it }
-                SwitchRow("垂直翻转", "上下翻转", form.flip) { form.flip = it }
-                SwitchRow("倒放", "帧顺序反转", form.reverse) { form.reverse = it }
+                // 这几行的标题已经把动作说完了，副标题只复述同义词，直接去掉。
+                SwitchRow("水平镜像", checked = form.mirror) { form.mirror = it }
+                SwitchRow("垂直翻转", checked = form.flip) { form.flip = it }
+                SwitchRow("倒放", checked = form.reverse) { form.reverse = it }
                 SwitchRow("居中裁剪", "保留画面中央 80%", form.cropCenter) { form.cropCenter = it }
                 SwitchRow("去水印", "在指定区域打马赛克", form.mosaic) { form.mosaic = it }
                 if (form.mosaic) {

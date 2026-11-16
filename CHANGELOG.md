@@ -4,73 +4,37 @@
 
 ## 1.4 — 2026-11-16
 
-以 Miuix `ac0af467`（= 当时 main 最新 HEAD）为基准的第二轮深度对照，修的是**机制层**的偏差，
-不是表面样式。三条问题的共同来源是：**用自己的补丁替代了库已有的机制**。
-
 **修复**
 
-- **一级页在首、末页仍能继续拖动**。Pager 之前只换了 `flingBehavior`，手势还是 Compose 原生那套；
-  而 `MiuixTheme` 全局注入了 `LocalOverscrollFactory = MiuixOverscrollFactory`，
-  原生 Pager 到边界时被拒的位移会交给 overscroll 工厂做弹性过冲 —— 看着"还在动"，
-  其实是过冲动画，不是翻页。改为官方默认的 Cross-Axis 三件套
-  （`pagerGestureOverride` + `userScrollEnabled = false` + `PagerGestureNestedScrollConnection`），
-  Pager 自身的 scrollable 被整个移除，位移不再进 overscroll 工厂，两端彻底锁死（实测位移 0.00%）
-- **二级页底部"多一层背景"**。原先是 `Brush.verticalGradient(0f 透明 → 0.55f 页面色)`，
-  渐变本身就在按钮上方切出一条可见色阶。但完全去掉会让列表内容从按钮周围的缝隙透出来
-  （滑块的蓝色圆弧会从按钮左下角露出），所以改成**与页面同色的纯色底**：
-  视觉上等于没有额外背景，同时挡住穿透
-- **顶栏玻璃补齐降级链**。`bandBrush` / `bandOverhang` / `backgroundAlpha` 之前全吃默认值。
-  现在显式传 `TopAppBarBandBrush` + `BandOverhang`：一旦 `progressiveTextureBlur`
-  在某个 GPU 上静默失效，库会落回这条渐变路径，17 段平滑衰减不会露出生硬的矩形边
-- **下拉弹层恢复玻璃采样**。之前 `backdrop = null`（退化成不透明底卡），是为了躲开
-  "弹层中部一坨灰糊"。但那个脏斑的成因是当时的录制层**没垫底色**，1.3 已经补上 `drawRect`，
-  前提条件不存在了。现在给 `GroupCard` 加卡片局部录制层（官方 `BlurSection.kt:125` 同款），
-  弹层真的会模糊背后的卡片，实机复测无脏斑
-- **退出确认改用库的 `WindowDialog`**。自绘的 `Box + Card` 没有进出场动画、不联动系统返回键、
-  `windowDimming` 也不渐入
-- **顶栏返回图标统一到 Glass 族**（`Glass.ChevronBackward`，28dp 画布 + `GlassIconButton`）。
-  之前玻璃档也用 extended 的 `Back`，线宽比同栏其它 Glass 图标粗一档
-- **顶栏玻璃 style 不再按明暗分档**，吃 `GlassDefaults.Style`（与官方 `AdaptiveTopAppBar` 一致）
+- 首页继续左滑、末页继续右滑时页面还会跟着动，现在两端不再回弹
+- 二级页底部按钮上方有一层渐变，看起来像多了一条底色，已去掉
+- 顶栏滚动时的模糊偶尔出现生硬边界，补上了渐变降级参数
+- 下拉菜单恢复背景模糊（之前为了躲开显示异常，退成了一整块不透明底）
 
-**基线**
+**调整**
 
-- 远程 `origin/main` 仍为 `ac0af467`（2026-11-15T15:29Z），与 1.3 相同，本轮无上游变化
+- 退出确认改用系统对话框，带进出场动画
+- 顶栏返回图标换成 Glass 图标集里的细箭头，和同栏其它图标的线宽一致
+- 顶栏玻璃不再按深浅色分档，跟随库默认
+- 应用图标改为白底黑主体
+- 关于页的应用图标改用 squircle 圆角（不支持着色器的设备自动退回普通圆角）
 
-**复用清理（第二轮：全项目自造轮子扫描）**
+**优化**
 
-详单见 `docs/os4-reuse-audit.md`。全项目 30 个文件逐个对照库的公开 API，
-没有发现"官方有实现却用自绘 Canvas / 自写 Blur 重复实现"的情况，问题集中在**薄包装层抄了库的常量与样式**。
+- 列表图标与文字的间距回到 8dp（之前多补了 4dp，和别的行不一致）
+- 底栏高度改为读取库的常量，不再本地写死
+- 作品页文件行改用官方的箭头行组件，不再自己拼箭头
+- 设置里的「自定义颜色」改名为「动态取色」，副标题说明它从壁纸取色
+- 精简页面副标题：同义重复的（如「水平镜像 / 左右翻转」）去掉；
+  错误提示补上「换一个文件试试」这类下一步说明
+- 去掉零调用的旧组件与重复的录制层构造
 
-- 底栏胶囊高度不再本地硬编码 `54.dp`，改引 `GlassNavigationBarDefaults.Height`
-- 关于页应用图标圆角改用 `squircleClip`（新增 `miuix-squircle` 依赖）：OS4 图标是连续曲率，
-  正圆弧大尺寸下能看出"角上有点方"；不支持 RuntimeShader 的设备上库内部自动退回普通圆角
-- 作品页文件行改 `ArrowPreference`，删掉自己拼的 `ChevronForward`（尺寸/颜色/行尾间距）
-- `LeadingIcon` 去掉 `padding(end = 4.dp)`，回归 `BasicComponent` 的 8dp 间距 ——
-  那个补边是 24dp 线框图标时代的产物，换成 28dp 画布的 Glass 图标后反而过宽且与其它行不一致
-- `GroupCard` 删掉冗余的 `insideMargin = PaddingValues(0.dp)`（`CardDefaults.InsideMargin` 本来就是它）
-- `App.kt` 与 `GlassScope.kt` 各写一遍的录制层构造抽成 `rememberPageBackdrop()`
-- 删零调用死代码 `InfoRow` / `Gap`
+**版本**
 
-**结论：验证后保留原实现**
+- 依赖基线 Miuix `ac0af467`（与 1.3 相同，上游无更新）
+- 新增 `miuix-squircle` 依赖
 
-- **作品页底部面板仍用 `WindowBottomSheet`**，没有换成 `GlassBottomSheet`。
-  `GlassBottomSheet` 是 **Scaffold 作用域**组件（`LocalDialogStates` 由 Scaffold 提供并渲染），
-  而这个面板与 `Os4ListPage` 内部的 Scaffold 是**兄弟**关系，拿不到宿主 —— 实测点击文件后
-  毫无反应（静默不渲染），`renderInRootScaffold` 的 true/false 都救不了。
-  要给它造宿主就得在页面外包一层 Scaffold，会改变 inset 与背景录制层，风险大于收益
-- **顶栏 `defaultWindowInsetsPadding` 保留默认 `true`**。官方传 `false` 是因为它的 Scaffold 已经
-  消费过 inset、另有 `appPageTopBarInsets()` 精确补回；我们没有那套 `AppPageInsets` 契约，
-  改成 `false` 就要重建整套 inset 处理，而收益只体现在刘海屏/横屏的边缘情况
-
-**踩坑记录（重要，已写进 AGENTS.md）**
-
-- 试过把页面录制层从内容区上移到 `Scaffold` 自身（照官方 `GlassPage.kt:242`），
-  **直接 SIGSEGV**：`RenderNode::prepareTreeImpl` 无限递归，cause 是 stack overflow。
-  官方敢那么写，是因为它顶栏采的是 `LocalTopAppBarBackdrop`（另一个 backdrop），
-  与挂在 Scaffold 上的不是同一个；我们顶栏与内容共用同一个 `contentBackdrop`，
-  录制层一旦包含顶栏，顶栏采样就会把正在采样的自己录进去
-- Android 16（gfxstream）上 AGSL 渐进模糊**不再失败**（`memory exhausted` 计数 0），
-  API 34 + SwiftShader 上那 113 次报错不能外推
+排查与清理记录见 `docs/os4-deep-audit.md`、`docs/os4-reuse-audit.md`。
 
 ## 1.3 — 2026-11-16
 

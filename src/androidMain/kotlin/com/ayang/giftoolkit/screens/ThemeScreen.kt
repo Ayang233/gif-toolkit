@@ -52,13 +52,15 @@ fun ThemeScreen(
                 )
                 SwitchRow(
                     title = "AMOLED 纯黑背景",
-                    summary = "深色模式下页面底用纯黑，卡片仍比页面亮一档",
+                    summary = "深色模式下页面用纯黑，卡片略亮",
                     checked = app.amoledEnabled,
                     onChange = { app.amoledEnabled = it },
                 )
+                // 原来叫"自定义颜色"，但这个功能并不自定义 —— 是让系统从壁纸取色。
+                // 与系统设置里"动态取色"的叫法统一。
                 SwitchRow(
-                    title = "自定义颜色",
-                    summary = "用 Monet 从壁纸生成整套配色",
+                    title = "动态取色",
+                    summary = "从壁纸提取配色（Monet）",
                     checked = app.monetEnabled,
                     onChange = { app.monetEnabled = it },
                 )

@@ -64,7 +64,7 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
 
             Tool.MVIMG_TO_GIF -> {
                 val video = MotionPhoto.extractVideo(context, f.uris[0])
-                    ?: error("这似乎不是动态照片，未找到内嵌视频")
+                    ?: error("文件里没有内嵌视频，可能不是动态照片")
                 frames = MediaTools.videoFrames(
                     context = context,
                     uri = Uri.fromFile(video),
@@ -74,7 +74,7 @@ suspend fun runTask(context: Context, tool: Tool, f: ToolForm) = withContext(Dis
                     width = f.width.toInt(),
                 ) { f.progress = 0.05f + it / 200f; f.checkCancelled() }
                 video.delete()
-                if (frames.isEmpty()) error("无法读取动态照片内嵌视频")
+                if (frames.isEmpty()) error("无法读取内嵌视频，换一个文件试试")
                 f.checkCancelled()
                 f.progress = 0.65f
                 frames = settle(frames, f)

@@ -100,7 +100,6 @@ fun AboutScreen(
                 )
                 ArrowPreference(
                     title = "开源许可",
-                    summary = "本应用使用的第三方组件",
                     startAction = { LeadingIcon(MiuixIcons.Glass.Light.NotesOutline) },
                     onClick = onOpenLicenses,
                 )

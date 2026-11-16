@@ -26,11 +26,11 @@ enum class ThemeMode(val label: String) {
  * 让返回变成和传统系统一致的行为。其余档位只改页面转场的视觉，系统手势由系统自己画。
  */
 enum class BackAnimation(val label: String, val summary: String) {
-    Miuix("Miuix", "左右滑入，下层视差后退，和系统设置页一致"),
+    Miuix("Miuix", "左右滑入，下层后退"),
     Aosp("AOSP", "进入页缩放淡入，当前页轻微后退"),
     Scale("缩放", "按手势方向缩放并平移"),
-    Classic("经典", "通栏平移，下层不视差"),
-    None("无", "关掉预测性返回的手势预览，页面切换仍用默认转场"),
+    Classic("经典", "通栏平移，下层不动"),
+    None("无", "关闭手势预览，页面切换仍用默认转场"),
 }
 
 /** 缩放档位下页面退出的方向。 */

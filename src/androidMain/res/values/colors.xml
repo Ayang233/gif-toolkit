@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 应用图标底色：白底蓝图（用户指定的方向） -->
+    <!-- 应用图标底色：白底黑主体 -->
     <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

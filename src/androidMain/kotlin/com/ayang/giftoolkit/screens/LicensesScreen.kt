@@ -1,13 +1,13 @@
 package com.ayang.giftoolkit.screens
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.ui.GroupCard
-import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LeadingIcon
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.rememberGlassScope
@@ -28,13 +28,14 @@ fun LicensesScreen(
     Os4ListPage(
         title = "开源许可",
         glass = glass,
-        subtitle = "共 ${thirdPartyLibraries.size} 个第三方组件",
+        subtitle = "共 ${thirdPartyLibraries.size} 个组件",
         onBack = onBack,
         reserveNavBar = false,
     ) {
-        item { GroupHeader("第三方组件") }
+        // 只有一个分组，不需要再顶一个"第三方组件"分组标题 —— 那是给多分组页面用的。
+        // 顶部间距由卡片的 top padding 补，和 GroupHeader 的视觉留白接近。
         item {
-            GroupCard {
+            GroupCard(modifier = Modifier.padding(top = 8.dp)) {
                 thirdPartyLibraries.forEachIndexed { index, entry ->
                     ArrowPreference(
                         title = entry.name,

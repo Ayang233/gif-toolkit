@@ -252,11 +252,16 @@ fun SliderRow(
     )
 }
 
-/** 开关行，整行可点。`onChange` 放最后，调用处才能用尾随 lambda。 */
+/**
+ * 开关行，整行可点。`onChange` 放最后，调用处才能用尾随 lambda。
+ *
+ * [summary] 可空：标题已经说清的事不要再复述一遍（"水平镜像 / 左右翻转"这种），
+ * 没有增量信息时就不传。不传时用命名参数写 `checked =`，别用位置参数跳过它。
+ */
 @Composable
 fun SwitchRow(
     title: String,
-    summary: String,
+    summary: String? = null,
     checked: Boolean,
     icon: ImageVector? = null,
     onChange: (Boolean) -> Unit,

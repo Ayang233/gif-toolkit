@@ -29,7 +29,7 @@ enum class Tool(
     GIF_EDIT("edit", "GIF 编辑", "裁剪、旋转、镜像、倒放、字幕", "处理", false, "image/gif"),
     GIF_COMPRESS("compress", "GIF 压缩", "降尺寸、抽帧、减色", "处理", false, "image/gif"),
     GIF_CONNECT("connect", "GIF 拼接", "多个 GIF 首尾相接", "处理", true, "image/gif"),
-    GIF_PUZZLE("puzzle", "GIF 拼图", "2~4 个同屏宫格播放", "处理", true, "image/gif"),
+    GIF_PUZZLE("puzzle", "GIF 拼图", "2~4 个画面同屏播放", "处理", true, "image/gif"),
 
     GIF_SPLIT("split", "GIF 分解", "拆成逐帧 PNG 并打包", "输出", false, "image/gif"),
     GIF_TO_VIDEO("tovideo", "GIF 转视频", "导出为 MP4 视频", "输出", false, "image/gif"),

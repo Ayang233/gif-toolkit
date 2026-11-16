@@ -10,8 +10,8 @@
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
-> 要改这个项目（尤其用 AI 协作）请先读 [AGENTS.md](AGENTS.md)：里面是目录地图、常用命令，
-> 以及 5 条违反就会出事的硬约束（玻璃节点、配色推导、分段控件、卡片无分割线、不引入 Material）。
+> 改这个项目之前请先读 [AGENTS.md](AGENTS.md)：目录地图、常用命令，以及 11 条硬约束
+> （玻璃录制层、配色推导、图标规范、Scaffold 宿主、状态栏适配等）。
 
 | 主页 | 工具页 | 设置 | 关于 |
 | --- | --- | --- | --- |
@@ -42,7 +42,7 @@
 ## 技术栈
 
 - Kotlin Multiplatform（单模块，`androidMain` 承载全部实现）+ Compose Multiplatform 1.12.2
-- [Miuix](https://github.com/compose-miuix-ui/miuix) 提供全部 UI 组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav`）
+- [Miuix](https://github.com/compose-miuix-ui/miuix) 提供全部 UI 组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`）
 - AGP 9.5.1 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
 - GIF 编解码为纯 Kotlin 实现，视频取帧与 MP4 编码使用系统 `MediaMetadataRetriever` / `MediaCodec`
 
@@ -96,7 +96,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 ├── data/SettingsStore.kt  外观设置的持久层（SharedPreferences）
 ├── ui/
 │   ├── ToolCatalog.kt     十个工具的元数据与图标
-│   ├── Widgets.kt         分组卡片、行、分段控件、预览舞台、主操作条、配色推导
+│   ├── Widgets.kt         分组卡片、行、下拉、预览舞台、主操作条、配色推导
 │   └── LicenseCatalog.kt  第三方组件清单
 ├── screens/               主页 / 工具页 / 作品页 / 设置 / 关于 / 开源许可
 ├── task/TaskRunner.kt     任务执行与预览取帧
@@ -105,18 +105,17 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 
 ## 设计约束（改 UI 前值得先看）
 
-这些是踩过的坑，写在这里省得后来人重踩：
+几条踩过的坑，完整清单见 [AGENTS.md](AGENTS.md)：
 
-1. **玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是子节点。**
-   否则玻璃会采样到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 原生栈溢出直接闪退。
+1. **玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是子节点，录制层也不能上移到 `Scaffold`。**
+   否则玻璃会采样到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 递归到栈溢出、直接闪退。
 2. **Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个色。**
    所以页面色不直接取 `surface`，而是由卡片色反推（`ui/Widgets.kt` 的 `pageColor()` / `cardColor()`），
    否则整页和卡片糊成一片，分组结构消失。
-3. **分段控件的滑块不要用 `colorScheme.background`**，Monet 下它不是白色，会和凹槽撞色。
-   同理走 `cardColor()` / `pageColor()`；圆角要同心：凹槽 11dp、内边距 3dp、滑块 8dp。
-4. **`TabRow` 不是分段控件**：它的未选中项会各画一圈 1dp 描边，渲染成"一排小按钮"。
-   主题切换用的是自绘的 `SegmentedControl`。
-5. **Miuix 卡片内不放分割线**，靠 56dp 最小行高与 16dp 内边距区分。
+3. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 作为宿主。** `App.kt` 那一层没有 Scaffold，
+   这类组件会静默不渲染；页面级浮层用 `WindowDialog` / `WindowBottomSheet`。
+4. **Miuix 卡片内不放分割线**，靠 56dp 最小行高与 16dp 内边距区分。
+5. **不引入 `androidx.compose.material3`**，会和 Miuix 的设计语言打架，也明显增大包体。
 
 ## 已知限制
 

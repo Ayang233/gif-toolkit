@@ -87,7 +87,7 @@ fun LibraryScreen(app: AppState) {
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "回到「工具」挑一个功能，生成结果会出现在这里",
+                                text = "在「工具」里生成后会出现在这里",
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 textAlign = TextAlign.Center,
