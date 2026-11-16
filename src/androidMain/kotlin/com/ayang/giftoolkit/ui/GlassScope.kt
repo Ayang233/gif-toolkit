@@ -49,20 +49,31 @@ class GlassScope internal constructor(
         get() = if (enabled && contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier
 }
 
+/**
+ * 页面级录制层：先铺一层页面底色，再录内容。
+ *
+ * **必须先铺底色再录内容**（官方 `rememberBlurBackdrop` 同款）：裸的 `rememberLayerBackdrop()`
+ * 只录内容，卡片之间的空隙、列表 padding 区都是透明的；玻璃采样并模糊后，这些位置仍然是透明
+ * —— 于是顶上那条带上内容原样透出来（看着像"糊影/重影"），而不是被糊成一层柔和的底色。
+ * 填充用 `pageColor()` 而不是 `surface`：页面实际画的就是这个色。
+ *
+ * 抽成一处是因为 `App.kt`（给底栏/侧栏采样）和每个页面（给顶栏采样）各需要一份，
+ * 之前两处各写了一遍同样的 `drawRect + drawContent`。
+ */
+@Composable
+fun rememberPageBackdrop(): LayerBackdrop {
+    val surfaceColor = pageColor()
+    return rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+}
+
 @Composable
 fun rememberGlassScope(enabled: Boolean = LocalGlassEnabled.current): GlassScope {
     // 无论开不开都建一个实例：创建本身只是分配对象，
     // 真正花 GPU 的是 layerBackdrop 这个 Modifier，只在 enabled 时才挂上去。
-    //
-    // **必须先铺一层页面底色再录内容**（官方 rememberBlurBackdrop 同款）：
-    // 裸的 rememberLayerBackdrop() 只录内容，卡片之间的空隙、列表 padding 区都是透明的；
-    // 顶栏采样并模糊后，这些位置仍然是透明 —— 于是顶栏那条带上，内容原样透出来（看着像"糊影/重影"），
-    // 而不是被糊成一层柔和的底色。填充用 pageColor() 而不是 surface：页面实际画的就是这个色。
-    val surfaceColor = pageColor()
-    val backdrop = rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
+    val backdrop = rememberPageBackdrop()
     return remember(enabled, backdrop) { GlassScope(enabled, backdrop) }
 }
 

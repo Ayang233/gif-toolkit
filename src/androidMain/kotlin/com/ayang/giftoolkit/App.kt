@@ -50,13 +50,13 @@ import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.pageColor
 import com.ayang.giftoolkit.ui.rememberBottomBarClearance
 import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
+import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.glass.GlassNavigationRail
@@ -130,12 +130,9 @@ fun GifApp() {
                 }
             }
 
-            // 同 GlassScope：录制层先铺一层页面底色，空隙才不是透明的（否则底栏采样区会透出内容）。
-            val backdropColorForRecord = pageColor()
-            val backdrop = rememberLayerBackdrop {
-                drawRect(backdropColorForRecord)
-                drawContent()
-            }
+            // 与页面级录制层同一套构造（GlassScope.rememberPageBackdrop）：
+            // 先铺页面底色，空隙才不是透明的（否则底栏采样区会透出内容）。
+            val backdrop = rememberPageBackdrop()
             val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
             var tab by rememberSaveable { mutableIntStateOf(0) }
             var confirmExit by remember { mutableStateOf(false) }

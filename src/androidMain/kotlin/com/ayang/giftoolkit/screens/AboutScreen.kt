@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -27,6 +25,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Link
 import top.yukonga.miuix.kmp.icon.glass.NotesOutline
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -62,7 +61,11 @@ fun AboutScreen(
                 Image(
                     painter = painterResource(R.drawable.ic_app_badge),
                     contentDescription = null,
-                    modifier = Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)),
+                    // 用库的 squircleClip 而不是 clip(RoundedCornerShape(20.dp))：
+                    // OS4 的图标圆角是连续曲率（四角不是正圆弧），普通圆角在大尺寸下能看出
+                    // "角上有点方"。squircleClip 在不支持 RuntimeShader 的设备上内部自动退回
+                    // 普通圆角，不需要调用方判断（SquircleBackground.kt:108）。
+                    modifier = Modifier.size(76.dp).squircleClip(20.dp),
                 )
                 Text("GIF 助手", style = MiuixTheme.textStyles.title3)
                 Text(

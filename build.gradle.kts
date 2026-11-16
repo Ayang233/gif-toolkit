@@ -29,6 +29,10 @@ kotlin {
             // miuix-material：GlassDefaults / GlassStyle / isRenderEffectSupported 在这里，
             // glass 模块不会把它们透出来，OS4 化必须显式依赖。
             implementation("top.yukonga.miuix.kmp:miuix-material")
+            // miuix-squircle：OS4 的连续曲率圆角（squircleClip / squircleBackground），
+            // 关于页的应用图标用它，而不是自己 clip 一个 RoundedCornerShape。
+            // 不支持 RuntimeShader 的设备上它内部会自动退回普通圆角，不需要调用方判断。
+            implementation("top.yukonga.miuix.kmp:miuix-squircle")
             implementation("top.yukonga.miuix.kmp:miuix-glass")
             // 反射 ApplicationInfo.setEnableOnBackInvokedCallback 需要解隐藏 API 豁免
             implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")

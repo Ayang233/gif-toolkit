@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -36,15 +37,15 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
  */
 val LocalBottomBarClearance = compositionLocalOf { 0.dp }
 
-/** 玻璃底栏胶囊高度，与 `GlassNavigationBarDefaults.Height` 保持一致。 */
-val GlassBarHeight: Dp = 54.dp
-
 /**
  * 底栏占位高度。
  *
- * 外边距规则镜像 `GlassNavigationBar` 内部那套（导航栏 ≤16dp → 28dp；≥28dp → 跟随；
- * 中间 → 12dp + 导航栏），这样内容末尾的留白和胶囊实际位置是同一套几何。
- * 库没有把这个值暴露出来，只能在这里复刻 —— 上游若改了，这里要跟着改。
+ * 胶囊高度直接取库的 `GlassNavigationBarDefaults.Height`（54dp），不再本地留一份 54.dp ——
+ * 之前硬编码过，上游一改这个值，顶栏高度和内容末尾留白就对不上了。
+ *
+ * 外边距规则仍要镜像 `GlassNavigationBar` 内部那套（导航栏 ≤16dp → 28dp；≥28dp → 跟随；
+ * 中间 → 12dp + 导航栏），因为库**没有把这个 margin 暴露出来**（`floatingMargin` 是函数内
+ * 局部变量）。这是全项目唯一"复刻库内部公式"的地方，上游若改规则这里要跟着改。
  */
 @Composable
 fun rememberBottomBarClearance(): Dp {
@@ -57,7 +58,9 @@ fun rememberBottomBarClearance(): Dp {
         navInset >= 28.dp -> navInset
         else -> 12.dp + navInset
     }
-    return remember(navInset, floatingMargin) { GlassBarHeight + floatingMargin + 12.dp }
+    return remember(navInset, floatingMargin) {
+        GlassNavigationBarDefaults.Height + floatingMargin + 12.dp
+    }
 }
 
 /**

@@ -8,14 +8,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -140,7 +138,8 @@ fun GroupCard(
             .padding(bottom = bottomPadding)
             // 只在玻璃开启时录制：关闭玻璃时弹层也走不透明底，这层录制就是白付开销。
             .then(if (glassEnabled) Modifier.layerBackdrop(cardBackdrop) else Modifier),
-        insideMargin = PaddingValues(0.dp),
+        // insideMargin 不再传：`CardDefaults.InsideMargin` 本来就是 `PaddingValues(0.dp)`，
+        // 之前显式写一遍等于把库的默认值抄进了调用点。行内边距由各 Preference 自己管。
         // 走 cardColor() 而不是库默认的 surfaceContainer：
         // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
         colors = CardDefaults.defaultColors(color = cardColor()),
@@ -157,8 +156,12 @@ fun GroupCard(
  * 尺寸统一走 [IconSizes.Row]：Glass 图标是 28dp 画布（图形本身占不满，四周留了描边余量），
  * 直接塞进 24dp 槽位会显得比旧线框图标小一圈。26dp 是"视觉大小与旧图标对齐"的实测值。
  *
- * Miuix 的 [top.yukonga.miuix.kmp.basic.BasicComponent] 在图标和标题之间只留 8dp，
- * 线框图标在这个距离上会显得贴字，补 4dp 到 12dp 更接近系统设置页。
+ * **不再自己补 `padding(end = 4.dp)`。** 之前补那是为了把图标从文字边上推开一点 ——
+ * 当时用的是 24dp 线框图标，`BasicComponent` 的固定 8dp 间距会显得贴字。
+ * 现在图标全换成 Glass 族，28dp 画布里的图形本身四周还有 2~3dp 空白，
+ * 实际视觉间距已经有 10dp 上下，再补 4dp 就过宽了。
+ * 间距交回库：`BasicComponent` 里 `spacerPx = 8.dp` 是写死的，没有可调参数，
+ * 调用方叠 padding 只会让这一行和别的行不一致。
  */
 @Composable
 fun LeadingIcon(
@@ -169,7 +172,7 @@ fun LeadingIcon(
     Icon(
         imageVector = icon,
         contentDescription = null,
-        modifier = Modifier.padding(end = 4.dp).size(size),
+        modifier = Modifier.size(size),
         tint = tint,
     )
 }
@@ -261,16 +264,6 @@ fun SwitchRow(
     SwitchPreference(
         checked = checked,
         onCheckedChange = onChange,
-        title = title,
-        summary = summary,
-        startAction = icon?.let { vector -> { LeadingIcon(vector) } },
-    )
-}
-
-/** 纯信息行（无点击）。 */
-@Composable
-fun InfoRow(title: String, summary: String, icon: ImageVector? = null) {
-    top.yukonga.miuix.kmp.basic.BasicComponent(
         title = title,
         summary = summary,
         startAction = icon?.let { vector -> { LeadingIcon(vector) } },
@@ -468,10 +461,4 @@ private fun ActionButton(
             color = colors.contentColor,
         )
     }
-}
-
-/** 空白占位，用于卡片底部留白。 */
-@Composable
-fun Gap(height: Int = 12) {
-    Spacer(Modifier.height(height.dp))
 }

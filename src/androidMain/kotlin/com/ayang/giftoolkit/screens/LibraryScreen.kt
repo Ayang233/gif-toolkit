@@ -31,11 +31,11 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.FolderOutline
-import top.yukonga.miuix.kmp.icon.glass.ChevronForward
 import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Download
 import top.yukonga.miuix.kmp.icon.glass.File
 import top.yukonga.miuix.kmp.icon.glass.Share
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.io.File
@@ -141,23 +141,22 @@ fun LibraryScreen(app: AppState) {
     }
 }
 
+/**
+ * 作品列表行。
+ *
+ * 用库的 [ArrowPreference] 而不是 `BasicComponent` + 自己拼一个 `ChevronForward`：
+ * 箭头图标、`onSurfaceVariantActions` 颜色、16dp 尺寸、行尾间距都是库内部定好的，
+ * 自己拼一遍等于把这几项抄进业务代码，上游一调就只剩这一行不一致。
+ */
 @Composable
 private fun FileRow(
     file: File,
     onClick: () -> Unit,
 ) {
-    BasicComponent(
+    ArrowPreference(
         title = file.name,
         summary = "${formatSize(file.length())} · ${formatTime(file.lastModified())}",
         startAction = { LeadingIcon(MiuixIcons.Glass.Light.File) },
-        endActions = {
-            Icon(
-                imageVector = MiuixIcons.Glass.Light.ChevronForward,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
-            )
-        },
         onClick = onClick,
     )
 }

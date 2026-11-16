@@ -36,6 +36,21 @@
 
 - 远程 `origin/main` 仍为 `ac0af467`（2026-11-15T15:29Z），与 1.3 相同，本轮无上游变化
 
+**复用清理（第二轮：全项目自造轮子扫描）**
+
+详单见 `docs/os4-reuse-audit.md`。全项目 30 个文件逐个对照库的公开 API，
+没有发现"官方有实现却用自绘 Canvas / 自写 Blur 重复实现"的情况，问题集中在**薄包装层抄了库的常量与样式**。
+
+- 底栏胶囊高度不再本地硬编码 `54.dp`，改引 `GlassNavigationBarDefaults.Height`
+- 关于页应用图标圆角改用 `squircleClip`（新增 `miuix-squircle` 依赖）：OS4 图标是连续曲率，
+  正圆弧大尺寸下能看出"角上有点方"；不支持 RuntimeShader 的设备上库内部自动退回普通圆角
+- 作品页文件行改 `ArrowPreference`，删掉自己拼的 `ChevronForward`（尺寸/颜色/行尾间距）
+- `LeadingIcon` 去掉 `padding(end = 4.dp)`，回归 `BasicComponent` 的 8dp 间距 ——
+  那个补边是 24dp 线框图标时代的产物，换成 28dp 画布的 Glass 图标后反而过宽且与其它行不一致
+- `GroupCard` 删掉冗余的 `insideMargin = PaddingValues(0.dp)`（`CardDefaults.InsideMargin` 本来就是它）
+- `App.kt` 与 `GlassScope.kt` 各写一遍的录制层构造抽成 `rememberPageBackdrop()`
+- 删零调用死代码 `InfoRow` / `Gap`
+
 **结论：验证后保留原实现**
 
 - **作品页底部面板仍用 `WindowBottomSheet`**，没有换成 `GlassBottomSheet`。
