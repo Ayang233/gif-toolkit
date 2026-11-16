@@ -22,12 +22,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
@@ -41,6 +41,9 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
 import top.yukonga.miuix.kmp.material.GlassDefaults
@@ -108,6 +111,16 @@ fun pageColor(): Color {
 }
 
 /**
+ * 卡片自己的局部录制层，供卡内弹层（下拉）采样。
+ *
+ * 官方 `BlurSection.kt:125` 就是这套做法：`val preferenceBackdrop = rememberLayerBackdrop()` +
+ * `Modifier.padding(...).layerBackdrop(preferenceBackdrop)`，然后把同一个 backdrop 传给
+ * `GlassDropdownPreference`。局部层的原点与弹层锚点是同一个容器，`localPositionOf` 反算
+ * 天然吻合，比整页录制层更不容易偏。
+ */
+val LocalCardBackdrop = compositionLocalOf<LayerBackdrop?> { null }
+
+/**
  * 一张不带内边距的分组卡片。Miuix 卡片内不用分割线，靠行高与留白区分。
  *
  * [bottomPadding] 默认 12dp：官方示例里卡片之间是 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`。
@@ -119,16 +132,22 @@ fun GroupCard(
     bottomPadding: Dp = 12.dp,
     content: @Composable () -> Unit,
 ) {
+    val glassEnabled = LocalGlassEnabled.current
+    val cardBackdrop = rememberLayerBackdrop()
     Card(
         modifier = modifier
             .padding(horizontal = 12.dp)
-            .padding(bottom = bottomPadding),
+            .padding(bottom = bottomPadding)
+            // 只在玻璃开启时录制：关闭玻璃时弹层也走不透明底，这层录制就是白付开销。
+            .then(if (glassEnabled) Modifier.layerBackdrop(cardBackdrop) else Modifier),
         insideMargin = PaddingValues(0.dp),
         // 走 cardColor() 而不是库默认的 surfaceContainer：
         // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
         colors = CardDefaults.defaultColors(color = cardColor()),
     ) {
-        content()
+        CompositionLocalProvider(LocalCardBackdrop provides cardBackdrop) {
+            content()
+        }
     }
 }
 
@@ -174,8 +193,15 @@ object IconSizes {
  * 和 InstallerX 的 `InstallerMiuixSpinnerPreference` 同一个做法；
  * 普通 `WindowDropdownPreference` 弹出来是白底卡片，一眼就不是 OS4。
  *
- * 注意 backdrop 必须**不含弹层宿主**：库把浮层挂在最外层 Scaffold 上，
- * 正好在录制层之外 —— 一旦浮层落进录制层，它就会采样到自己（参见 AGENTS.md 第 1 条）。
+ * `backdrop` 取 [GroupCard] 提供的**卡片局部录制层**（官方 `BlurSection.kt:171` 同款），
+ * 让弹层真的采样并模糊卡片背景。之前传 `null`，退化成不透明底卡 —— 那是为了躲开
+ * "弹层中部一坨灰糊"打的补丁，但那个脏斑的成因是当时的录制层**没铺底色**
+ * （裸 `rememberLayerBackdrop()` 只录内容，卡片空隙与被 padding 掉的区域都是透明的，
+ * 采样后仍是透明）。现在 `rememberGlassScope` 已经 `drawRect(pageColor())` 垫底，
+ * 前提条件不存在了，所以恢复采样。
+ *
+ * 仍然**不能**传整页录制层：弹层挂在录制层外面，坐标靠 `localPositionOf` 反算，
+ * 跨容器反算一旦偏移就会把背景抹成脏斑。卡片局部层与弹层锚点同源，没有这个问题。
  */
 @Composable
 fun DropdownRow(
@@ -186,20 +212,16 @@ fun DropdownRow(
     summary: String? = null,
     enabled: Boolean = true,
 ) {
+    val glassEnabled = LocalGlassEnabled.current
+    val cardBackdrop = LocalCardBackdrop.current
     GlassDropdownPreference(
         onSelectedIndexChange = onSelect,
         items = items,
         selectedIndex = selectedIndex,
         title = title,
-        // 传 null 而不是页面录制层：库里这时走**不透明底色**
-        // （containerColor 纯白 / #2C2C2C），描边与投影照旧 ——
-        // 也就是 InstallerX 主题页里那个边缘清晰的实心白卡。
-        //
-        // 为什么不让弹层采样：弹层挂在录制层**外面**，坐标要靠
-        // `localPositionOf` 反算，采样区一旦偏移，背景内容就被抹成一块脏斑
-        // （实机与模拟器上都能复现：弹层中部一坨发灰的糊影）。
-        // 顶栏/底栏是贴边采样的，没有这个问题；弹层为了"透一点"去冒这个险不值。
-        backdrop = null,
+        // 没有卡片上下文的调用点（不在 GroupCard 里）仍然退回不透明底卡，
+        // 这是安全兜底，不是主路径。
+        backdrop = cardBackdrop.takeIf { glassEnabled },
         summary = summary,
         enabled = enabled,
         visuals = GlassPopupDefaults.visuals(
@@ -322,8 +344,14 @@ fun PreviewStage(
  *
  * 三条决定都来自参考实现：
  * 1. **进度画在按钮内部**（轨道是按钮本身，填充从左往右铺），不再单独拉一条进度条。
- * 2. **不铺实心底栏，改用渐变遮罩**：实心色块会在页面上切出一条"带子"，
- *    完全不加又会让人文字从按钮底下穿过去。
+ * 2. **容器只铺一层与页面同色的不透明底，不铺渐变**。
+ *    之前是 `Brush.verticalGradient(0f 透明 → 0.55f 纯色)`，那才是"按钮底部能看到一层
+ *    额外背景"的来源：渐变在按钮上方切出一条从透明到实色的过渡带，本身就是一个可见的色阶。
+ *    但完全不加也不成立 —— 二级页底部只有一个按钮，列表内容会从按钮周围的缝隙里透出来
+ *    （实机上能看到滑块的蓝色圆弧从按钮左下角露出来），官方的 `GlassPage` 之所以不用背景，
+ *    是因为它的 `bottomBar` 里是带材质的玻璃导航胶囊，本身就挡住了。
+ *    所以这里用 `pageColor()` 纯色：与页面底色**完全相同**，视觉上等于没有额外背景，
+ *    同时把穿透内容挡住。
  * 3. **生成中仍可点击 = 取消任务**，文案直接写「取消生成 · 45%」，
  *    比禁用掉按钮更符合"我在等一个可以中断的任务"的直觉。
  */
@@ -337,22 +365,20 @@ fun PrimaryActionBar(
     onCancel: () -> Unit = {},
 ) {
     val sideGap = 12.dp
-    val background = pageColor()
     // 通栏控件左右留白要参与圆角安全区推导：屏幕圆角是圆弧，
     // 距离底部越近，水平方向的可用宽度越窄，贴边会被切掉一角。
-    val bottomGap = safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + 4.dp)
+    // 24dp 是官方 `bottomBar` 的下限（`maxOf(24.dp, insets + 8.dp)`），
+    // 大圆角机型上 safeBottomGap 会算出比它更大的值。
+    val bottomGap = maxOf(
+        safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + 4.dp),
+        24.dp,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // 渐变遮罩：最上面完全透明，到按钮所在高度时已经是纯页面色。
-            // 放在最外层，这样连导航栏内边距也一起盖住，底部不会漏出别的颜色。
-            .background(
-                Brush.verticalGradient(
-                    0f to background.copy(alpha = 0f),
-                    0.55f to background,
-                    1f to background,
-                ),
-            )
+            // 纯页面色、不透明。背景在整个内边距之外，导航栏区域也一起盖住，
+            // 底部不会漏出别的颜色。
+            .background(pageColor())
             .navigationBarsPadding()
             .padding(start = sideGap, end = sideGap, top = 20.dp)
             .padding(bottom = bottomGap),

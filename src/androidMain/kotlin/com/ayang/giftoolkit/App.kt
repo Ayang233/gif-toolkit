@@ -6,13 +6,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -30,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.ayang.giftoolkit.data.SettingsStore
@@ -49,7 +46,6 @@ import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.LocalWideLayout
 import com.ayang.giftoolkit.ui.Tool
 import com.ayang.giftoolkit.ui.backTransition
-import com.ayang.giftoolkit.ui.cardColor
 import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.pageColor
 import com.ayang.giftoolkit.ui.rememberBottomBarClearance
@@ -58,8 +54,6 @@ import com.ayang.giftoolkit.ui.rememberWideLayout
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -79,8 +73,12 @@ import top.yukonga.miuix.kmp.nav.core.navBackStackOf
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
+import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
+import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
+import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun GifApp() {
@@ -217,18 +215,43 @@ fun GifApp() {
                         effects = navEffects,
                     ) {
                         entry<Route.Root> {
+                            // 吸附曲线与手势接管器必须共用**同一个** flingBehavior 实例，
+                            // 否则松手后的吸附和手势识别器算出来的目标页会是两套物理参数。
+                            // 注意 `PagerDefaults.flingBehavior` 本身就是 @Composable（内部已 remember），
+                            // 不能再套一层 remember。
+                            val flingBehavior = PagerDefaults.flingBehavior(
+                                state = pagerState,
+                                snapAnimationSpec = PagerNavigationSpringSpec,
+                            )
                             HorizontalPager(
                                 state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                // 只留当前页与正在滑动的那一页：每页都挂着玻璃录制层，
-                                // 多留一页就多一次整屏 GPU 录制。
-                                beyondViewportPageCount = 0,
-                                // 松手后的吸附曲线换库的弹簧，和点击切页走同一套物理参数，
-                                // 否则「点击」和「滑动」会是两种手感。
-                                flingBehavior = PagerDefaults.flingBehavior(
-                                    state = pagerState,
-                                    snapAnimationSpec = PagerNavigationSpringSpec,
-                                ),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // Cross-Axis 接管：官方 example 的 pagerInterceptionMode 默认值就是
+                                    // CrossAxis（AppState.kt:34 → 1），只有这条路径才是"首尾页拖不动"。
+                                    //
+                                    // 为什么原生 Pager 拖得动：MiuixTheme 全局注入了
+                                    // `LocalOverscrollFactory = MiuixOverscrollFactory`（MiuixTheme.kt:40），
+                                    // 原生 Pager 到边界时被拒的位移会交给 overscroll 工厂做弹性过冲 ——
+                                    // 那个"还在动"是过冲动画，不是翻页。CrossAxis 模式下 Pager 自身的
+                                    // scrollable 被整个移除（见下面的 userScrollEnabled = false），
+                                    // 位移不再经过 overscroll 工厂，边界就是死的。
+                                    .pagerGestureOverride(
+                                        pagerState = pagerState,
+                                        flingBehavior = flingBehavior,
+                                        mode = PagerInterceptionMode.CrossAxis,
+                                    ),
+                                // 必须关掉：CrossAxis 靠 pagerGestureOverride 装的识别器驱动，
+                                // 两个识别器同时存在会互相抢手势。
+                                userScrollEnabled = false,
+                                // CrossAxis 下垂直滚动与速度交给页面内容自己处理（含跨页时）。
+                                pageNestedScrollConnection = PagerGestureNestedScrollConnection,
+                                verticalAlignment = Alignment.Top,
+                                // 只多留一页：0 会让首次横滑出现白帧（滑入中的页面还没组合），
+                                // 官方给 4 是因为它每页都轻；我们每页挂一个玻璃录制层，
+                                // 多留一页就多一次整屏 GPU 录制，所以取 1 而不是照抄 4。
+                                beyondViewportPageCount = 1,
+                                flingBehavior = flingBehavior,
                             ) { index ->
                                 when (index) {
                                     0 -> HomeScreen(onOpen = { tool -> stack.add(Route.Tool(tool.id)) })
@@ -313,14 +336,43 @@ fun GifApp() {
                 }
             }
 
-            if (confirmExit) {
-                ExitConfirm(
-                    onDismiss = { confirmExit = false },
-                    onConfirm = {
-                        confirmExit = false
-                        (context as? Activity)?.finish()
-                    },
-                )
+            // 退出确认用库的 **WindowDialog**（系统窗口版），不用 GlassDialog。
+            //
+            // 本想用 GlassDialog（官方 GlassPage.kt:378），但它是 **Scaffold 作用域**组件：
+            // `MiuixPopupUtils.DialogLayout` 从 `LocalDialogStates` 取宿主列表来绘制，
+            // 而这个 local 由 Scaffold 提供并负责渲染。GifApp 这一层只有 NavDisplay + 浮层底栏，
+            // **没有 Scaffold**，于是对话框被加进一个没人绘制的列表 —— 静默不显示，
+            // 实测按返回毫无反应。`renderInRootScaffold` 的 true/false 都救不了（两者都要宿主）。
+            //
+            // 要给 GlassDialog 造宿主就得在 GifApp 外包一层 Scaffold，那会改变所有页面的
+            // inset 与背景录制层，风险远大于收益。WindowDialog 是独立的系统 Dialog 窗口，
+            // 不依赖 Compose 宿主，行为稳定 —— AGENTS.md 里"确认用 WindowDialog"也是这个理由。
+            WindowDialog(
+                show = confirmExit,
+                title = "退出 GIF 助手？",
+                summary = "正在进行的任务会被中断。",
+                onDismissRequest = { confirmExit = false },
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { confirmExit = false },
+                        modifier = Modifier.weight(1f),
+                        insideMargin = PaddingValues(vertical = 12.dp),
+                    ) {
+                        Text("继续使用", style = MiuixTheme.textStyles.button)
+                    }
+                    Button(
+                        onClick = {
+                            confirmExit = false
+                            (context as? Activity)?.finish()
+                        },
+                        modifier = Modifier.weight(1f),
+                        insideMargin = PaddingValues(vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(contentColor = MiuixTheme.colorScheme.error),
+                    ) {
+                        Text("退出", style = MiuixTheme.textStyles.button)
+                    }
+                }
             }
         }
     }
@@ -339,51 +391,3 @@ private val navItems = listOf(
     GlassNavigationItem(icon = MiuixIcons.Glass.SettingsOutline, label = "设置", contentDescription = "设置"),
 )
 
-@Composable
-private fun ExitConfirm(onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixTheme.colorScheme.windowDimming)
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Card(
-            modifier = Modifier.padding(horizontal = 36.dp),
-            cornerRadius = 28.dp,
-            insideMargin = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
-            colors = CardDefaults.defaultColors(color = cardColor()),
-        ) {
-            Text(
-                text = "退出 GIF 助手？",
-                style = MiuixTheme.textStyles.title3,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "正在进行的任务会被中断。",
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
-            // Miuix 的对话框动作是竖排通栏按钮（见 HyperStar / KernelSU 的弹窗），不是左右并排
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                cornerRadius = 14.dp,
-                insideMargin = PaddingValues(0.dp),
-            ) { Text("继续使用", style = MiuixTheme.textStyles.button) }
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                cornerRadius = 14.dp,
-                insideMargin = PaddingValues(0.dp),
-                colors = ButtonDefaults.buttonColors(contentColor = MiuixTheme.colorScheme.error),
-            ) { Text("退出", style = MiuixTheme.textStyles.button) }
-        }
-    }
-}

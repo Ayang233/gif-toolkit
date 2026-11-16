@@ -48,6 +48,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 1. **玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是子节点。**
    子是采样到自己 → `libhwui` 的 `RenderNode::prepareTreeImpl` 原生栈溢出 → 直接闪退。
    这是项目历史上真实发生过的崩溃。
+   **同理：录制层不能上移到 `Scaffold` 自身。** 官方 `GlassPage.kt:242` 敢那么写
+   （`Scaffold(modifier = Modifier.layerBackdrop(pageBackdrop))`），是因为它顶栏采的是
+   `LocalTopAppBarBackdrop`（另一个 backdrop），与挂在 Scaffold 上的不是同一个。
+   我们顶栏与内容**共用** `GlassScope.contentBackdrop`，录制层一旦包含顶栏，顶栏采样就会
+   把正在采样的自己录进去 —— 1.4 试过，`RenderNode::prepareTreeImpl` 无限递归，SIGSEGV。
+   **录制层必须排除顶栏，落在内容区（`ContentBackdropBox`）。**
 2. **颜色一律走 `ui/Widgets.kt` 的 `pageColor()` / `cardColor()`。**
    Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个值，
    直接用主题角色会让页面和卡片糊成一片。
@@ -57,10 +63,14 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    **另外：Miuix 的 `isRenderEffectSupported()` 只是 `SDK_INT >= 31`**，
    它查不出某台 GPU 上模糊会不会翻车（真机上出现过「内容不糊开、只被压暗」），
    所以"关掉玻璃"这个开关必须一直留给用户。
-4. **弹层（Popover / Dropdown / BottomSheet）不要采样背景。**
-   `GlassDropdownPreference` 的 `backdrop` 传 `null`：弹层挂在录制层**外面**，
-   采样坐标靠 `localPositionOf` 反算，偏一点就把背景抹成一块脏斑（实机可复现）。
-   传 `null` 时库走不透明底色 + 描边 + 投影，才是参考实现那个观感。
+4. **弹层的 `backdrop` 用「卡片局部录制层」，不要传整页录制层，也不要用 `null` 一躲了事。**
+   `GroupCard` 已经建好局部层并通过 `LocalCardBackdrop` 下发，`DropdownRow` 直接消费它
+   （官方 `BlurSection.kt:125` 同款：卡片容器 `layerBackdrop(preferenceBackdrop)`）。
+   局部层的原点与弹层锚点是同一个容器，`localPositionOf` 反算天然吻合。
+   传**整页**录制层才会出问题：弹层挂在录制层外面，跨容器反算一旦偏移就把背景抹成一块脏斑。
+   1.4 之前一律传 `null`，那是躲开脏斑的补丁 —— 但脏斑的真实成因是当时的录制层**没垫底色**
+   （裸 `rememberLayerBackdrop()` 只录内容，卡片空隙是透明的），1.3 补了 `drawRect(pageColor())`
+   之后前提就不成立了。现在弹层真的会采样并模糊卡片，实机复测无脏斑。
 5. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow` 去做"分段"。**
    库里其实有三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`），
    它们都是**可横向滚动的页签**，不是「一整条凹槽 + 一个滑块」的分段控件；
@@ -84,6 +94,15 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     Glass 族是 **28dp 画布**（`buildHyperOSIcon` 里 `defaultWidth = 28.dp`），
     塞进 24dp 槽位会明显偏小；列表统一 26dp（`IconSizes.Row`）。
     注意新版权重/命名变化：`Glass.Folder` / `Glass.Settings` 已改名成 `*Outline` / `*Fill`。
+    顶栏返回键玻璃档用 `Glass.ChevronBackward`（28dp），非玻璃档才用 extended 的 `Back`（24dp），
+    官方 `component/BackNavigationIcon.kt` 就是这么分的。
+11. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 宿主，`GifApp` 这一层没有。**
+    它们靠 `MiuixPopupUtils.DialogLayout` 从 `LocalDialogStates` 取宿主列表来绘制，
+    而这个 local 由 Scaffold 提供**并负责渲染**。GifApp 只有 `NavDisplay` + 浮层底栏，
+    没有 Scaffold —— 组件会被加进一个没人绘制的列表，**静默不显示**（不报错、不崩溃，
+    点了没反应，极难排查）。`renderInRootScaffold` 的 true/false 都要宿主，都不管用。
+    这类**页面级**浮层要用系统窗口版：`WindowDialog` / `WindowBottomSheet`。
+    页面**内部**的弹层（如 `GroupCard` 里的 `GlassDropdownPreference`）有 Scaffold 祖先，可以正常用玻璃版。
 
 ## 常见改动怎么下手
 
@@ -94,7 +113,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
 | 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
-| 加弹层 | 选择面板用 `WindowBottomSheet`、确认用 `WindowDialog`；两者都是系统窗口，天然在录制层外 |
+| 加弹层 | 页面级（全屏浮层）用 `WindowBottomSheet` / `WindowDialog`：系统窗口，天然在录制层外，且**不依赖 Scaffold 宿主**（见硬约束 11）。页面内部的弹层才用玻璃版 |
 
 ## 产物与版本约定
 

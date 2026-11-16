@@ -7,19 +7,22 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.glass.ChevronBackward
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
-import top.yukonga.miuix.kmp.material.GlassDefaults
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -97,12 +100,30 @@ fun PageTopBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
+    // 返回键照官方 `component/BackNavigationIcon.kt` 写：
+    // 玻璃档用 Glass 族 **ChevronBackward + 28dp + GlassIconButton**，非玻璃档才退回
+    // extended 的 `Back` + 24dp + IconButton。之前两档都用 extended 的 `Back`，
+    // 线宽比同栏其它 Glass 图标粗一档，也是 AGENTS.md 第 10 条"只用 Glass 族"的自相矛盾处。
+    // 28dp 是因为 Glass 族是 28dp 画布（`buildHyperOSIcon` 的 defaultWidth），
+    // 塞进 24dp 槽会明显偏小。
+    val layoutDirection = LocalLayoutDirection.current
     val backIcon: @Composable () -> Unit = {
         if (onBack != null) {
+            val glassIcon: @Composable () -> Unit = {
+                Icon(
+                    imageVector = MiuixIcons.Glass.ChevronBackward,
+                    contentDescription = "返回",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer {
+                            // RTL 下箭头要跟着反向（官方同款处理）
+                            if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
+                        },
+                    tint = MiuixTheme.colorScheme.onSurface,
+                )
+            }
             if (glass.enabled) {
-                GlassIconButton(onClick = onBack) {
-                    Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
-                }
+                GlassIconButton(onClick = onBack) { glassIcon() }
             } else {
                 IconButton(onClick = onBack) {
                     Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
@@ -113,6 +134,20 @@ fun PageTopBar(
         }
     }
     if (glass.enabled) {
+        // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
+        //
+        // `GlassTopAppBar` 内部（GlassTopAppBar.kt:392-458）是二选一：
+        //   progressiveBlur && backdrop != null → 走 progressiveTextureBlur（AGSL 运行时着色器）
+        //   否则                                → 走 bandBrush 渐变（零 AGSL）
+        // 而 `bandBrush` 的类型决定了走哪条绘制路径：传 `TopAppBarBandBrush`（bandBrush() 的返回值）
+        // 时库会用 `TopAppBarFadeBrush`，渐变高度 = bandOverhang + 12dp，尾部是 17 段平滑衰减，
+        // **这才是"看不到边界"的关键**；传其它 Brush 就退化成 `background(brush)` 的拉伸平涂。
+        //
+        // 所以哪怕当前走了 progressive 分支，也要把 bandBrush / bandOverhang 备好：
+        // AGSL 在个别 GPU 上编译失败是**静默**的（图层不产出内容，不抛异常），
+        // 那时库会落回这条分支，参数不对就会露出生硬的矩形边。
+        val surfaceColor = MiuixTheme.colorScheme.surface
+        val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
@@ -122,7 +157,15 @@ fun PageTopBar(
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
-            style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
+            // 不传 style，吃 `GlassDefaults.Style`（= CommonMediumRegularLowLight），
+            // 与官方 `AdaptiveTopAppBar` 一致 —— 它也不按明暗分档。
+            // 之前用 `GlassDefaults.style(isDark)`，深色下取的是 CommonMediumRegularDark，
+            // 玻璃厚度/高光与官方不同；明暗由材质内部的 `isDarkTheme()` 处理，不需要调用方判断。
+            // 背景带与标题的透明度乘子。官方在"模糊未生效"时会把它降到 0，避免
+            // progressive 与 band 两层同时上色；我们没有那层判断，恒为 1 即可。
+            backgroundAlpha = { 1f },
+            bandBrush = bandBrush,
+            bandOverhang = GlassTopAppBarDefaults.BandOverhang,
             navigationIcon = backIcon,
             actions = actions,
         )

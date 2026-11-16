@@ -165,10 +165,17 @@ private fun FileRow(
 /**
  * 文件操作面板。
  *
- * 从「自己拼一个居中的 Card + 蒙层」换成库里的 [WindowBottomSheet]：
- * 自带拖拽手柄、下拉消失、返回手势联动和 OS4 圆角；这些手搓的话，
- * 每一处和系统交互的细节都得自己对，而且永远差一点。
- * 参考实现里「运行状态、Monet 详情改底部面板」用的也是这个组件。
+ * 用 [WindowBottomSheet]（系统窗口版）而不是 [GlassBottomSheet]，原因是被实测否掉的：
+ *
+ * `GlassBottomSheet` 是 **Scaffold 作用域**组件 —— `MiuixPopupUtils.DialogLayout` 从
+ * `LocalDialogStates` 取宿主列表来绘制，而这个 local 由 Scaffold 提供并负责渲染。
+ * 这个面板挂在 `Box` 里，与 `Os4ListPage` 内部的 Scaffold 是**兄弟**关系，
+ * 拿不到那个 local，于是被加进一个没人绘制的列表 —— 静默不显示（`renderInRootScaffold`
+ * 的 true/false 都要宿主，都救不了；实测点击文件后毫无反应）。
+ *
+ * 要给它造宿主就得在页面外包一层 Scaffold，那会改变 inset 与背景录制层，风险大于收益。
+ * [WindowBottomSheet] 是独立系统窗口，不依赖 Compose 宿主，行为稳定。
+ * 代价是拿不到玻璃材质（它的参数表里没有 `backdrop`）—— 这一项记为"验证后保留原实现"。
  */
 @Composable
 private fun FileActionSheet(

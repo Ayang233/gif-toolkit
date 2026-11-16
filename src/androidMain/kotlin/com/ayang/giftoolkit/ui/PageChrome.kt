@@ -133,6 +133,20 @@ fun Os4ListPage(
     val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
     Scaffold(
+        // 录制层**不能**挂在 Scaffold 上，只能挂在内容区（见 ContentBackdropBox）。
+        //
+        // 曾尝试照官方 `GlassPage.kt:242`（`Scaffold(modifier = Modifier.layerBackdrop(pageBackdrop))`）
+        // 把录制层上移，理由是那样顶栏的 `localPositionOf` 反算能落在录制内容上。
+        // 实测直接 SIGSEGV：`RenderNode::prepareTreeImpl` 在 prepareTreeImpl / prepareListAndChildren
+        // 之间无限递归（cause: stack overflow）。
+        //
+        // 为什么官方敢那么写：它顶栏采的是 `LocalTopAppBarBackdrop`（由 BlurredBar 提供的**另一个**
+        // backdrop），而挂在 Scaffold 上的 `pageBackdrop` 只给底栏/弹层用，两者不是同一个 ——
+        // 所以顶栏不在自己采样源的录制树里。我们顶栏与内容**共用** `GlassScope.contentBackdrop`，
+        // 录制层一旦包含顶栏，顶栏采样时就会把"正在采样的自己"录进去，递归到栈溢出。
+        //
+        // 结论：录制层排除顶栏是这套结构下的唯一安全解。顶栏反算得到负 y，
+        // 采样区间落在内容区顶部 —— 这正是"顶栏正下方的内容"，语义是对的。
         topBar = {
             PageTopBar(
                 title = title,
