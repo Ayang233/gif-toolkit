@@ -7,13 +7,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +32,8 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Card
@@ -281,39 +284,56 @@ fun PreviewStage(
     aspect: Float = 4f / 3f,
     placeholder: String = "选择素材后显示预览",
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(aspect.coerceIn(0.4f, 3f))
-            .clip(RoundedCornerShape(12.dp))
-            // 卡片是 surfaceContainer（白），舞台用 surface（#F7F7F7）才看得出"一块画布"；
-            // 用 surfaceContainer 会和卡片糊成一片，透明度高的素材完全没边界。
-            .background(pageColor()),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "预览",
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Glass.ImageOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+    // 高度上限按**窗口高度**算，不是按可用约束算：预览在 LazyColumn 里，
+    // item 的 maxHeight 是无穷大，按约束取会退回"宽度算出来的那个离谱高度"。
+    // 横屏窗口只有 ~410dp 高，16:9 铺满宽要 620dp —— 预览会把参数区整块顶出屏幕，
+    // 空态提示语居中在视口之外，看起来就是"预览区是空的"。上限压到窗口高度的 42%。
+    val density = LocalDensity.current
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // 宽度取**实际可用宽度**（展开 Rail 时卡片更窄），高度上限取窗口高度的一个比例。
+        // 横屏这种"矮窗口"（<500dp）要按更小的比例算：竖屏 42% 时预览能完整落在参数区上方，
+        // 横屏 42% 会把预览推到「开始生成」按钮底下，占位图标和提示语被按钮压住，
+        // 看上去就是一块空白的圆角框。所以矮窗口取 32%。
+        val cap = with(density) {
+            val h = windowHeight.toDp()
+            h * if (h < 500.dp) 0.32f else 0.42f
+        }
+        val stageHeight = (maxWidth / aspect.coerceIn(0.4f, 3f)).coerceAtMost(cap)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(stageHeight)
+                .clip(RoundedCornerShape(12.dp))
+                // 卡片是 surfaceContainer（白），舞台用 surface（#F7F7F7）才看得出"一块画布"；
+                // 用 surfaceContainer 会和卡片糊成一片，透明度高的素材完全没边界。
+                .background(pageColor()),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "预览",
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    contentScale = ContentScale.Fit,
                 )
-                Text(
-                    text = placeholder,
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.ImageOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Text(
+                        text = placeholder,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -40,6 +42,8 @@ import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.LocalRailInset
+import com.ayang.giftoolkit.ui.LocalTopBarTitleAlpha
+import com.ayang.giftoolkit.ui.LocalRootBackdrop
 import com.ayang.giftoolkit.ui.LocalWideLayout
 import com.ayang.giftoolkit.ui.Tool
 import com.ayang.giftoolkit.ui.backTransition
@@ -51,6 +55,7 @@ import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import com.ayang.giftoolkit.ui.shouldExpandNavigationRail
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
@@ -107,10 +112,8 @@ fun GifApp() {
 
     // 页面栈与一级导航的在场条件在这里就定，供下面的 CompositionLocal 使用。
     val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
-    // 一级导航是否在场：底栏与侧栏**共用**这一个条件。
-    // 之前只给了底栏，Rail 是裸的 `if (wide)` —— 竖屏进二级页后再转横屏，
-    // 侧栏又会在旁边冒出来，二级页还留着 250dp 空白。导航挂载只能有这一个判据。
-    val showPrimaryNav = stack.size <= 1 && !app.modalOverlayOpen
+    // 一级导航是否在场：只有 Rail 需要这个判据（底栏已经跟着一级页走了，见下）。
+    val showPrimaryNav = stack.size <= 1
     // 侧栏展开与否跟官方同一档阈值（≥1200dp 才展开，见 ui/Adaptive.kt 的 shouldExpandNavigationRail）。
     // 手机横屏约 900dp，官方在那里是**折叠成顶部胶囊**（只显示文字），不是左侧面板；
     // 之前写死 `initialExpanded = true` + `showToggle = false`，等于自己造了一套"常驻展开"的规则。
@@ -131,6 +134,9 @@ fun GifApp() {
         LocalAmoled provides app.amoledEnabled,
         LocalWideLayout provides wide,
         LocalRailInset provides railInset,
+        // 折叠态（顶部居中胶囊）与居中标题抢同一条位置：标题透明度跟着折叠进度走，
+        // 官方 `AppContent.kt:208-214` 就是这么接的。二级页没有 Rail，标题恒为 1。
+        LocalTopBarTitleAlpha provides { if (railVisible) railState.progress else 1f },
         LocalBottomBarClearance provides if (wide) 0.dp else bottomClearance,
     ) {
         AnimatedMiuixTheme(controller) {
@@ -146,9 +152,12 @@ fun GifApp() {
                 }
             }
 
-            // 与页面级录制层同一套构造（GlassScope.rememberPageBackdrop）：
-            // 先铺页面底色，空隙才不是透明的（否则底栏采样区会透出内容）。
-            val backdrop = rememberPageBackdrop()
+            // 一级页（三个 tab）共用的录制层：录 **Pager 以外** 的内容，见下面 entry<Route.Root>。
+            // 为什么不在这一层录：底栏要跟着一级页一起被二级页盖住（官方底栏就在一级页内部），
+            // 所以底栏必须进 NavDisplay；一旦它成为录制层的子节点就会采样到自己 → libhwui 闪退。
+            // 把录制层下沉到一级页内部、底栏做它的兄弟，两个条件才同时满足。
+            val rootBackdrop = rememberPageBackdrop()
+
             var tab by rememberSaveable { mutableIntStateOf(0) }
             val scope = rememberCoroutineScope()
             // 三个一级页用 Pager 承载：切 tab 时是连续位移（还能左右滑），
@@ -182,24 +191,21 @@ fun GifApp() {
 
             // 页面底色见 ui/Widgets.kt 的 pageColor()：卡片是 surfaceContainer，
             // 页面必须是另一个角色，两套配色（Miuix 静态 / Monet）才都有层次。
-            Box(Modifier.fillMaxSize().background(pageColor())) {
-                // 玻璃侧栏**叠放**在内容之上，不参与 Row 的宽度分配。
-                // GlassNavigationRail 的根节点是 `fillMaxSize()`（它自己决定面板位置：
-                // 折叠时是顶部居中的胶囊，展开时距左边 Margin、宽 ExpandedWidth），
-                // 所以一旦放进 Row 当兄弟，它会吃掉整行宽度，把内容挤成 0 宽 —— 实机上就是一片空白。
-                // 官方 AppContent 同样是「内容 Box 在外、Rail 叠在内容 Box 里」。
-                //
-                // **录制层必须满宽**：官方 `AppContent.kt:300-350` 把 `layerBackdrop(sidebarBackdrop)`
-                // 挂在满宽的 Box 上，玻璃 Rail 作为兄弟叠上去，内容让位由页面内边距（LocalRailInset）负责。
-                // 之前我们把 `padding(start = railInset)` 加在录制层和 NavDisplay 上：录制层从 x=railInset
-                // 才开始录，左边那一条没有像素，玻璃只剩一块平色，还能看到一条竖直硬边。
-                // 只有内容区域参与背景录制；玻璃条画在它之上，才不会采样到自己。
-                // 关闭玻璃时完全不录制 —— 每帧整屏录制本身开销不小，没必要白付。
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .then(if (glassEnabled) Modifier.layerBackdrop(backdrop) else Modifier),
-                ) {
+            //
+            // 这一层 Scaffold 是**弹层宿主**，不负责布局（contentWindowInsets = 0、底色透明）。
+            // 官方 `GlassPageHost`（GlassPage.kt:652）就是这层壳：GlassDialog / GlassBottomSheet /
+            // GlassDropdownPreference 的 `renderInRootScaffold` 默认为 true，会去找**最外层** Scaffold 的
+            // `LocalRootDialogStates` 并由它绘制。没有这层壳时它们退回页面自己的 Scaffold ——
+            // 而页面在 HorizontalPager 里，弹层的窗口坐标和页面录制层的坐标会差整整一页宽
+            // （实测 offset.x = -1080），玻璃采样落在录制区之外，面板只剩材质、看不到背景。
+            //
+            // 顺带解决压盖：弹层现在画在最外层，永远在底栏之上，不再需要 `modalOverlayOpen`
+            // 那种"开面板就把导航让出去"的状态联动。
+            Scaffold(
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0),
+            ) {
+                Box(Modifier.fillMaxSize().background(pageColor())) {
                     // 转场档位来自主题设置；圆角裁剪半径取设备真实屏幕圆角 ——
                     // 之前没传 effects，默认 cornerClipRadius = 0.dp，等于把圆角裁剪关掉了。
                     val pageBackground = pageColor()
@@ -222,51 +228,97 @@ fun GifApp() {
                         effects = navEffects,
                     ) {
                         entry<Route.Root> {
-                            // 吸附曲线与手势接管器必须共用**同一个** flingBehavior 实例，
-                            // 否则松手后的吸附和手势识别器算出来的目标页会是两套物理参数。
-                            // 注意 `PagerDefaults.flingBehavior` 本身就是 @Composable（内部已 remember），
-                            // 不能再套一层 remember。
-                            val flingBehavior = PagerDefaults.flingBehavior(
-                                state = pagerState,
-                                snapAnimationSpec = PagerNavigationSpringSpec,
-                            )
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    // Cross-Axis 接管：官方 example 的 pagerInterceptionMode 默认值就是
-                                    // CrossAxis（AppState.kt:34 → 1），只有这条路径才是"首尾页拖不动"。
-                                    //
-                                    // 为什么原生 Pager 拖得动：MiuixTheme 全局注入了
-                                    // `LocalOverscrollFactory = MiuixOverscrollFactory`（MiuixTheme.kt:40），
-                                    // 原生 Pager 到边界时被拒的位移会交给 overscroll 工厂做弹性过冲 ——
-                                    // 那个"还在动"是过冲动画，不是翻页。CrossAxis 模式下 Pager 自身的
-                                    // scrollable 被整个移除（见下面的 userScrollEnabled = false），
-                                    // 位移不再经过 overscroll 工厂，边界就是死的。
-                                    .pagerGestureOverride(
-                                        pagerState = pagerState,
-                                        flingBehavior = flingBehavior,
-                                        mode = PagerInterceptionMode.CrossAxis,
-                                    ),
-                                // 必须关掉：CrossAxis 靠 pagerGestureOverride 装的识别器驱动，
-                                // 两个识别器同时存在会互相抢手势。
-                                userScrollEnabled = false,
-                                // CrossAxis 下垂直滚动与速度交给页面内容自己处理（含跨页时）。
-                                pageNestedScrollConnection = PagerGestureNestedScrollConnection,
-                                verticalAlignment = Alignment.Top,
-                                // 只多留一页：0 会让首次横滑出现白帧（滑入中的页面还没组合），
-                                // 官方给 4 是因为它每页都轻；我们每页挂一个玻璃录制层，
-                                // 多留一页就多一次整屏 GPU 录制，所以取 1 而不是照抄 4。
-                                beyondViewportPageCount = 1,
-                                flingBehavior = flingBehavior,
-                            ) { index ->
-                                when (index) {
-                                    0 -> HomeScreen(onOpen = { tool -> stack.add(Route.Tool(tool.id)) })
-                                    1 -> LibraryScreen(app = app)
-                                    else -> SettingsScreen(
-                                        app = app,
-                                        onOpenTheme = { stack.add(Route.Theme) },
-                                        onOpenAbout = { stack.add(Route.About) },
+                            // 一级页 = Pager + 底栏，两者都在这一层。
+                            //
+                            // 这是官方 `CompactScreenLayout`（AppContent.kt:581-627）的结构：
+                            // 底栏属于一级页，二级页压栈时它跟着一级页一起被新页面**盖住**
+                            // （官方实测：进入二级页的过渡帧里底栏原地不动、随后被新页覆盖，
+                            // 没有任何自己的缩放/淡出动画；退出时也是被"揭开"）。
+                            // 之前底栏画在 NavDisplay 外面并靠 `stack.size` 挂载/卸载：
+                            // 进二级页它在新页盖上来之前就消失，返回时又立刻冒在退出中的二级页之上。
+                            Box(Modifier.fillMaxSize()) {
+                                // 录制层只包 Pager，底栏做它的**兄弟** —— 底栏采样它、又不在它里面，
+                                // 才不会采样到自己（AGENTS.md 第 1 条）。
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .then(if (glassEnabled) Modifier.layerBackdrop(rootBackdrop) else Modifier),
+                                ) {
+                                    // 弹层的采样源 = 这一层（Pager 之外、x 从 0 开始）。
+                                    // 用页面自己的录制层不行：Pager 的每一页是按页宽错位的，
+                                    // 页面内录制层上报的窗口坐标是"槽位坐标"（第 2 页 x = 1080），
+                                    // 而弹层上报的是真实坐标 —— 两者相减正好差一页宽，采样全落在外面。
+                                    CompositionLocalProvider(
+                                        LocalRootBackdrop provides rootBackdrop.takeIf { glassEnabled },
+                                    ) {
+                                        // 吸附曲线与手势接管器必须共用**同一个** flingBehavior 实例，
+                                        // 否则松手后的吸附和手势识别器算出来的目标页会是两套物理参数。
+                                        // 注意 `PagerDefaults.flingBehavior` 本身就是 @Composable（内部已 remember），
+                                        // 不能再套一层 remember。
+                                        val flingBehavior = PagerDefaults.flingBehavior(
+                                            state = pagerState,
+                                            snapAnimationSpec = PagerNavigationSpringSpec,
+                                        )
+                                        HorizontalPager(
+                                            state = pagerState,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                // Cross-Axis 接管：官方 example 的 pagerInterceptionMode 默认值就是
+                                                // CrossAxis（AppState.kt:34 → 1），只有这条路径才是"首尾页拖不动"。
+                                                //
+                                                // 为什么原生 Pager 拖得动：MiuixTheme 全局注入了
+                                                // `LocalOverscrollFactory = MiuixOverscrollFactory`（MiuixTheme.kt:40），
+                                                // 原生 Pager 到边界时被拒的位移会交给 overscroll 工厂做弹性过冲 ——
+                                                // 那个"还在动"是过冲动画，不是翻页。CrossAxis 模式下 Pager 自身的
+                                                // scrollable 被整个移除（见下面的 userScrollEnabled = false），
+                                                // 位移不再经过 overscroll 工厂，边界就是死的。
+                                                .pagerGestureOverride(
+                                                    pagerState = pagerState,
+                                                    flingBehavior = flingBehavior,
+                                                    mode = PagerInterceptionMode.CrossAxis,
+                                                ),
+                                            // 必须关掉：CrossAxis 靠 pagerGestureOverride 装的识别器驱动，
+                                            // 两个识别器同时存在会互相抢手势。
+                                            userScrollEnabled = false,
+                                            // CrossAxis 下垂直滚动与速度交给页面内容自己处理（含跨页时）。
+                                            pageNestedScrollConnection = PagerGestureNestedScrollConnection,
+                                            verticalAlignment = Alignment.Top,
+                                            // 只多留一页：0 会让首次横滑出现白帧（滑入中的页面还没组合），
+                                            // 官方给 4 是因为它每页都轻；我们每页挂一个玻璃录制层，
+                                            // 多留一页就多一次整屏 GPU 录制，所以取 1 而不是照抄 4。
+                                            beyondViewportPageCount = 1,
+                                            flingBehavior = flingBehavior,
+                                        ) { index ->
+                                            when (index) {
+                                                0 -> HomeScreen(onOpen = { tool -> stack.add(Route.Tool(tool.id)) })
+                                                1 -> LibraryScreen(app = app)
+                                                else -> SettingsScreen(
+                                                    app = app,
+                                                    onOpenTheme = { stack.add(Route.Theme) },
+                                                    onOpenAbout = { stack.add(Route.About) },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 底栏：一级页自己的浮层。宽屏没有它（用 Rail），
+                                // 二级页也不用管它 —— 它根本不在那些页面的组合里。
+                                // 参数一律吃库的默认值（高度 54dp、指示器色、悬浮外边距），
+                                // 几何不该我们维护。
+                                if (!wide) {
+                                    GlassNavigationBar(
+                                        items = navItems,
+                                        selectedIndex = tab,
+                                        onSelect = { goTab(it) },
+                                        // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
+                                        // 不会塌回通栏白底条。
+                                        backdrop = rootBackdrop.takeIf { glassEnabled },
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
+                                            // 圆弧会被屏幕边缘切掉；间距也不能太窄，否则三条 tab 挤成一条长带。
+                                            .padding(horizontal = 24.dp),
                                     )
                                 }
                             }
@@ -300,53 +352,22 @@ fun GifApp() {
                             LicenseDetailScreen(index = route.index, onBack = pop)
                         }
                     }
-                }
 
-                // 侧栏必须与上面的录制层是**兄弟**节点（同一 Box 的相邻子项），
-                // 与底栏同理：进了录制层就会采样到自己 → libhwui 原生栈溢出闪退。
-                if (railVisible) {
-                    GlassNavigationRail(
-                        items = navItems,
-                        selectedIndex = tab,
-                        onSelect = { goTab(it) },
-                        backdrop = if (glassEnabled) backdrop else null,
-                        state = railState,
-                        // 折叠态就是官方的"顶部居中胶囊"（只显示文字），左侧那个方块按钮
-                        // 是库自带的展开/收起入口 —— 交回默认值，不再用 showToggle = false 把它藏起来。
-                        // 之前那句"折叠胶囊会压住顶栏标题"是 250dp 面板时代的顾虑：
-                        // 现在手机横屏本来就是折叠态，官方也一样让胶囊和标题并排。
-                    )
-                }
-
-                // 底栏是画在录制层**外面**的浮层，不是内容的一部分。
-                // 参数一律用库的默认值：高度 54dp、指示器色、选中色、以及底部悬浮外边距
-                // （库内部按导航栏高度算：≤16 → 28dp，≥28 → 跟随，中间 → 12+导航栏）。
-                // 之前我们手算 maxOf(24, inset+8) 并传 defaultWindowInsetsPadding = false，
-                // 结果同一台设备上比官方高出一截 —— 这类几何不该自己维护。
-                //
-                // 宽屏下完全不挂载（而不是 visible=false 后留着）：两个导航器同时存在时，
-                // 底栏虽然淡出了仍在布局里，会干扰 Rail 的手势区域。
-                //
-                // 二级页同理，**按不存在处理，不传 visible**：`visible = false` 不是"藏起来"，
-                // 库里是 `showScale` 缩到 `NAV_HIDE_SCALE` + 淡出 + 自身模糊一起收掉
-                // （`GlassNavigationBar.kt:256` 的 `LaunchedEffect(visible)`），
-                // 那就是进出二级页看到的那段收缩/展开动画。官方示例的二级页（About / License 等）
-                // 根本没有底栏 —— 它把底栏画在 Main 那一层页面里，压栈后随整页一起被替换掉。
-                // GIF 助手的底栏在 NavDisplay 外面，只能靠"挂不挂载"来表达同一件事。
-                if (!wide && showPrimaryNav) {
-                    GlassNavigationBar(
-                        items = navItems,
-                        selectedIndex = tab,
-                        onSelect = { goTab(it) },
-                        // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
-                        // 不会塌回通栏白底条。
-                        backdrop = if (glassEnabled) backdrop else null,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
-                            // 圆弧会被屏幕边缘切掉；间距也不能太窄，否则三条 tab 挤成一条长带。
-                            .padding(horizontal = 24.dp),
-                    )
+                    // 侧栏必须与一级页的录制层**不是父子**关系：它采样那一层，自己不能在里面，
+                    // 否则采样到自己 → libhwui 原生栈溢出闪退。
+                    // 它在一级页外面，所以只在栈底（`showPrimaryNav`）挂载；
+                    // 二级页按官方以外的约定不显示一级导航（见 docs/os4-round6-audit.md §1.1）。
+                    if (railVisible) {
+                        GlassNavigationRail(
+                            items = navItems,
+                            selectedIndex = tab,
+                            onSelect = { goTab(it) },
+                            backdrop = if (glassEnabled) rootBackdrop else null,
+                            state = railState,
+                            // 折叠态就是官方的"顶部居中胶囊"（只显示文字），左侧那个方块按钮
+                            // 是库自带的展开/收起入口 —— 交回默认值，不再用 showToggle = false 把它藏起来。
+                        )
+                    }
                 }
             }
         }

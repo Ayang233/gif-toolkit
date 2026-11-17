@@ -42,6 +42,18 @@ val LocalWideLayout = compositionLocalOf { false }
 val LocalRailInset = compositionLocalOf { 0.dp }
 
 /**
+ * 宽屏折叠态下顶栏标题的透明度（官方 `LocalTopAppBarTitleAlpha` 同款）。
+ *
+ * 折叠式 Rail 是**顶部居中的胶囊**，和居中标题抢同一个位置。官方
+ * （`utils/PageUtils.kt:249` + `AppContent.kt:208-214`）的做法是让标题透明度跟着折叠进度走：
+ * `{ sidebarState.progress }` —— 折叠态 progress = 0，标题整体不可见；
+ * 展开成左侧面板后 progress = 1，标题回来。这样胶囊和标题不会互相盖住。
+ *
+ * 下发的是**函数**而不是 Float：绘制期读取，折叠动画过程里不触发重组。
+ */
+val LocalTopBarTitleAlpha = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
+
+/**
  * 侧栏是否展开，阈值与官方 `utils/AdaptiveUtils.kt` 的 `shouldExpandNavigationRail()` 一致：
  * **宽度 ≥ 1200dp** 才展开。
  *

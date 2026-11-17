@@ -107,11 +107,14 @@ fun pageContentPadding(
     val clearance = if (reserveNavBar) LocalBottomBarClearance.current else 0.dp
     // 宽屏玻璃侧栏叠在内容之上，内容靠内边距让位（随展开进度变化，折叠态为 0）。
     // 官方 `AppContent.kt:219-229` 也是让页面内容让位，而不是把录制层挤窄。
+    //
+    // **只让 start 一侧**：Rail 只在起始边（LTR 是左边）。之前 start / end 都加了同一个值，
+    // 展开态下右侧也白白空出 250dp，内容被压成一条竖带（1200dp 下实测可见）。
     val side = horizontal + LocalRailInset.current
     val top = innerPadding.calculateTopPadding() + extraTop
     val bottom = maxOf(innerPadding.calculateBottomPadding(), clearance) + extraBottom
-    return remember(top, bottom, side) {
-        PaddingValues(start = side, end = side, top = top, bottom = bottom)
+    return remember(top, bottom, side, horizontal) {
+        PaddingValues(start = side, end = horizontal, top = top, bottom = bottom)
     }
 }
 
@@ -200,6 +203,12 @@ fun Os4ListPage(
             )
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
-        pageOverlay(glass.contentBackdrop.takeIf { glass.enabled })
+        //
+        // 采样源优先取**一级页录制层**（[LocalRootBackdrop]，录在 Pager 外面）。
+        // 页面自己那层只在没有 Pager 的二级页里用：Pager 页面的页面内录制层上报的是槽位坐标
+        // （第 2 个 tab 是 x = 1080），跟弹层的真实窗口坐标差一整页宽，采样会整块落空。
+        pageOverlay(
+            LocalRootBackdrop.current ?: glass.contentBackdrop.takeIf { glass.enabled },
+        )
     }
 }

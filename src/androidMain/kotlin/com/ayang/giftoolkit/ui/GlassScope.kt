@@ -73,6 +73,22 @@ class GlassScope internal constructor(
 val LocalPageBackdrop = compositionLocalOf<LayerBackdrop?> { null }
 
 /**
+ * 一级页（Pager 之外）的录制层，**弹层的采样源**。
+ *
+ * 与 [LocalPageBackdrop] 的差别只有一处，但很关键：它录在 Pager 外面，所以它的窗口坐标是
+ * 真实的屏幕坐标（x 从 0 开始）。
+ *
+ * 为什么弹层不能用页面里那一层：`HorizontalPager` 的每一页是按页宽错位摆的，
+ * 页面内录制层上报的窗口坐标是"槽位坐标"——第 2 个 tab 报 x = 1080（实测），
+ * 而弹层（由最外层 Scaffold 的弹层宿主绘制）上报的是真实坐标 (0, y)。
+ * 两者相减正好差一整页宽，采样区间整块落在录制区之外，玻璃只剩材质、背景一点也采不到。
+ * 换了这一层以后 offset 变成 (0, y)，采样才落在屏幕上的真实位置。
+ *
+ * 二级页没有 Pager，页面自己那一层的坐标就是真实坐标，所以那边继续用 [LocalPageBackdrop]。
+ */
+val LocalRootBackdrop = compositionLocalOf<LayerBackdrop?> { null }
+
+/**
  * 页面级录制层：先铺一层页面底色，再录内容。
  *
  * **必须先铺底色再录内容**（官方 `rememberBlurBackdrop` 同款）：裸的 `rememberLayerBackdrop()`
@@ -167,6 +183,8 @@ fun PageTopBar(
             navigationIcon()
         }
     }
+    // 宽屏折叠态：标题让位给顶部胶囊（官方 LocalTopAppBarTitleAlpha 同款机制）。
+    val titleAlpha = LocalTopBarTitleAlpha.current
     if (glass.enabled) {
         // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
         //
@@ -202,12 +220,16 @@ fun PageTopBar(
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
             navigationIcon = backIcon,
             actions = actions,
+            // 绘制期读取，折叠动画期间不重组。
+            titleAlpha = titleAlpha,
         )
     } else {
         TopAppBar(
             title = title,
             expandable = expandable,
             largeTitle = largeTitle,
+            largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha()),
+            titleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha()),
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
             navigationIcon = backIcon,

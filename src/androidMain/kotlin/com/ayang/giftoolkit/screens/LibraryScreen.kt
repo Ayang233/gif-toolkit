@@ -1,14 +1,15 @@
 package com.ayang.giftoolkit.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,9 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButton
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import java.io.File
 
 @Composable
@@ -51,6 +55,10 @@ fun LibraryScreen(app: AppState) {
     // 面板的 show 与"当前文件"要分开：关闭时先收起面板，等退场动画跑完再清文件，
     // 否则退场过程中标题和条目会瞬间变空
     var sheetVisible by remember { mutableStateOf(false) }
+    // 删除是不可恢复的（文件在应用私有目录里，删掉就没了），必须二次确认。
+    // 面板先收起，再弹确认框 —— 两个弹层不叠在一起。
+    var deleteTarget by remember { mutableStateOf<File?>(null) }
+    var deleteVisible by remember { mutableStateOf(false) }
     val files = remember(app.libraryToken) {
         MediaTools.outputDir(context).listFiles()
             ?.filter { it.isFile }
@@ -58,8 +66,9 @@ fun LibraryScreen(app: AppState) {
             ?: emptyList()
     }
 
-    // 面板是模态的：开着时让出一层导航（底栏画在页面外面，不然会压在面板上）。
-    LaunchedEffect(sheetVisible) { app.modalOverlayOpen = sheetVisible }
+    // 面板不再需要"让出一层导航"：它由最外层 Scaffold 绘制，永远在底栏之上（官方同理，
+    // 面板开着时底栏只是被遮罩压暗）。之前那句 modalOverlayOpen 是"面板画在底栏下面"的补丁，
+    // 现在结构改了，补丁连同它的状态泄漏风险一起删掉。
 
     val glass = rememberGlassScope()
     Os4ListPage(
@@ -91,12 +100,49 @@ fun LibraryScreen(app: AppState) {
                         actionTarget = null
                     },
                     onDelete = {
-                        file.delete()
                         sheetVisible = false
-                        actionTarget = null
-                        app.libraryToken++
+                        deleteTarget = file
+                        deleteVisible = true
                     },
                 )
+            }
+
+            // 删除确认：走官方的 GlassDialog（现在有最外层 Scaffold 当宿主）。
+            deleteTarget?.let { file ->
+                GlassDialog(
+                    show = deleteVisible,
+                    backdrop = backdrop,
+                    title = "删除这个文件？",
+                    summary = "${file.name} 会从「我的作品」里永久删除，App 里无法恢复。",
+                    onDismissRequest = { deleteVisible = false },
+                    onDismissFinished = {
+                        deleteVisible = false
+                        deleteTarget = null
+                    },
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        GlassDialogButton(
+                            onClick = { deleteVisible = false },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(text = "取消", style = MiuixTheme.textStyles.button)
+                        }
+                        GlassDialogButton(
+                            onClick = {
+                                file.delete()
+                                deleteVisible = false
+                                deleteTarget = null
+                                app.libraryToken++
+                            },
+                            modifier = Modifier.weight(1f),
+                            // 破坏性操作用库的 Destructive 角色（半透明红），
+                            // 不用 Primary 蓝 —— 蓝色在这个语境里等于"推荐操作"。
+                            role = GlassDialogButtonRole.Destructive,
+                        ) {
+                            Text(text = "删除", style = MiuixTheme.textStyles.button)
+                        }
+                    }
+                }
             }
         },
     ) {
