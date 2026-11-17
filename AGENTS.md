@@ -11,7 +11,7 @@ UI 全部基于 [Miuix](https://github.com/compose-miuix-ui/miuix)，**不引入
 
 ```
 src/androidMain/kotlin/com/ayang/giftoolkit/
-├── App.kt                主题装配、NavDisplay 路由、玻璃底栏/宽屏侧栏、退出确认
+├── App.kt                主题装配、NavDisplay 路由、玻璃底栏/宽屏侧栏
 ├── Route.kt              路由定义（Root / Tool / About / Licenses / License）
 ├── AppState.kt           全局状态 + 每个工具一份 ToolForm（表单状态）
 ├── data/SettingsStore.kt 外观设置持久层（SharedPreferences）
@@ -63,14 +63,16 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    **另外：Miuix 的 `isRenderEffectSupported()` 只是 `SDK_INT >= 31`**，
    它查不出某台 GPU 上模糊会不会翻车（真机上出现过「内容不糊开、只被压暗」），
    所以"关掉玻璃"这个开关必须一直留给用户。
-4. **弹层的 `backdrop` 用「卡片局部录制层」，不要传整页录制层，也不要用 `null` 一躲了事。**
-   `GroupCard` 已经建好局部层并通过 `LocalCardBackdrop` 下发，`DropdownRow` 直接消费它
-   （官方 `BlurSection.kt:125` 同款：卡片容器 `layerBackdrop(preferenceBackdrop)`）。
-   局部层的原点与弹层锚点是同一个容器，`localPositionOf` 反算天然吻合。
-   传**整页**录制层才会出问题：弹层挂在录制层外面，跨容器反算一旦偏移就把背景抹成一块脏斑。
-   1.4 之前一律传 `null`，那是躲开脏斑的补丁 —— 但脏斑的真实成因是当时的录制层**没垫底色**
-   （裸 `rememberLayerBackdrop()` 只录内容，卡片空隙是透明的），1.3 补了 `drawRect(pageColor())`
-   之后前提就不成立了。现在弹层真的会采样并模糊卡片，实机复测无脏斑。
+4. **弹层的 `backdrop` 用「页面正文录制层」，即 `LocalPageBackdrop`，不要用卡片局部层，也不要用 `null` 一躲了事。**
+   官方 `GlassPage.kt:441-452` 就是给 `GlassDropdownPreference` 传整页 `backdrop`；
+   `BlurSection.kt:123-125` 的 `preferenceBackdrop` 挂在**包住整列行的大容器**上，不是单张卡片。
+   曾按"卡片局部录制层"实现（`GroupCard` 自建 `layerBackdrop`），单行卡片上必翻车：
+   弹层伸出卡片下边界后没有像素可采，下半截只剩材质、能看出一条横向硬边
+   （`docs/os4-round5-audit.md` §1.3 有对照图）。
+   坐标不会偏：库用 `layerCoordinates.localPositionOf(...)` 反算（`LayerBackdrop.kt:81`）。
+   1.4 之前一律传 `null` 是躲脏斑的补丁，而脏斑的真实成因是录制层**没垫底色**
+   —— `rememberPageBackdrop` 已经 `drawRect(pageColor())`，前提不存在了。
+   **前提**：录制层必须排除弹层宿主（弹层由 Scaffold 的 popup 层绘制，是 `ContentBackdropBox` 的兄弟）。
 5. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow` 去做"分段"。**
    库里其实有三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`），
    它们都是**可横向滚动的页签**，不是「一整条凹槽 + 一个滑块」的分段控件；
@@ -86,7 +88,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    官方 `AppContent` 也是这个结构（`useGlassSidebar` 分支）。
 9. **内边距只走 `pageContentPadding()`。** 页面里不要再手写 `+2.dp` 或固定 `128.dp` 底部留白：
    底栏是浮层、不占 Scaffold 槽位，高度由 `LocalBottomBarClearance` 单点下发（`App.kt` 算）。
-   二级页（工具页 / 主题 / 关于 / 许可）要传 `reserveNavBar = false` —— 那时底栏已淡出，
+   二级页（工具页 / 主题 / 关于 / 许可）要传 `reserveNavBar = false` —— 二级页根本不挂载底栏，
    再预留 100dp 会在列表末尾留一块空带。
 10. **图标只用官方 Glass 族，不自绘、不混 `extended`。**
     `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
@@ -103,6 +105,13 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     点了没反应，极难排查）。`renderInRootScaffold` 的 true/false 都要宿主，都不管用。
     这类**页面级**浮层要用系统窗口版：`WindowDialog` / `WindowBottomSheet`。
     页面**内部**的弹层（如 `GroupCard` 里的 `GlassDropdownPreference`）有 Scaffold 祖先，可以正常用玻璃版。
+12. **底栏只在「一级页且非宽屏」时挂载，二级页直接不组合，不要用 `visible = false` 去关它。**
+    `visible = false` 不是隐藏，是 `showScale` 缩到 `NAV_HIDE_SCALE` + 淡出 + 自身模糊一起收
+    （`GlassNavigationBar.kt:200`、`:256-266`），就是"进出二级页底栏会缩一下"的来源。
+    官方示例的二级页没有底栏 —— 它把底栏画在 Main 页面内部，压栈后随页面一起被替换；
+    我们的底栏在 `NavDisplay` 外面（录制层约束决定），只能靠"挂不挂载"表达同一件事。
+    同理，一级页的 `BackHandler` 只在 `tab != 0` 时启用：tab 0 要交还系统直接退出，
+    官方 `MainScreenBackHandler`（`AppContent.kt:910`）就是这么写的，不要加退出确认框。
 
 ## 常见改动怎么下手
 
@@ -140,7 +149,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix `ac0af467`（2026-11-16）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
+1. 基线是 Miuix `3a980f7c`（2026-11-17）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
    的默认值有没有变 —— 这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。

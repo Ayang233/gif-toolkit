@@ -3,7 +3,9 @@ package com.ayang.giftoolkit.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
@@ -48,6 +50,27 @@ class GlassScope internal constructor(
     val contentBackdropModifier: Modifier
         get() = if (enabled && contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier
 }
+
+/**
+ * 页面正文录制层，供**页面内弹层**（下拉）采样。
+ *
+ * 官方 `GlassPage.kt:447` 给 `GlassDropdownPreference` 传的就是整页的 `backdrop`，
+ * 不是卡片自己的局部层 —— 这是本轮改掉的一处偏差。
+ *
+ * 为什么必须用整页而不是卡片局部层：卡内弹层会**伸出卡片边界**，局部录制层没有那部分像素，
+ * 采样到边界之外就只剩一圈材质、没有背景模糊。实测「预测性返回动画」那张单行卡片
+ * （卡片只有 ~56dp 高，弹层有 5 项）弹层下半截明显发灰、能看出一条横向硬边；
+ * 而「主题模式」那张三行卡片高得多，弹层基本落在卡片里，所以看起来是正常的 ——
+ * 两个菜单的「不一致」就是这么来的，不是它们用了不同组件。
+ *
+ * 坐标不是问题：库内部用 `layerCoordinates.localPositionOf(...)`（`LayerBackdrop.kt:81`）
+ * 换算，跨容器是精确的。早期那次的脏斑是录制层**没垫底色**（`rememberPageBackdrop` 已补上
+ * `drawRect(pageColor())`），与容器层级无关。
+ *
+ * **不能**把录制层做进弹层宿主里：弹层由 Scaffold 的 popup 层绘制，是 `ContentBackdropBox` 的
+ * 兄弟节点；一旦录制层包含弹层就会采样到自己 → libhwui 原生栈溢出（AGENTS.md 第 1 条）。
+ */
+val LocalPageBackdrop = compositionLocalOf<LayerBackdrop?> { null }
 
 /**
  * 页面级录制层：先铺一层页面底色，再录内容。
@@ -204,5 +227,9 @@ fun ContentBackdropBox(
     glass: GlassScope,
     content: @Composable () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().then(glass.contentBackdropModifier)) { content() }
+    val backdrop = glass.contentBackdrop.takeIf { glass.enabled }
+    // 页面内弹层（下拉）采样同一个录制层：官方 GlassPage 也是给弹层传整页 backdrop。
+    CompositionLocalProvider(LocalPageBackdrop provides backdrop) {
+        Box(Modifier.fillMaxSize().then(glass.contentBackdropModifier)) { content() }
+    }
 }

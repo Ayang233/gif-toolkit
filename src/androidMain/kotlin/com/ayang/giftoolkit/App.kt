@@ -6,10 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -18,7 +15,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,9 +49,6 @@ import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
@@ -78,7 +71,6 @@ import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
 import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun GifApp() {
@@ -135,7 +127,6 @@ fun GifApp() {
             val backdrop = rememberPageBackdrop()
             val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
             var tab by rememberSaveable { mutableIntStateOf(0) }
-            var confirmExit by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             // 三个一级页用 Pager 承载：切 tab 时是连续位移（还能左右滑），
             // 不是原来 Crossfade 那种纯淡入淡出 —— 这是"切页面生硬"的直接原因。
@@ -158,13 +149,15 @@ fun GifApp() {
             }
 
             // NavDisplay 的预测性返回只在 stack.size > 1 时启用（源码 enabled = backStack.size > 1），
-            // 到栈底就交还给系统 → 直接 finish。这里在栈底接管：先回第一个 tab，再问是否退出。
-            BackHandler(enabled = stack.size <= 1) {
-                if (tab != 0) {
-                    goTab(0)
-                } else {
-                    confirmExit = true
-                }
+            // 到栈底就交还给系统 → 直接 finish。这里只接管一件事：栈底时先回第一个 tab。
+            //
+            // 回到 tab 0 之后**不再拦**（enabled 里带上 tab != 0）：交还给系统，
+            // 预测性返回 → Activity finish → 回桌面。官方示例 `MainScreenBackHandler`
+            // （AppContent.kt:910）就是这么写的：`isBackEnabled` 带 `selectedPage != 0`，
+            // 一级页按返回直接退到桌面，没有二次确认。之前那句「退出 GIF 助手？」确认弹窗
+            // 是本项目自己加的拦截，与官方行为不一致，本轮移除（见 docs/os4-round5-audit.md）。
+            BackHandler(enabled = stack.size <= 1 && tab != 0) {
+                goTab(0)
             }
 
             // 页面底色见 ui/Widgets.kt 的 pageColor()：卡片是 surfaceContainer，
@@ -315,7 +308,14 @@ fun GifApp() {
                 //
                 // 宽屏下完全不挂载（而不是 visible=false 后留着）：两个导航器同时存在时，
                 // 底栏虽然淡出了仍在布局里，会干扰 Rail 的手势区域。
-                if (!wide) {
+                //
+                // 二级页同理，**按不存在处理，不传 visible**：`visible = false` 不是"藏起来"，
+                // 库里是 `showScale` 缩到 `NAV_HIDE_SCALE` + 淡出 + 自身模糊一起收掉
+                // （`GlassNavigationBar.kt:256` 的 `LaunchedEffect(visible)`），
+                // 那就是进出二级页看到的那段收缩/展开动画。官方示例的二级页（About / License 等）
+                // 根本没有底栏 —— 它把底栏画在 Main 那一层页面里，压栈后随整页一起被替换掉。
+                // GIF 助手的底栏在 NavDisplay 外面，只能靠"挂不挂载"来表达同一件事。
+                if (!wide && stack.size <= 1) {
                     GlassNavigationBar(
                         items = navItems,
                         selectedIndex = tab,
@@ -323,52 +323,12 @@ fun GifApp() {
                         // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
                         // 不会塌回通栏白底条。
                         backdrop = if (glassEnabled) backdrop else null,
-                        visible = stack.size <= 1,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
                             // 圆弧会被屏幕边缘切掉；间距也不能太窄，否则三条 tab 挤成一条长带。
                             .padding(horizontal = 24.dp),
                     )
-                }
-            }
-
-            // 退出确认用库的 **WindowDialog**（系统窗口版），不用 GlassDialog。
-            //
-            // 本想用 GlassDialog（官方 GlassPage.kt:378），但它是 **Scaffold 作用域**组件：
-            // `MiuixPopupUtils.DialogLayout` 从 `LocalDialogStates` 取宿主列表来绘制，
-            // 而这个 local 由 Scaffold 提供并负责渲染。GifApp 这一层只有 NavDisplay + 浮层底栏，
-            // **没有 Scaffold**，于是对话框被加进一个没人绘制的列表 —— 静默不显示，
-            // 实测按返回毫无反应。`renderInRootScaffold` 的 true/false 都救不了（两者都要宿主）。
-            //
-            // 要给 GlassDialog 造宿主就得在 GifApp 外包一层 Scaffold，那会改变所有页面的
-            // inset 与背景录制层，风险远大于收益。WindowDialog 是独立的系统 Dialog 窗口，
-            // 不依赖 Compose 宿主，行为稳定 —— AGENTS.md 里"确认用 WindowDialog"也是这个理由。
-            WindowDialog(
-                show = confirmExit,
-                title = "退出 GIF 助手？",
-                summary = "正在进行的任务会被中断。",
-                onDismissRequest = { confirmExit = false },
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = { confirmExit = false },
-                        modifier = Modifier.weight(1f),
-                        insideMargin = PaddingValues(vertical = 12.dp),
-                    ) {
-                        Text("继续使用", style = MiuixTheme.textStyles.button)
-                    }
-                    Button(
-                        onClick = {
-                            confirmExit = false
-                            (context as? Activity)?.finish()
-                        },
-                        modifier = Modifier.weight(1f),
-                        insideMargin = PaddingValues(vertical = 12.dp),
-                        colors = ButtonDefaults.buttonColors(contentColor = MiuixTheme.colorScheme.error),
-                    ) {
-                        Text("退出", style = MiuixTheme.textStyles.button)
-                    }
                 }
             }
         }

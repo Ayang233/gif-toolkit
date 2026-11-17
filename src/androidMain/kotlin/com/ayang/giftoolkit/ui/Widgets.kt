@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,9 +38,6 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
 import top.yukonga.miuix.kmp.material.GlassDefaults
@@ -109,20 +105,13 @@ fun pageColor(): Color {
 }
 
 /**
- * 卡片自己的局部录制层，供卡内弹层（下拉）采样。
- *
- * 官方 `BlurSection.kt:125` 就是这套做法：`val preferenceBackdrop = rememberLayerBackdrop()` +
- * `Modifier.padding(...).layerBackdrop(preferenceBackdrop)`，然后把同一个 backdrop 传给
- * `GlassDropdownPreference`。局部层的原点与弹层锚点是同一个容器，`localPositionOf` 反算
- * 天然吻合，比整页录制层更不容易偏。
- */
-val LocalCardBackdrop = compositionLocalOf<LayerBackdrop?> { null }
-
-/**
  * 一张不带内边距的分组卡片。Miuix 卡片内不用分割线，靠行高与留白区分。
  *
  * [bottomPadding] 默认 12dp：官方示例里卡片之间是 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`。
  * 之前卡片上下贴在一起，一串分组读下来像一整块，分不清组边界。
+ *
+ * 卡片**不再自带录制层**：卡内下拉的采样源改成整页录制层（见 [LocalPageBackdrop]），
+ * 卡片自己那层只在弹层落在卡片范围内时才够用，弹层一伸出卡片就露硬边。
  */
 @Composable
 fun GroupCard(
@@ -130,23 +119,17 @@ fun GroupCard(
     bottomPadding: Dp = 12.dp,
     content: @Composable () -> Unit,
 ) {
-    val glassEnabled = LocalGlassEnabled.current
-    val cardBackdrop = rememberLayerBackdrop()
     Card(
         modifier = modifier
             .padding(horizontal = 12.dp)
-            .padding(bottom = bottomPadding)
-            // 只在玻璃开启时录制：关闭玻璃时弹层也走不透明底，这层录制就是白付开销。
-            .then(if (glassEnabled) Modifier.layerBackdrop(cardBackdrop) else Modifier),
+            .padding(bottom = bottomPadding),
         // insideMargin 不再传：`CardDefaults.InsideMargin` 本来就是 `PaddingValues(0.dp)`，
         // 之前显式写一遍等于把库的默认值抄进了调用点。行内边距由各 Preference 自己管。
         // 走 cardColor() 而不是库默认的 surfaceContainer：
         // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
         colors = CardDefaults.defaultColors(color = cardColor()),
     ) {
-        CompositionLocalProvider(LocalCardBackdrop provides cardBackdrop) {
-            content()
-        }
+        content()
     }
 }
 
@@ -196,15 +179,14 @@ object IconSizes {
  * 和 InstallerX 的 `InstallerMiuixSpinnerPreference` 同一个做法；
  * 普通 `WindowDropdownPreference` 弹出来是白底卡片，一眼就不是 OS4。
  *
- * `backdrop` 取 [GroupCard] 提供的**卡片局部录制层**（官方 `BlurSection.kt:171` 同款），
- * 让弹层真的采样并模糊卡片背景。之前传 `null`，退化成不透明底卡 —— 那是为了躲开
- * "弹层中部一坨灰糊"打的补丁，但那个脏斑的成因是当时的录制层**没铺底色**
- * （裸 `rememberLayerBackdrop()` 只录内容，卡片空隙与被 padding 掉的区域都是透明的，
- * 采样后仍是透明）。现在 `rememberGlassScope` 已经 `drawRect(pageColor())` 垫底，
- * 前提条件不存在了，所以恢复采样。
+ * `backdrop` 取 [LocalPageBackdrop]（页面正文录制层），与官方 `GlassPage.kt:447` 一致。
+ * 之前传的是「卡片局部录制层」（照 `BlurSection.kt:125` 抄的，但那页的录制层是套住整列行的大容器，
+ * 不是单张卡片）：单行卡片上的弹层会伸出卡片下边界，边界之外没有像素可采，
+ * 弹层下半截只剩材质、看不到背景模糊 —— 实机截图见
+ * `_archive/screenshots/os4-round5/cmp_popup2_backanim.png`。
  *
- * 仍然**不能**传整页录制层：弹层挂在录制层外面，坐标靠 `localPositionOf` 反算，
- * 跨容器反算一旦偏移就会把背景抹成脏斑。卡片局部层与弹层锚点同源，没有这个问题。
+ * 传整页层不会偏移：库用 `layerCoordinates.localPositionOf(...)` 换算坐标。
+ * 早期那次的脏斑是录制层没垫底色，`rememberPageBackdrop` 已经用 `drawRect(pageColor())` 补掉了。
  */
 @Composable
 fun DropdownRow(
@@ -216,15 +198,15 @@ fun DropdownRow(
     enabled: Boolean = true,
 ) {
     val glassEnabled = LocalGlassEnabled.current
-    val cardBackdrop = LocalCardBackdrop.current
+    val pageBackdrop = LocalPageBackdrop.current
     GlassDropdownPreference(
         onSelectedIndexChange = onSelect,
         items = items,
         selectedIndex = selectedIndex,
         title = title,
-        // 没有卡片上下文的调用点（不在 GroupCard 里）仍然退回不透明底卡，
-        // 这是安全兜底，不是主路径。
-        backdrop = cardBackdrop.takeIf { glassEnabled },
+        // 没有页面上下文（不在 ContentBackdropBox 里）或关掉玻璃时退回不透明底卡，
+        // 这是库的官方兜底，不是我们的主路径。
+        backdrop = pageBackdrop.takeIf { glassEnabled },
         summary = summary,
         enabled = enabled,
         visuals = GlassPopupDefaults.visuals(
