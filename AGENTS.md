@@ -174,11 +174,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 ## 产物与版本约定
 
 - 版本号在 `build.gradle.kts` 的 `versionCode` / `versionName`
-- release 的签名配置在 `build.gradle.kts` 顶部：读仓库根目录的 `keystore.properties`（**不入库**），
-  没有就**回退 debug 签名**并打 warning —— 这样任何人 clone 下来都能 `assembleRelease` 装机试用，
-  不会因为缺密钥构建失败。正式分发前必须放好 `keystore.properties` + `.jks`（模板见 `keystore.properties.example`）。
-  只签 v2 + v3（minSdk 33，v1 无意义），不用自己 `apksigner`。
-  **换证书 = 老用户必须卸载重装**，keystore 必须离线备份。
+- release 使用 **debug 签名**，只为方便装机试用；正式分发必须换 keystore
 - debug 包约 38MB（未混淆），release 约 3MB
 - 改完 UI 要跑一遍「静态 / Monet × 明 / 暗」四种组合，只看一种会漏掉配色塌陷
 

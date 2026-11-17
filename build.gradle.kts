@@ -1,6 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.io.FileInputStream
-import java.util.Properties
 
 plugins {
     id("com.android.application") version "9.5.1"
@@ -50,22 +48,6 @@ kotlin {
     }
 }
 
-/**
- * 发布签名：读仓库根目录的 `keystore.properties`（**不入库**，`.gitignore` 已排除）。
- *
- * 文件不存在、或里面指的 .jks 不存在时**回退 debug 签名** —— 保证任何人 clone 下来都能直接
- * `assembleRelease` 装机试用，不会因为缺密钥编译失败。回退时会打一条 warning，别忽略它：
- * 用 debug 签名的包不能对外分发（同一套 debug key 任何人都能生成，谁都能造一个同包名的包）。
- *
- * 模板见 `keystore.properties.example`。
- */
-val keystorePropsFile = rootProject.file("keystore.properties")
-val keystoreProps = Properties().apply {
-    if (keystorePropsFile.isFile) FileInputStream(keystorePropsFile).use { load(it) }
-}
-val releaseStoreFile = keystoreProps.getProperty("storeFile")?.let { rootProject.file(it) }
-val hasReleaseKey = releaseStoreFile != null && releaseStoreFile.isFile
-
 android {
     namespace = "com.ayang.giftoolkit"
     compileSdk = 37
@@ -79,36 +61,11 @@ android {
         versionName = "1.5"
     }
 
-    signingConfigs {
-        if (hasReleaseKey) {
-            create("release") {
-                storeFile = releaseStoreFile
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
-                // minSdk 33：v1（JAR 签名）没有意义，只留 v2 + v3。
-                // 实测 AGP 在 minSdk ≥ 33 时会把 v2 当作冗余省掉，产物只有 v3 —— 这对 13+ 的
-                // 设备是完整的；留 v2 这一行是为了以后 minSdk 下调时不用再改。
-                enableV1Signing = false
-                enableV2Signing = true
-                enableV3Signing = true
-            }
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = if (hasReleaseKey) {
-                signingConfigs.getByName("release")
-            } else {
-                logger.warn(
-                    "release 没有配置发布签名（缺 keystore.properties 或其中的 .jks），" +
-                        "本次回退 debug 签名 —— 这样的包只能自己装机，不能对外分发。",
-                )
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
