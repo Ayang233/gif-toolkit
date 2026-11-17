@@ -83,7 +83,16 @@ cd gif-toolkit
 
 ### 关于 release 签名
 
-`build.gradle.kts` 里 release 用的是 debug 签名，方便直接装机试用。要正式分发请换成自己的 keystore。
+release 包默认用 **debug 签名**（方便 clone 下来直接装机试用），签名配置见 `build.gradle.kts`
+顶部的 `keystore.properties` 读取逻辑：
+
+1. 复制 `keystore.properties.example` 成 `keystore.properties`（不入库），填 `storeFile` / `storePassword` /
+   `keyAlias` / `keyPassword`；
+2. 没有该文件（或里面的 `.jks` 不存在）时自动回退 debug 签名，并在构建日志里打一条 warning；
+3. 换了证书之后，同一个包名的旧版本**无法覆盖安装**，必须先卸载 —— keystore 丢了就只能这样，
+   所以除了本机还要做离线备份。
+
+签名方案用 v2 + v3（minSdk 33，v1 无意义），不用自己再 `apksigner`。
 
 ## 目录结构
 
