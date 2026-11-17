@@ -15,10 +15,10 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 3a980f7c = 滚动性能优化（PullToRefresh / ScrollBar / Slider）+ blur/material 文档更新。
+# 上游 d45ca181 = 侧栏折叠形态重写 + 顶栏/Scaffold 结构调整 + 模糊管线优化（MaxBlurRadius 100f）。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="3a980f7c"
+PINNED_REF="d45ca181"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -39,6 +39,7 @@ import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
+import com.ayang.giftoolkit.ui.LocalRailInset
 import com.ayang.giftoolkit.ui.LocalWideLayout
 import com.ayang.giftoolkit.ui.Tool
 import com.ayang.giftoolkit.ui.backTransition
@@ -48,6 +49,7 @@ import com.ayang.giftoolkit.ui.rememberBottomBarClearance
 import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
+import com.ayang.giftoolkit.ui.shouldExpandNavigationRail
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
@@ -103,10 +105,32 @@ fun GifApp() {
     // 底栏占位高度由这里单点计算、单点下发；宽屏没有底栏，所以是 0。
     val bottomClearance = rememberBottomBarClearance()
 
+    // 页面栈与一级导航的在场条件在这里就定，供下面的 CompositionLocal 使用。
+    val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
+    // 一级导航是否在场：底栏与侧栏**共用**这一个条件。
+    // 之前只给了底栏，Rail 是裸的 `if (wide)` —— 竖屏进二级页后再转横屏，
+    // 侧栏又会在旁边冒出来，二级页还留着 250dp 空白。导航挂载只能有这一个判据。
+    val showPrimaryNav = stack.size <= 1 && !app.modalOverlayOpen
+    // 侧栏展开与否跟官方同一档阈值（≥1200dp 才展开，见 ui/Adaptive.kt 的 shouldExpandNavigationRail）。
+    // 手机横屏约 900dp，官方在那里是**折叠成顶部胶囊**（只显示文字），不是左侧面板；
+    // 之前写死 `initialExpanded = true` + `showToggle = false`，等于自己造了一套"常驻展开"的规则。
+    val expandRail = shouldExpandNavigationRail()
+    val railState = rememberGlassNavigationRailState(initialExpanded = expandRail)
+    LaunchedEffect(expandRail) { railState.expanded = expandRail }
+    val railVisible = wide && showPrimaryNav
+    // 内容让位：跟着侧栏的形变进度走（官方 AppContent.kt:219-229 同款式子），
+    // 折叠态 progress = 0，页面不需要让出任何宽度。
+    val railInset = if (railVisible) {
+        (GlassNavigationRailDefaults.ExpandedWidth + GlassNavigationRailDefaults.Margin) * railState.progress
+    } else {
+        0.dp
+    }
+
     CompositionLocalProvider(
         LocalGlassEnabled provides glassEnabled,
         LocalAmoled provides app.amoledEnabled,
         LocalWideLayout provides wide,
+        LocalRailInset provides railInset,
         LocalBottomBarClearance provides if (wide) 0.dp else bottomClearance,
     ) {
         AnimatedMiuixTheme(controller) {
@@ -125,7 +149,6 @@ fun GifApp() {
             // 与页面级录制层同一套构造（GlassScope.rememberPageBackdrop）：
             // 先铺页面底色，空隙才不是透明的（否则底栏采样区会透出内容）。
             val backdrop = rememberPageBackdrop()
-            val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
             var tab by rememberSaveable { mutableIntStateOf(0) }
             val scope = rememberCoroutineScope()
             // 三个一级页用 Pager 承载：切 tab 时是连续位移（还能左右滑），
@@ -136,9 +159,6 @@ fun GifApp() {
             LaunchedEffect(pagerState.settledPage) {
                 if (tab != pagerState.settledPage) tab = pagerState.settledPage
             }
-            // 宽屏侧栏固定展开（见下面的 showToggle = false）。
-            val railState = rememberGlassNavigationRailState(initialExpanded = true)
-
             val pop: () -> Unit = { stack.removeLastOrNull() }
 
             // 切 tab：先置高亮，再启动弹簧滚动 —— 指示器与页面同时起步，
@@ -163,24 +183,21 @@ fun GifApp() {
             // 页面底色见 ui/Widgets.kt 的 pageColor()：卡片是 surfaceContainer，
             // 页面必须是另一个角色，两套配色（Miuix 静态 / Monet）才都有层次。
             Box(Modifier.fillMaxSize().background(pageColor())) {
-                // 宽屏：玻璃侧栏**叠放**在内容之上，不参与 Row 的宽度分配。
+                // 玻璃侧栏**叠放**在内容之上，不参与 Row 的宽度分配。
                 // GlassNavigationRail 的根节点是 `fillMaxSize()`（它自己决定面板位置：
-                // 距左边 Margin、宽度 ExpandedWidth），所以一旦放进 Row 当兄弟，
-                // 它会吃掉整行宽度，把内容挤成 0 宽 —— 实机上就是一片空白。
+                // 折叠时是顶部居中的胶囊，展开时距左边 Margin、宽 ExpandedWidth），
+                // 所以一旦放进 Row 当兄弟，它会吃掉整行宽度，把内容挤成 0 宽 —— 实机上就是一片空白。
                 // 官方 AppContent 同样是「内容 Box 在外、Rail 叠在内容 Box 里」。
                 //
-                // 因此内容要自己让出侧栏宽度，见 railInset。
-                val railInset = if (wide) {
-                    GlassNavigationRailDefaults.ExpandedWidth + GlassNavigationRailDefaults.Margin
-                } else {
-                    0.dp
-                }
+                // **录制层必须满宽**：官方 `AppContent.kt:300-350` 把 `layerBackdrop(sidebarBackdrop)`
+                // 挂在满宽的 Box 上，玻璃 Rail 作为兄弟叠上去，内容让位由页面内边距（LocalRailInset）负责。
+                // 之前我们把 `padding(start = railInset)` 加在录制层和 NavDisplay 上：录制层从 x=railInset
+                // 才开始录，左边那一条没有像素，玻璃只剩一块平色，还能看到一条竖直硬边。
                 // 只有内容区域参与背景录制；玻璃条画在它之上，才不会采样到自己。
                 // 关闭玻璃时完全不录制 —— 每帧整屏录制本身开销不小，没必要白付。
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .padding(start = railInset)
                         .then(if (glassEnabled) Modifier.layerBackdrop(backdrop) else Modifier),
                 ) {
                     // 转场档位来自主题设置；圆角裁剪半径取设备真实屏幕圆角 ——
@@ -287,16 +304,17 @@ fun GifApp() {
 
                 // 侧栏必须与上面的录制层是**兄弟**节点（同一 Box 的相邻子项），
                 // 与底栏同理：进了录制层就会采样到自己 → libhwui 原生栈溢出闪退。
-                if (wide) {
+                if (railVisible) {
                     GlassNavigationRail(
                         items = navItems,
                         selectedIndex = tab,
                         onSelect = { goTab(it) },
                         backdrop = if (glassEnabled) backdrop else null,
                         state = railState,
-                        // 宽屏上固定展开：折叠形态会变成"停在顶部居中"的胶囊，
-                        // 正好压在顶栏标题上。GIF 助手的设置项不多，不需要这个交互。
-                        showToggle = false,
+                        // 折叠态就是官方的"顶部居中胶囊"（只显示文字），左侧那个方块按钮
+                        // 是库自带的展开/收起入口 —— 交回默认值，不再用 showToggle = false 把它藏起来。
+                        // 之前那句"折叠胶囊会压住顶栏标题"是 250dp 面板时代的顾虑：
+                        // 现在手机横屏本来就是折叠态，官方也一样让胶囊和标题并排。
                     )
                 }
 
@@ -315,7 +333,7 @@ fun GifApp() {
                 // 那就是进出二级页看到的那段收缩/展开动画。官方示例的二级页（About / License 等）
                 // 根本没有底栏 —— 它把底栏画在 Main 那一层页面里，压栈后随整页一起被替换掉。
                 // GIF 助手的底栏在 NavDisplay 外面，只能靠"挂不挂载"来表达同一件事。
-                if (!wide && stack.size <= 1) {
+                if (!wide && showPrimaryNav) {
                     GlassNavigationBar(
                         items = navItems,
                         selectedIndex = tab,

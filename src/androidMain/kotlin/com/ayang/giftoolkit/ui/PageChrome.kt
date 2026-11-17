@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -104,10 +105,13 @@ fun pageContentPadding(
     // 二级页没有底栏（进入子页面时它已淡出），此时不该为它预留高度，
     // 否则列表末尾会多出一块 100dp 左右的空白。
     val clearance = if (reserveNavBar) LocalBottomBarClearance.current else 0.dp
+    // 宽屏玻璃侧栏叠在内容之上，内容靠内边距让位（随展开进度变化，折叠态为 0）。
+    // 官方 `AppContent.kt:219-229` 也是让页面内容让位，而不是把录制层挤窄。
+    val side = horizontal + LocalRailInset.current
     val top = innerPadding.calculateTopPadding() + extraTop
     val bottom = maxOf(innerPadding.calculateBottomPadding(), clearance) + extraBottom
-    return remember(top, bottom, horizontal) {
-        PaddingValues(start = horizontal, end = horizontal, top = top, bottom = bottom)
+    return remember(top, bottom, side) {
+        PaddingValues(start = side, end = side, top = top, bottom = bottom)
     }
 }
 
@@ -129,6 +133,20 @@ fun Os4ListPage(
     extraBottom: Dp = 12.dp,
     horizontalPadding: Dp = 0.dp,
     reserveNavBar: Boolean = true,
+    /**
+     * 页面级弹层槽位（Dialog / BottomSheet）。
+     *
+     * 必须是**Scaffold 作用域内**、且在 `ContentBackdropBox` **之外**的一组兄弟节点：
+     * - 在 Scaffold 里：`GlassDialog` / `GlassBottomSheet` 靠 `LocalDialogStates` 找宿主
+     *   （由 Scaffold 提供并绘制，`Scaffold.kt:108-118`）。放到页面外面就只剩一个没人绘制的列表，
+     *   点了没反应、也不报错 —— 之前作品操作面板退回系统窗口版就是这个原因。
+     * - 在录制层外：弹层要采样页面背景，如果它自己也在录制层里，就会采样到自己 →
+     *   libhwui `prepareNode` 原生栈溢出（AGENTS.md 第 1 条）。
+     *
+     * 参数就是页面正文录制层（玻璃关闭时为 `null`，组件会退回不透明底），
+     * 弹层把它直接传给 `GlassBottomSheet(backdrop = ...)`。
+     */
+    pageOverlay: @Composable (LayerBackdrop?) -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -181,5 +199,7 @@ fun Os4ListPage(
                 content = content,
             )
         }
+        // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
+        pageOverlay(glass.contentBackdrop.takeIf { glass.enabled })
     }
 }

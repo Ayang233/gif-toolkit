@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +38,8 @@ import top.yukonga.miuix.kmp.icon.glass.File
 import top.yukonga.miuix.kmp.icon.glass.Share
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import java.io.File
 
 @Composable
@@ -56,13 +58,48 @@ fun LibraryScreen(app: AppState) {
             ?: emptyList()
     }
 
-    Box(Modifier.fillMaxSize()) {
-        val glass = rememberGlassScope()
-        Os4ListPage(
-            title = "我的作品",
-            glass = glass,
-            subtitle = "共 ${files.size} 个导出文件",
-        ) {
+    // 面板是模态的：开着时让出一层导航（底栏画在页面外面，不然会压在面板上）。
+    LaunchedEffect(sheetVisible) { app.modalOverlayOpen = sheetVisible }
+
+    val glass = rememberGlassScope()
+    Os4ListPage(
+        title = "我的作品",
+        glass = glass,
+        subtitle = "共 ${files.size} 个导出文件",
+        // 面板要组合在 Scaffold 里才拿得到 LocalDialogStates（玻璃弹层的宿主），
+        // 同时必须在录制层之外，否则它会采样到自己。
+        pageOverlay = { backdrop ->
+            actionTarget?.let { file ->
+                FileActionSheet(
+                    file = file,
+                    backdrop = backdrop,
+                    visible = sheetVisible,
+                    onDismiss = { sheetVisible = false },
+                    onDismissFinished = {
+                        sheetVisible = false
+                        actionTarget = null
+                    },
+                    onSave = {
+                        MediaTools.saveToGallery(context, file, mimeOf(file), file.name)
+                        sheetVisible = false
+                        actionTarget = null
+                        app.libraryToken++
+                    },
+                    onShare = {
+                        MediaTools.share(context, file, mimeOf(file))
+                        sheetVisible = false
+                        actionTarget = null
+                    },
+                    onDelete = {
+                        file.delete()
+                        sheetVisible = false
+                        actionTarget = null
+                        app.libraryToken++
+                    },
+                )
+            }
+        },
+    ) {
             if (files.isEmpty()) {
                 item {
                     // 空态居中：之前是一段左对齐的灰字，看起来像"页面没加载完"。
@@ -108,36 +145,6 @@ fun LibraryScreen(app: AppState) {
                     }
                 }
             }
-        }
-
-        actionTarget?.let { file ->
-            FileActionSheet(
-                file = file,
-                visible = sheetVisible,
-                onDismiss = { sheetVisible = false },
-                onDismissFinished = {
-                    sheetVisible = false
-                    actionTarget = null
-                },
-                onSave = {
-                    MediaTools.saveToGallery(context, file, mimeOf(file), file.name)
-                    sheetVisible = false
-                    actionTarget = null
-                    app.libraryToken++
-                },
-                onShare = {
-                    MediaTools.share(context, file, mimeOf(file))
-                    sheetVisible = false
-                    actionTarget = null
-                },
-                onDelete = {
-                    file.delete()
-                    sheetVisible = false
-                    actionTarget = null
-                    app.libraryToken++
-                },
-            )
-        }
     }
 }
 
@@ -164,21 +171,21 @@ private fun FileRow(
 /**
  * 文件操作面板。
  *
- * 用 [WindowBottomSheet]（系统窗口版）而不是 [GlassBottomSheet]，原因是被实测否掉的：
+ * 用官方的 [GlassBottomSheet]，采样页面正文录制层（[LocalPageBackdrop]），
+ * 与官方示例 `component/GlassBottomSheetDemo.kt` 同一套：半透明磨砂面板 + 拖拽把手 + 标题。
  *
- * `GlassBottomSheet` 是 **Scaffold 作用域**组件 —— `MiuixPopupUtils.DialogLayout` 从
- * `LocalDialogStates` 取宿主列表来绘制，而这个 local 由 Scaffold 提供并负责渲染。
- * 这个面板挂在 `Box` 里，与 `Os4ListPage` 内部的 Scaffold 是**兄弟**关系，
- * 拿不到那个 local，于是被加进一个没人绘制的列表 —— 静默不显示（`renderInRootScaffold`
- * 的 true/false 都要宿主，都救不了；实测点击文件后毫无反应）。
+ * 之前这里是 `WindowBottomSheet`（系统窗口版）：它的参数表里没有 `backdrop`，
+ * 所以拿不到任何玻璃效果，实拍是一块不透明的白色面板。
+ * 当时退成系统窗口的原因是 `GlassBottomSheet` 依赖 `LocalDialogStates` —— 由 Scaffold 提供并绘制，
+ * 而面板挂在 `Os4ListPage` 外面（兄弟节点），拿不到那个 local，静默不显示。
  *
- * 要给它造宿主就得在页面外包一层 Scaffold，那会改变 inset 与背景录制层，风险大于收益。
- * [WindowBottomSheet] 是独立系统窗口，不依赖 Compose 宿主，行为稳定。
- * 代价是拿不到玻璃材质（它的参数表里没有 `backdrop`）—— 这一项记为"验证后保留原实现"。
+ * 现在改由 `Os4ListPage` 的 `pageOverlay` 槽位承载：槽位在 Scaffold **内部**、录制层**外部**，
+ * 宿主与"不要采样自己"两个条件同时满足。业务回调与菜单项保持原样。
  */
 @Composable
 private fun FileActionSheet(
     file: File,
+    backdrop: LayerBackdrop?,
     visible: Boolean,
     onDismiss: () -> Unit,
     onDismissFinished: () -> Unit,
@@ -186,9 +193,10 @@ private fun FileActionSheet(
     onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    WindowBottomSheet(
+    GlassBottomSheet(
         show = visible,
         title = file.name,
+        backdrop = backdrop,
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished,
     ) {

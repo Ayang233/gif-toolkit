@@ -345,6 +345,9 @@ fun PrimaryActionBar(
     onCancel: () -> Unit = {},
 ) {
     val sideGap = 12.dp
+    // 展开态玻璃侧栏叠在内容之上，底部主操作条也要跟着让位，否则按钮左端会被面板压住。
+    // 折叠态（手机横屏 / 竖屏）这个值是 0，与之前完全一致。
+    val railInset = LocalRailInset.current
     // 通栏控件左右留白要参与圆角安全区推导：屏幕圆角是圆弧，
     // 距离底部越近，水平方向的可用宽度越窄，贴边会被切掉一角。
     // 24dp 是官方 `bottomBar` 的下限（`maxOf(24.dp, insets + 8.dp)`），
@@ -360,7 +363,7 @@ fun PrimaryActionBar(
             // 底部不会漏出别的颜色。
             .background(pageColor())
             .navigationBarsPadding()
-            .padding(start = sideGap, end = sideGap, top = 20.dp)
+            .padding(start = sideGap + railInset, end = sideGap, top = 20.dp)
             .padding(bottom = bottomGap),
     ) {
         ActionButton(

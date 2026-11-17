@@ -103,15 +103,34 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     而这个 local 由 Scaffold 提供**并负责渲染**。GifApp 只有 `NavDisplay` + 浮层底栏，
     没有 Scaffold —— 组件会被加进一个没人绘制的列表，**静默不显示**（不报错、不崩溃，
     点了没反应，极难排查）。`renderInRootScaffold` 的 true/false 都要宿主，都不管用。
-    这类**页面级**浮层要用系统窗口版：`WindowDialog` / `WindowBottomSheet`。
+    **页面级的弹层**不要挂在 `GifApp` 这一层，改由 `Os4ListPage` 的 `pageOverlay` 槽位承载 —— 那里在
+    Scaffold 作用域内，`GlassBottomSheet` / `GlassDialog` 能正常用上玻璃版（见第 14 条）。
+    `GifApp` 自己这一层要弹窗，才退回系统窗口版 `WindowDialog`。
     页面**内部**的弹层（如 `GroupCard` 里的 `GlassDropdownPreference`）有 Scaffold 祖先，可以正常用玻璃版。
-12. **底栏只在「一级页且非宽屏」时挂载，二级页直接不组合，不要用 `visible = false` 去关它。**
-    `visible = false` 不是隐藏，是 `showScale` 缩到 `NAV_HIDE_SCALE` + 淡出 + 自身模糊一起收
-    （`GlassNavigationBar.kt:200`、`:256-266`），就是"进出二级页底栏会缩一下"的来源。
-    官方示例的二级页没有底栏 —— 它把底栏画在 Main 页面内部，压栈后随页面一起被替换；
-    我们的底栏在 `NavDisplay` 外面（录制层约束决定），只能靠"挂不挂载"表达同一件事。
-    同理，一级页的 `BackHandler` 只在 `tab != 0` 时启用：tab 0 要交还系统直接退出，
-    官方 `MainScreenBackHandler`（`AppContent.kt:910`）就是这么写的，不要加退出确认框。
+12. **一级导航的在场只有一个判据：`showPrimaryNav = stack.size <= 1`，底栏和 Rail 都必须读它。**
+    - 二级页直接不组合导航，不要用 `visible = false` 去关：那不是隐藏，是
+      `showScale` 缩到 `NAV_HIDE_SCALE` + 淡出 + 自身模糊一起收（`GlassNavigationBar.kt:200`、`:256-266`），
+      就是"进出二级页底栏会缩一下"的来源。
+    - 曾经只给底栏加了栈深条件、Rail 还是裸的 `if (wide)`：竖屏进二级页再转横屏，
+      侧栏会重新冒出来，二级页还留着 250dp 空白。
+    - 一级页的 `BackHandler` 只在 `tab != 0` 时启用：tab 0 交还系统直接退出，
+      官方 `MainScreenBackHandler`（`AppContent.kt:910`）就是这么写的，不要加退出确认框。
+13. **横屏导航形态照官方两档阈值走，不要自己定规则。**
+    宽屏判定 `shouldShowSplitPane` = `≥840dp` 或（`≥600dp` 且高宽比 < 1.2）→ 用 `GlassNavigationRail`；
+    是否展开看 `shouldExpandNavigationRail` = **`≥1200dp`**。手机横屏约 900dp，落在"有 Rail 但折叠"，
+    折叠态就是**顶部居中胶囊、只显示文字**（`GlassNavigationRail.kt:276`）——
+    那不是顶部导航栏，是 Rail 的另一种形态。不要写死 `initialExpanded = true`，
+    也不要用 `showToggle = false` 把折叠入口藏掉（1.5 之前就是这么写的）。
+    内容让位由 `LocalRailInset = (ExpandedWidth + Margin) * railState.progress` 下发到页面内边距，
+    **录制层不许跟着收窄** —— 收窄会让 Rail 左半段没有像素可采，玻璃只剩一块平色。
+    官方 `AppContent.kt:300-350` 也是"满宽录制 + 页面内边距让位"。
+14. **页面级弹层（Dialog / BottomSheet）走 `Os4ListPage` 的 `pageOverlay` 槽位，不要挂在页面外面。**
+    `GlassDialog` / `GlassBottomSheet` 靠 `LocalDialogStates` 找宿主，这个 local 由 Scaffold 提供
+    并负责绘制（`Scaffold.kt:108-118`）。挂在 `Os4ListPage` 外面（兄弟节点）拿不到它 ——
+    表现是"点了没反应"，也不报错（`renderInRootScaffold` 的 true/false 都救不了）。
+    槽位在 Scaffold **内部**、`ContentBackdropBox` **外部**，两个条件同时满足：拿得到宿主，
+    又不会被录进 backdrop 采样到自己。槽位参数就是页面录制层，直接传给 `backdrop`。
+    模态面板打开期间要置 `app.modalOverlayOpen`，把一层导航让出去（底栏画在页面外面，否则会压在面板上）。
 
 ## 常见改动怎么下手
 
@@ -122,7 +141,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
 | 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
-| 加弹层 | 页面级（全屏浮层）用 `WindowBottomSheet` / `WindowDialog`：系统窗口，天然在录制层外，且**不依赖 Scaffold 宿主**（见硬约束 11）。页面内部的弹层才用玻璃版 |
+| 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |
 
 ## 文案与对外内容
 
@@ -149,7 +168,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix `3a980f7c`（2026-11-17）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
+1. 基线是 Miuix `d45ca181`（2026-11-17）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
    的默认值有没有变 —— 这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。

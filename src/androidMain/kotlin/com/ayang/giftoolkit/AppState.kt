@@ -48,6 +48,16 @@ enum class BackExitDirection(val label: String) {
  */
 class AppState(private val store: SettingsStore) {
 
+    /**
+     * 是否有一层**模态**页面弹层（如作品操作面板）正开着。
+     *
+     * 底栏画在 NavDisplay 外面（录制层约束），层级永远在页面内容之上；
+     * 而 GlassBottomSheet 由页面自己的 Scaffold 绘制 —— 所以弹层会被底栏压住。
+     * 弹层开着时把一层导航让出去，既解决压盖，也符合"模态遮住导航"的常规行为。
+     * 不落盘，纯运行时状态。
+     */
+    var modalOverlayOpen by mutableStateOf(false)
+
     private var themeModeState by mutableStateOf(store.themeMode)
     private var monetEnabledState by mutableStateOf(store.monetEnabled)
     private var glassEnabledState by mutableStateOf(store.glassEnabled)

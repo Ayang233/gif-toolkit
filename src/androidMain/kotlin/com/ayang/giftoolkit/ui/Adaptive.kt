@@ -29,3 +29,29 @@ fun rememberWideLayout(): Boolean {
 
 /** 宽屏标记，页面骨架据此决定顶栏是否还允许大标题展开。 */
 val LocalWideLayout = compositionLocalOf { false }
+
+/**
+ * 宽屏下页面要为玻璃侧栏让出的水平宽度（dp）。
+ *
+ * 由 `App.kt` 单点计算、单点下发：`(ExpandedWidth + Margin) * railState.progress`。
+ * 折叠态（手机上横屏）progress 为 0，页面不需要让位；展开态（≥1200dp）才让出整条面板。
+ * 官方 `AppContent.kt:219-229` 用的是同一个式子：让位跟着侧栏的形变进度走，而不是"有侧栏就让 250dp"。
+ *
+ * **录制层不能跟着这个值收窄** —— 那会让侧栏左半段没有像素可采，玻璃只剩一块平色。
+ */
+val LocalRailInset = compositionLocalOf { 0.dp }
+
+/**
+ * 侧栏是否展开，阈值与官方 `utils/AdaptiveUtils.kt` 的 `shouldExpandNavigationRail()` 一致：
+ * **宽度 ≥ 1200dp** 才展开。
+ *
+ * 这一点很容易记错：宽屏判定（840dp）决定"用 Rail 还是底栏"，展开判定（1200dp）是另一档。
+ * 手机横屏大约 900dp，官方在那里是**折叠成顶部胶囊**（只显示文字），不是左侧面板。
+ */
+@Composable
+fun shouldExpandNavigationRail(): Boolean {
+    val width = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.width.toDp()
+    }
+    return width >= 1200.dp
+}

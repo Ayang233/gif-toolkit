@@ -113,7 +113,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
    所以页面色不直接取 `surface`，而是由卡片色反推（`ui/Widgets.kt` 的 `pageColor()` / `cardColor()`），
    否则整页和卡片糊成一片，分组结构消失。
 3. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 作为宿主。** `App.kt` 那一层没有 Scaffold，
-   这类组件会静默不渲染；页面级浮层用 `WindowDialog` / `WindowBottomSheet`。
+   这类组件会静默不渲染；页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（Scaffold 内、录制层外）。
 4. **Miuix 卡片内不放分割线**，靠 56dp 最小行高与 16dp 内边距区分。
 5. **不引入 `androidx.compose.material3`**，会和 Miuix 的设计语言打架，也明显增大包体。
 
