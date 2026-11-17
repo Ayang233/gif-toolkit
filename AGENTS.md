@@ -72,16 +72,19 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    **另外：Miuix 的 `isRenderEffectSupported()` 只是 `SDK_INT >= 31`**，
    它查不出某台 GPU 上模糊会不会翻车（真机上出现过「内容不糊开、只被压暗」），
    所以"关掉玻璃"这个开关必须一直留给用户。
-4. **弹层的 `backdrop` 用「页面正文录制层」，即 `LocalPageBackdrop`，不要用卡片局部层，也不要用 `null` 一躲了事。**
-   官方 `GlassPage.kt:441-452` 就是给 `GlassDropdownPreference` 传整页 `backdrop`；
-   `BlurSection.kt:123-125` 的 `preferenceBackdrop` 挂在**包住整列行的大容器**上，不是单张卡片。
-   曾按"卡片局部录制层"实现（`GroupCard` 自建 `layerBackdrop`），单行卡片上必翻车：
-   弹层伸出卡片下边界后没有像素可采，下半截只剩材质、能看出一条横向硬边
-   （`docs/os4-round5-audit.md` §1.3 有对照图）。
-   坐标不会偏：库用 `layerCoordinates.localPositionOf(...)` 反算（`LayerBackdrop.kt:81`）。
-   1.4 之前一律传 `null` 是躲脏斑的补丁，而脏斑的真实成因是录制层**没垫底色**
-   —— `rememberPageBackdrop` 已经 `drawRect(pageColor())`，前提不存在了。
-   **前提**：录制层必须排除弹层宿主（弹层由 Scaffold 的 popup 层绘制，是 `ContentBackdropBox` 的兄弟）。
+4. **弹层的 `backdrop` 用 `pageOverlay` 传进来的那个（= `LocalRootBackdrop ?: 页面正文录制层`），
+   不要用卡片局部层，也不要用 `null` 一躲了事。**
+   `pageOverlay` 已经按页面类型选好了采样源，调用方直接传，不要再自己挑。
+   卡片局部录制层必翻车：`GroupCard` 自建 `layerBackdrop` 时，弹层伸出行边界后没有像素可采，
+   下半截只剩材质、还带一条横向硬边（`docs/os4-round5-audit.md` §1.3 有对照图）。
+   **不要以为 `localPositionOf` 一定能算对坐标**：它只在同一条布局链上自洽。
+   `HorizontalPager` 的页面按页宽错位，页面内录制层上报槽位坐标（第 2 个 tab x = 1080），
+   弹层上报真实坐标 —— 差一整页宽，采样整块落在录制层之外
+   （第六轮"作品面板不模糊"的真因，第七轮用探针实测，见 `docs/os4-round7-audit.md` §3）。
+   所以一级页的弹层必须采 `LocalRootBackdrop`（录在 Pager 外面）。
+   1.4 之前一律传 `null` 是躲脏斑的补丁；脏斑的真实成因是录制层没垫底色，
+   `rememberPageBackdrop` 现在先 `drawRect(pageColor())`，前提已经不成立。
+   **前提**：弹层宿主不能在被采样的录制层里面（第 1、11 条）。
 5. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow` 去做"分段"。**
    库里其实有三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`），
    它们都是**可横向滚动的页签**，不是「一整条凹槽 + 一个滑块」的分段控件；

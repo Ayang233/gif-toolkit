@@ -10,7 +10,7 @@
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
-> 改这个项目之前请先读 [AGENTS.md](AGENTS.md)：目录地图、常用命令，以及 11 条硬约束
+> 改这个项目之前请先读 [AGENTS.md](AGENTS.md)：目录地图、常用命令，以及 14 条硬约束
 > （玻璃录制层、配色推导、图标规范、Scaffold 宿主、状态栏适配等）。
 
 | 主页 | 工具页 | 设置 | 关于 |
@@ -89,7 +89,7 @@ cd gif-toolkit
 
 ```
 src/androidMain/kotlin/com/ayang/giftoolkit/
-├── App.kt                 主题、NavDisplay 路由、玻璃底栏、退出确认
+├── App.kt                 主题、NavDisplay 路由、一级页（Pager + 玻璃底栏）、宽屏侧栏、弹层宿主
 ├── Route.kt               路由（Root / Tool / About / Licenses / License）
 ├── AppState.kt            全局状态 + 每个工具一份 ToolForm
 ├── MainActivity.kt        edge-to-edge 入口
@@ -109,11 +109,14 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 
 1. **玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是子节点，录制层也不能上移到 `Scaffold`。**
    否则玻璃会采样到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 递归到栈溢出、直接闪退。
+   另外，弹层的采样源必须录在 `HorizontalPager` **外面**：Pager 的页面按页宽错位，
+   页面内录制层上报的是槽位坐标，和弹层的真实坐标差一整页宽，采样会整块落空。
 2. **Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个色。**
    所以页面色不直接取 `surface`，而是由卡片色反推（`ui/Widgets.kt` 的 `pageColor()` / `cardColor()`），
    否则整页和卡片糊成一片，分组结构消失。
-3. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 作为宿主。** `App.kt` 那一层没有 Scaffold，
-   这类组件会静默不渲染；页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（Scaffold 内、录制层外）。
+3. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 作为宿主。** `App.kt` 顶部那层
+   `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是弹层宿主（官方 `GlassPageHost` 同款），
+   去掉它这类组件会静默不渲染；页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（Scaffold 内、录制层外）。
 4. **Miuix 卡片内不放分割线**，靠 56dp 最小行高与 16dp 内边距区分。
 5. **不引入 `androidx.compose.material3`**，会和 Miuix 的设计语言打架，也明显增大包体。
 
@@ -122,7 +125,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 - 「去水印」目前是按区域打马赛克，不是真正的 inpainting
 - 视频取帧仍是逐帧 `getFrameAtTime`，长视频偏慢，计划换成 `MediaCodec` 顺序解码
 - 没有目标体积压缩（不会为了压到某个大小自动二分色数/帧率）
-- 返回栈未持久化，进程被杀后回到首页
+- 进程被杀后返回栈能由系统恢复到原页面，但页面里的选择（已选素材、参数、生成进度）会丢
 - 玻璃在低端机上的性能未充分验证，设置里可关闭
 
 ## 许可证
