@@ -437,7 +437,7 @@ drawRect(brush, BlendMode.SrcIn)     // 只在有像素的地方铺渐变
 | `./gradlew :assembleRelease` | BUILD SUCCESSFUL，3,311,827 B（R8 开启，debug 签名） |
 | release 包实机跑通 | `R9_01_home_1200x540.png` ~ `R9_06_notice.png`（版本 1.7（9），1200dp 横屏，浅色 + 玻璃开） |
 | 自动化测试 | **项目没有测试源集**（`src/**/test`、`androidTest` 均不存在），`./gradlew test` 无可执行用例 —— 如实记录，不虚报数量 |
-| 编译警告 | 无 error；Kotlin 未使用 import 已被清理 |
+| 编译警告 | 无 error；项目自身只剩 `core/MediaTools.kt:214` 一处 `COLOR_FormatYUV420SemiPlanar` 的 JDK 弃用告警，与本轮无关 |
 | 1200dp 横屏一级三页 | 通过（§1.5） |
 | 1200dp 横屏二级页（工具 / 关于 / 许可 / GPL 正文） | 通过 |
 | 1200dp 竖屏 | 通过 |
