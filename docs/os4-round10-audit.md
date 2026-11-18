@@ -534,6 +534,9 @@ ProgressButtonDefaults.progressButtonColors(
 没有为了让字更清楚把它改成 enabled。四种方案仍可在「设置 → 主题 → 调试」的对比页并排查看
 （该页现在把 A 标为"已采用"，其余三组保留作记录；release 包里整页不存在）。
 
+已发布：**1.8（10）**，release 包 3,311,823 B（SHA-256 `7466816E…DFD61CA`），
+https://github.com/Ayang233/gif-toolkit/releases/tag/v1.8 。
+
 ## 4. 全项目 MIUIX OS4 组件审计
 
 审计范围：`screens/` 全部 7 个页面 + `ui/` 全部公共组件 + `App.kt` 的主题/导航/弹层宿主。
