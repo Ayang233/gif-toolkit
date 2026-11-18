@@ -2,7 +2,7 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
-## 未发布
+## 1.6 — 2026-11-18
 
 **新增**
 
