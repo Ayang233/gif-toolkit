@@ -17,8 +17,8 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 ├── data/SettingsStore.kt 外观设置持久层（SharedPreferences）
 ├── ui/
 │   ├── ToolCatalog.kt    十个工具的元数据（id / 标题 / 说明 / 分组 / 图标 / 按钮文案）
-│   ├── Widgets.kt        分组卡片、行、下拉、预览舞台、主操作条、pageColor/cardColor、图标尺寸
-│   ├── PageChrome.kt     页面骨架 Os4ListPage + pageScrollModifiers + pageContentPadding
+│   ├── Widgets.kt        分组卡片、玻璃卡片 GlassCard、行、下拉、预览舞台、主操作条、pageColor/cardColor、图标尺寸
+│   ├── PageChrome.kt     页面骨架 Os4ListPage（整屏背景 / 固定大标题区 / 顶栏采样源）+ pageScrollModifiers + pageContentPadding
 │   ├── Adaptive.kt       宽屏判定（阈值与官方 AdaptiveUtils 一致）
 │   ├── GlassScope.kt     页面玻璃作用域 + PageTopBar（玻璃/普通两态）
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
@@ -73,7 +73,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    已经踩过的两个例子：
    - 关于页顶栏原来采正文录制层，而正文层刻意不垫底色（渐变在页面根部）、顶部还有 40dp 图标留白
      → 顶栏区域全透明 → 真机上顶栏一条黑带 + 返回键胶囊花屏（`_archive/round11/`）。
-     修法：`PageTopBar(backdrop = rememberCombinedBackdrop(渐变层, 正文层))`。
+     修法：`Os4ListPage(topBarBackdrop = rememberCombinedBackdrop(渐变层, 正文层))`。
    - 渐变层自己会在滚动到底后淡出，所以**不能**只采它 —— 这就是要叠两层的理由（`ui/CombinedBackdrop.kt`）。
    判断方法：问一句"这个组件所在的位置，在被采样的那层里是谁画的？画了没有？"
 2. **颜色分三层，别混用：`pageBaseColor()` / `pageColor()` / `cardColor()`。**
@@ -130,7 +130,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    `innerPadding` 的横向部分就是 `systemBars ∪ displayCutout`，横屏时挖孔落在起始边（本机 64dp）。
    曾经只让 `railInset`、把这段丢掉，结果侧栏自己吃了安全区、内容没跟上，横屏下被压住 52dp
    （`docs/os4-round9-audit.md` §1）。**不在 Scaffold 内容槽位里的控件**（底部主操作条、
-   关于页自己的列表）用 `rememberHorizontalSafeInsets()` 自己取，不要再写第三套算式。
+   页面级浮层控件等）用 `rememberHorizontalSafeInsets()` 自己取，不要再写第三套算式。
 10. **图标只用官方 Glass 族，不自绘、不混 `extended`。**
     `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
     `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
@@ -185,16 +185,30 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     面板开着时底栏只是被遮罩压暗（与官方一致）。之前那套"开面板就把一层导航让出去"的联动已删除，
     不要加回来 —— 它会在面板异常关闭时把导航留在隐藏状态。
 
-15. **关于页是唯一"自己铺背景"的页面，结构和别的页不一样，照抄会踩两个坑。**
-    - 渐变（`ui/bg/BgEffectBackground`）必须铺在**页面根部、Scaffold 之外**，
-      且 Scaffold 要 `containerColor = Transparent` + `contentWindowInsets = 0`：
+15. **关于页走 `Os4ListPage`，它是唯一"自己铺背景"的页面；不要退回自建 Scaffold。**
+    整屏渐变 + 固定大标题 + 可滚动内容，现在由骨架的三个参数表达：
+    - `background = { progress -> ... }`：渐变（`ui/bg/BgEffectBackground`）铺在**页面根部、Scaffold 之外**，
+      骨架负责把 Scaffold 设成 `containerColor = Transparent` + `contentWindowInsets = 0`。
       渐变要一直延伸到状态栏下面，放进 Scaffold 内容区会在顶栏下方切出一条硬边。
-    - 它的 `rememberGlassScope(opaqueBase = false)` 不垫页面底色 —— 背后已经是整屏不透明渐变，
-      垫了就把渐变盖掉。**顶栏的采样源要单独传**：正文层在这里是空的（顶部 40dp 是图标留白），
-      渐变层在滚动到底后又会淡出，所以传
-      `rememberCombinedBackdrop(渐变层, 正文层)`（`ui/CombinedBackdrop.kt`），见第 1 条覆盖硬约束。
+      传了 `background` 的页面，顶栏在收起前**完全透明**，`progress == 1f` 后才上 `surface` 实色。
+    - `largeHeader = { progress -> ... }`：固定在列表**下面**的图标 / 名称 / 版本。骨架自动在列表首项
+      插一块与头部等高的透明占位（初值 300dp，`onSizeChanged` 回填），头部因此不会被卡片压住；
+      `progress` = 首项滚动偏移 / 头部高度，`progress == 1f` 之后顶栏才浮起。
+      关于页 `AboutHeader` 的淡出阈值：版本 0.05、标题 0.20、图标 0.35（各 0.15 宽），
+      图标 / 标题另缩到 0.95。
+    - `topBarBackdrop`：顶栏采样源覆盖。关于页的正文层不垫底色（`opaqueBase = false`），
+      顶部 40dp 又是图标留白 → 正文层在顶栏区域没有像素；渐变层滚到底又会淡出。
+      传 `rememberCombinedBackdrop(bgBackdrop, contentBackdrop)`（`ui/CombinedBackdrop.kt`），
+      任何滚动位置至少有一层有像素。玻璃关时传 `null`（走库的渐变带）。
       **不要**为了"让顶栏采到渐变"在页面根部再套一层 `layerBackdrop`：
       那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
+    - 短内容也要能滚：内容 item 外先放 `Spacer(Modifier.fillParentMaxHeight())` 撑满一屏，
+      否则列表不可滚，头部永远收不回去（1.10 的 `fillParentMaxHeight`）。
+    - 卡片用 **`GlassCard(backdrop = bgBackdrop)`**：官方 `Card` + 官方 `textureBlur`，
+      卡片本体透明、圆角 `CardDefaults.CornerRadius`、半径 60f、混合色 `surface` 0.6，
+      与图标 / 标题同采 `bgBackdrop`，三者材质同源（InstallerX `MiuixAboutPage.kt:612-638` 的写法）。
+      `backdrop = null` 时退回 `cardColor()` 不透明卡 —— 玻璃关闭时入口不能消失。
+      **不要**自造卡片渐变或第二套卡片色。
     - 图标与软件名称**必须走参考项目的原生 `textureBlur`**：一份背景录制层
       （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
       `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。
@@ -207,8 +221,6 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       这是 GPU 能力问题，不是接线问题 —— 保留原生实现，标注真机待验证，
       **不要**为了在模拟器上看出来而换一套视觉。详见 `docs/os4-round10-audit.md` §2.5。
     - 图标**不带白底/底板**，只有单色剪影。第九轮那块 `cardColor(alpha = 0.72f)` 底板已删除。
-    - 卡片用 `cardColor().copy(alpha = 0.82f)`，不用 `textureBlur`。详见 `docs/os4-round8-audit.md` §6.3
-      与 `docs/os4-round10-audit.md` §2.7。
     - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
       不要再拆成两个 Route。
@@ -220,6 +232,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加一个工具 | `ToolCatalog` 加枚举项和图标 → `TaskRunner` 加分支 → `ToolScreen.ParamPanel` 加参数行 |
 | 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` / `ThemeScreen` 加行 |
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
+| 加整屏背景 / 固定大标题 | 用 `Os4ListPage` 的 `background` / `largeHeader` / `topBarBackdrop`，不要自建 Scaffold（见第 15 条） |
 | 改配色层次 | 只动 `pageBaseColor()` / `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*`（分工见硬约束 2） |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
 | 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |

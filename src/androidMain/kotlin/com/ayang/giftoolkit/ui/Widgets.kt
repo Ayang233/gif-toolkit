@@ -41,6 +41,10 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -157,6 +161,58 @@ fun GroupCard(
         // 走 cardColor() 而不是库默认的 surfaceContainer：
         // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
         colors = CardDefaults.defaultColors(color = cardColor()),
+    ) {
+        content()
+    }
+}
+
+/**
+ * **玻璃卡片**：卡片本体透明，由 `textureBlur` 采样页面背景画出材质。
+ *
+ * 这是参考项目 InstallerX Revived 关于页的写法（`MiuixAboutPage.kt:612-638`）：
+ *
+ * ```kotlin
+ * Card(
+ *     modifier = Modifier.textureBlur(backdrop, RoundedCornerShape(16.dp), colors = BlurColors(...)),
+ *     colors = CardDefaults.defaultColors(Color.Transparent, Color.Transparent),
+ * )
+ * ```
+ *
+ * 为什么要有独立组件而不是给 `GroupCard` 加参数：玻璃卡**只能是可选的**，
+ * 普通设置页仍用不透明的 [cardColor]（文字对比度更稳，也和系统设置页一致）。
+ *
+ * [backdrop] 为 `null`（玻璃关闭 / 页面没有录制层）时退回不透明卡片 ——
+ * `textureBlur` 没有采样源时会把卡片画成一块透明板，入口会整块消失，那是功能回退。
+ */
+@Composable
+fun GlassCard(
+    backdrop: Backdrop?,
+    modifier: Modifier = Modifier,
+    bottomPadding: Dp = 12.dp,
+    content: @Composable () -> Unit,
+) {
+    val glassy = backdrop != null
+    val surface = MiuixTheme.colorScheme.surface
+    Card(
+        modifier = modifier
+            .padding(horizontal = 12.dp)
+            .padding(bottom = bottomPadding)
+            .then(
+                if (glassy) {
+                    Modifier.textureBlur(
+                        backdrop = backdrop,
+                        shape = RoundedCornerShape(CardDefaults.CornerRadius),
+                        // 卡片是"薄玻璃"，半径比顶栏/底栏小一档：太大就糊成一片纯色
+                        blurRadius = 60f,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.6f))),
+                        ),
+                    )
+                } else {
+                    Modifier
+                },
+            ),
+        colors = CardDefaults.defaultColors(color = if (glassy) Color.Transparent else cardColor()),
     ) {
         content()
     }

@@ -1,13 +1,19 @@
 package com.ayang.giftoolkit.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -16,18 +22,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -180,48 +194,104 @@ fun Os4ListPage(
      * 弹层把它直接传给 `GlassBottomSheet(backdrop = ...)`。
      */
     pageOverlay: @Composable (LayerBackdrop?) -> Unit = {},
+    /**
+     * 页面背景，铺在 `Scaffold` **外面**（页面根部）。目前只有关于页用：整屏 OS3 渐变要一直
+     * 延伸到状态栏下面，放进 Scaffold 内容区会在顶栏下方切出一条硬边。
+     *
+     * 传了它意味着"这一页自己铺背景"，于是顶栏改成：滚动到收起前完全透明、收起后才上实色
+     * （与参考项目 InstallerX `MiuixAboutPage.kt` 的非玻璃档写法一致），标题透明度跟着
+     * [largeHeader] 的滚动进度走。
+     */
+    background: (@Composable (progress: () -> Float) -> Unit)? = null,
+    /**
+     * 顶栏的采样源覆盖。默认是页面正文录制层。
+     *
+     * 只有"正文层在顶栏区域没有像素"的页面要传：关于页的正文层刻意不垫底色、顶部还有 40dp
+     * 图标留白，所以它传的是 `rememberCombinedBackdrop(渐变层, 正文层)`（见 AGENTS 第 1 条覆盖约束）。
+     */
+    topBarBackdrop: Backdrop? = null,
+    /**
+     * 固定在列表下方、随滚动淡出的自定义头部（关于页的图标 / 名称 / 版本）。
+     *
+     * 传了它以后：
+     * - 列表首项自动插入一块与头部等高的透明占位（`logoSpacer`），头部因此不会被卡片压住；
+     * - 滚动进度 = 首项滚动偏移 / 头部高度，作为参数交给 [largeHeader]，页面自己决定怎么淡出；
+     * - 顶栏的 `isScrolled` 改为"进度到 1"（与参考项目一致：内容完全收起后顶栏才浮起）。
+     */
+    largeHeader: (@Composable (progress: () -> Float) -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
     val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
-    Scaffold(
-        // 页面底色显式写出来，不依赖 Scaffold 的默认值（默认是 `surface`，现在与它同值）。
-        // 必须与 `rememberPageBackdrop` 垫的那一层、底部主操作条的遮挡色是**同一个**
-        // `pageBaseColor()`：三处只要有一处走偏，玻璃/操作条就会在页面上留一块色差方块。
-        containerColor = pageBaseColor(),
-        //
-        // 录制层**不能**挂在 Scaffold 上，只能挂在内容区（见 ContentBackdropBox）。
-        //
-        // 曾尝试照官方 `GlassPage.kt:242`（`Scaffold(modifier = Modifier.layerBackdrop(pageBackdrop))`）
-        // 把录制层上移，理由是那样顶栏的 `localPositionOf` 反算能落在录制内容上。
-        // 实测直接 SIGSEGV：`RenderNode::prepareTreeImpl` 在 prepareTreeImpl / prepareListAndChildren
-        // 之间无限递归（cause: stack overflow）。
-        //
-        // 为什么官方敢那么写：它顶栏采的是 `LocalTopAppBarBackdrop`（由 BlurredBar 提供的**另一个**
-        // backdrop），而挂在 Scaffold 上的 `pageBackdrop` 只给底栏/弹层用，两者不是同一个 ——
-        // 所以顶栏不在自己采样源的录制树里。我们顶栏与内容**共用** `GlassScope.contentBackdrop`，
-        // 录制层一旦包含顶栏，顶栏采样时就会把"正在采样的自己"录进去，递归到栈溢出。
-        //
-        // 结论：录制层排除顶栏是这套结构下的唯一安全解。顶栏反算得到负 y，
-        // 采样区间落在内容区顶部 —— 这正是"顶栏正下方的内容"，语义是对的。
-        topBar = {
-            PageTopBar(
-                title = title,
-                glass = glass,
-                isScrolled = isScrolled,
-                scrollBehavior = scrollBehavior,
-                subtitle = subtitle,
-                onBack = onBack,
-                // 宽屏顶栏没有大标题这一档（官方 AdaptiveTopAppBar 同款判断）
-                expandable = !LocalWideLayout.current,
-                actions = actions,
-            )
-        },
-        bottomBar = bottomBar,
-    ) { padding ->
+    // 头部高度：首帧用 300dp 兜底（与官方 `AboutPage.kt` 的 logoHeightDp 初值一致）。
+    // 用 0 会让透明占位高度为 0 —— 首帧卡片压住图标/标题，且滚动进度恒为 0（判据 > 0 不成立）。
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerProgress: () -> Float = {
+        when {
+            largeHeader == null -> if (isScrolled) 1f else 0f
+            listState.firstVisibleItemIndex > 0 -> 1f
+            headerHeightPx > 0 ->
+                (listState.firstVisibleItemScrollOffset.toFloat() / headerHeightPx).coerceIn(0f, 1f)
+            else -> 0f
+        }
+    }
+    val collapsed by remember { derivedStateOf { headerProgress() == 1f } }
+
+    val topBar: @Composable () -> Unit = {
+        PageTopBar(
+            title = title,
+            glass = glass,
+            isScrolled = if (largeHeader != null) collapsed else isScrolled,
+            scrollBehavior = scrollBehavior,
+            subtitle = subtitle,
+            onBack = onBack,
+            // 宽屏顶栏没有大标题这一档（官方 AdaptiveTopAppBar 同款判断）
+            expandable = largeHeader == null && !LocalWideLayout.current,
+            actions = actions,
+            // 有自定义头部时，标题透明度跟着头部收起进度走（参考项目同款）
+            titleAlpha = if (largeHeader != null) {
+                { ((headerProgress() - 0.35f) / 0.65f).coerceIn(0f, 1f) }
+            } else {
+                null
+            },
+            // 自己铺背景的页面：收起前透明、收起后上实色，避免把渐变切出一块白条
+            background = if (background != null) {
+                if (collapsed) MiuixTheme.colorScheme.surface else Color.Transparent
+            } else {
+                null
+            },
+            backdrop = topBarBackdrop,
+        )
+    }
+
+    val body: @Composable (PaddingValues) -> Unit = { padding ->
+        val layoutDirection = LocalLayoutDirection.current
+        val density = LocalDensity.current
+        val headerPadTop = padding.calculateTopPadding() + 40.dp
+        val listTop = padding.calculateTopPadding() + 2.dp
+        val headerHeight = with(density) {
+            (if (headerHeightPx > 0) headerHeightPx else 300.dp.roundToPx()).toDp()
+        }
+
         ContentBackdropBox(glass) {
+            if (largeHeader != null) {
+                // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = padding.calculateLeftPadding(layoutDirection),
+                            end = padding.calculateRightPadding(layoutDirection),
+                            top = headerPadTop,
+                        )
+                        .onSizeChanged { headerHeightPx = it.height },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    largeHeader(headerProgress)
+                }
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -234,8 +304,15 @@ fun Os4ListPage(
                     horizontal = horizontalPadding,
                     reserveNavBar = reserveNavBar,
                 ),
-                content = content,
-            )
+            ) {
+                if (largeHeader != null) {
+                    item(key = "logoSpacer") {
+                        // 头部内容高度 + 头部比列表多出来的顶部留白（40dp 相对 2dp）+ 呼吸
+                        Spacer(Modifier.height(headerHeight + (headerPadTop - listTop) + 20.dp))
+                    }
+                }
+                content()
+            }
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
         //
@@ -244,6 +321,29 @@ fun Os4ListPage(
         // （第 2 个 tab 是 x = 1080），跟弹层的真实窗口坐标差一整页宽，采样会整块落空。
         pageOverlay(
             LocalRootBackdrop.current ?: glass.contentBackdrop.takeIf { glass.enabled },
+        )
+    }
+
+    if (background != null) {
+        // 背景铺在 Scaffold 外面：Scaffold 必须透明，否则会盖住整屏渐变。
+        Box(Modifier.fillMaxSize()) {
+            background(headerProgress)
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = topBar,
+                bottomBar = bottomBar,
+                content = body,
+            )
+        }
+    } else {
+        Scaffold(
+            // 页面底色显式写出来，不依赖 Scaffold 的默认值（默认是 `surface`，现在与它同值）。
+            // 必须与 `rememberPageBackdrop` 垫的那一层、底部主操作条的遮挡色是**同一个**
+            // `pageBaseColor()`：三处只要有一处走偏，玻璃/操作条就会在页面上留一块色差方块。
+            containerColor = pageBaseColor(),
+            topBar = topBar,
+            bottomBar = bottomBar,
+            content = body,
         )
     }
 }
