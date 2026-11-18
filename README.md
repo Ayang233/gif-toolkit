@@ -6,7 +6,7 @@
 界面基于 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）重写，
 支持静态配色与 Monet 动态取色两套主题、明暗双模式，以及 OS4 玻璃质感的浮动底栏。
 
-**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上）
+**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上，当前 1.8）
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
@@ -16,6 +16,9 @@
 | 主页 | 工具页 | 设置 | 关于 |
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
+
+> 截图取自 1.8。「关于」页这一张是**关闭玻璃材质**时的样子 —— 开启玻璃时图标与软件名称由
+> `textureBlur` 采样背景绘制，而截图所用的模拟器是软件渲染，该路径不产出像素（原因见文末「已知限制」）。
 
 <details>
 <summary>深色模式</summary>
@@ -96,7 +99,13 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 ├── data/SettingsStore.kt  外观设置的持久层（SharedPreferences）
 ├── ui/
 │   ├── ToolCatalog.kt     十个工具的元数据与图标
-│   ├── Widgets.kt         分组卡片、行、下拉、预览舞台、主操作条、配色推导
+│   ├── Widgets.kt         分组卡片、行、下拉、预览舞台、主操作条、三层配色推导
+│   ├── PageChrome.kt      页面骨架 Os4ListPage / 内边距 / 滚动修饰符
+│   ├── GlassScope.kt      页面玻璃作用域、顶栏、录制层
+│   ├── GlassSupport.kt    玻璃开关与能力检测（唯一决策点）
+│   ├── Adaptive.kt        宽屏判定与侧栏让位
+│   ├── ProgressButton.kt  带进度填充的按钮（移植，Apache-2.0）
+│   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例）
 │   └── LicenseCatalog.kt  第三方组件清单
 ├── screens/               主页 / 工具页 / 作品页 / 设置 / 关于 / 开源许可
 ├── task/TaskRunner.kt     任务执行与预览取帧
@@ -111,9 +120,13 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
    否则玻璃会采样到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 递归到栈溢出、直接闪退。
    另外，弹层的采样源必须录在 `HorizontalPager` **外面**：Pager 的页面按页宽错位，
    页面内录制层上报的是槽位坐标，和弹层的真实坐标差一整页宽，采样会整块落空。
-2. **Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个色。**
-   所以页面色不直接取 `surface`，而是由卡片色反推（`ui/Widgets.kt` 的 `pageColor()` / `cardColor()`），
-   否则整页和卡片糊成一片，分组结构消失。
+2. **颜色分三层，别混用。** `pageBaseColor()` 是页面真正铺在屏幕上的那层（`surface`），
+   玻璃录制层垫底色、底部主操作条遮挡、页面 `containerColor` 只用它；
+   `pageColor()` 是由卡片色反推的**次级表面**（比页面深/浅一档），给预览舞台这类要拉开层次的位置；
+   `cardColor()` 才是卡片。写错会露馅：深色下把 `pageColor()` 当页面底色，
+   页面上会出现一条比页面亮 30 个灰阶的色带（第十轮实测）。
+   旧结论「Monet 会把 `surface` / `surfaceContainer` 压成同一个值」在当前 Miuix 上已不成立，
+   四套配色实测都不同值。
 3. **`GlassDialog` / `GlassBottomSheet` 需要 Scaffold 作为宿主。** `App.kt` 顶部那层
    `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是弹层宿主（官方 `GlassPageHost` 同款），
    去掉它这类组件会静默不渲染；页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（Scaffold 内、录制层外）。
@@ -127,6 +140,9 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 - 没有目标体积压缩（不会为了压到某个大小自动二分色数/帧率）
 - 进程被杀后返回栈能由系统恢复到原页面，但页面里的选择（已选素材、参数、生成进度）会丢
 - 玻璃在低端机上的性能未充分验证，设置里可关闭
+- 关于页的图标与软件名称用原生 `textureBlur` 采样背景绘制，需要硬件 GPU；
+  模拟器（SwiftShader 软件渲染）上该路径不产出像素，图标与标题会整块不显示，真机正常。
+  想在这个环境里看到它们，把「设置 → 主题 → 玻璃材质」关掉即可。
 
 ## 许可证
 
