@@ -210,5 +210,10 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。
    `scripts/setup-miuix.sh` 会把这两件事都做掉。
-3. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed`，而 `api.github.com` 仍然可用；
-   必要时可走 REST API（blobs → tree → commit → refs）推送，但远端与本地 commit SHA 会不同源。
+3. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed` / `Empty reply from server`，
+   而 `api.github.com` 仍然可用（`gh api` 能通）。必要时走 REST API 推送：
+   对每个待推提交，用 `git show <sha>:<path>` 取内容 → `POST /git/blobs`（base64）→
+   `POST /git/trees`（`base_tree` = 远端当前 tree）→ `POST /git/commits`（parent = 远端当前 head）→
+   最后 `PATCH /git/refs/heads/main`。**远端与本地 commit SHA 会不同源**（tree 相同、SHA 不同），
+   网络恢复后本地要先 `git fetch` 再 `git reset --hard origin/main` 才不会撞 non-fast-forward。
+   1.6 的发布就是这么推的：本地 `b055db7` ↔ 远端 `a43e6029`。
