@@ -3,8 +3,8 @@
 第九轮报告：`docs/os4-round9-audit.md`
 
 本轮起点（第九轮交付）：`e2911c8` / `34b8e15`，应用版本 `1.7 (9)`。
-本轮**未改版本号**：这一轮是修复与审查轮，不是发布轮；版本仍为 `1.7 (9)`，
-release APK 只用于真机验证（见 §8.3）。
+本轮**发布 1.8（10）**：在审查与修复完成后按你选定的 A 方案落地开始按钮配色，
+并打出 release 包（见 §8.3）。
 
 ---
 
@@ -493,7 +493,8 @@ AboutScreen
 四种方案的可访问性语义都真实：`enabled = false`、`Role.Button`、不可点击，
 没有为了让文字清楚把它改成 enabled。
 
-**正式按钮本轮不变**（仍是 `ProgressButtonDefaults` 默认禁用三色），等看过对比再定。
+**已采用方案 A**（2026-11-18 决定）：`disabledPrimaryButton` + `disabledOnPrimaryButton`。
+正式按钮在 `Widgets.ActionButton` 里显式传这三个禁用色（轨道/填充/文字），不再吃库默认值。
 
 ### 3.4 与第九轮数字的差异
 
@@ -502,6 +503,36 @@ AboutScreen
 第九轮是直接拿 `#99000000` 的 RGB 算的。以本轮实现为准（半透明色直接算会虚高/虚低）。
 
 ---
+
+### 3.5 采用记录：方案 A 已落地（1.8）
+
+你选定 **A**（`disabledPrimaryButton` + `disabledOnPrimaryButton`）后，正式按钮按此实现：
+
+```kotlin
+// ui/Widgets.kt · ActionButton 的 disabled 分支
+ProgressButtonDefaults.progressButtonColors(
+    trackColor = primary,
+    progressColor = primary,
+    contentColor = MiuixTheme.colorScheme.onPrimary,
+    disabledTrackColor = MiuixTheme.colorScheme.disabledPrimaryButton,
+    disabledProgressColor = MiuixTheme.colorScheme.disabledPrimaryButton,
+    disabledContentColor = MiuixTheme.colorScheme.disabledOnPrimaryButton,
+)
+```
+
+采用后的实际取值（截图取色）：
+
+| 配色 | 轨道 | 文字 | 对比度 | 截图 |
+|---|---|---|---|---|
+| 静态浅色 | `#C2D9FF` | `#FFFFFF` | 1.43:1 | `final/final_light_03_tool.png` |
+| 静态深色 | `#253E64` | `#677893` | 2.40:1 | `final/after_dark_03_tool.png` |
+| Monet 浅色 | `#B5BED6` | `#E1E5EF` | 1.47:1 | `final/final_monet_light_03_tool.png` |
+
+修前（库默认配对）是 `#F2F2F2` 底 + `#FFFFFF` 字，浅色 1.12:1 —— 灰底白字基本读不出字。
+
+保留的语义没有变：按钮仍是真实的 `enabled = false`（`Role.Button`、不可点），
+没有为了让字更清楚把它改成 enabled。四种方案仍可在「设置 → 主题 → 调试」的对比页并排查看
+（该页现在把 A 标为"已采用"，其余三组保留作记录；release 包里整页不存在）。
 
 ## 4. 全项目 MIUIX OS4 组件审计
 
@@ -744,7 +775,7 @@ GifApp
 | 目标 | 结果 | 产物 |
 |---|---|---|
 | `:compileDebugKotlin` | 成功 | — |
-| `:assembleDebug` | 成功，无 error | `build/outputs/apk/debug/GifHelper-debug.apk`（45,316,921 B） |
+| `:assembleDebug` | 成功，无 error | `build/outputs/apk/debug/GifHelper-debug.apk`（45,065,374 B） |
 | `:assembleRelease` | 成功（R8 + 资源压缩），无 error | `build/outputs/apk/release/GifHelper-release.apk`（3,311,823 B） |
 
 ### 7.2 覆盖的页面 × 尺寸 × 主题

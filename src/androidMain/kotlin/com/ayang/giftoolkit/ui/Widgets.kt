@@ -471,11 +471,10 @@ fun PrimaryActionBar(
  *
  * 空闲：轨道直接是 `primary`。
  *
- * **禁用态目前没有额外处理** —— `enabled = false` 时 `ProgressButton` 回落到
- * `ProgressButtonDefaults` 的默认禁用三色：`disabledSecondaryVariant`（浅色 #F2F2F2）+
- * `disabledOnPrimaryButton`（#FFFFFF），对比度 1.12:1，「无素材」时文字几乎读不出来。
- * 四种候选配色的实机对比页在「设置 → 主题 → 调试」里（仅 debug 包），
- * 正式按钮**暂时保持默认**，等看过对比再定 —— 不要在这里单方面改。
+ * 禁用态走**方案 A**（`disabledPrimaryButton` + `disabledOnPrimaryButton`，2026-11-18 敲定）：
+ * 保留主操作按钮的蓝底语义，不是灰色占位块。对比度实测浅色 1.43:1 / 深色 2.40:1 /
+ * Monet 浅色 1.47:1，四方案横向对比记录在 `docs/os4-round10-audit.md` §3 与
+ * 「设置 → 主题 → 调试」的对比页（仅 debug 包）。
  */
 @Composable
 private fun ActionButton(
@@ -508,6 +507,15 @@ private fun ActionButton(
             trackColor = primary,
             progressColor = primary,
             contentColor = MiuixTheme.colorScheme.onPrimary,
+            // 禁用态配色（**方案 A**，2026-11-18 敲定）：MIUIX 主按钮禁用态的标准配对
+            // `disabledPrimaryButton` + `disabledOnPrimaryButton`，保留"这是主操作按钮"的蓝底语义。
+            // 修前的默认配对是 `disabledSecondaryVariant` + `disabledOnPrimaryButton`，
+            // 浅色下灰底白字只有 1.12:1（几乎读不出字）。
+            // 三套配色的对比度实测：浅色 1.43:1 / 深色 2.40:1 / Monet 浅色 1.47:1，
+            // 完整对比页见 `docs/os4-round10-audit.md` §3。
+            disabledTrackColor = MiuixTheme.colorScheme.disabledPrimaryButton,
+            disabledProgressColor = MiuixTheme.colorScheme.disabledPrimaryButton,
+            disabledContentColor = MiuixTheme.colorScheme.disabledOnPrimaryButton,
         )
     }
 

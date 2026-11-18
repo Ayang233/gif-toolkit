@@ -95,29 +95,17 @@ fun ButtonColorPreviewScreen(onBack: () -> Unit) {
         extraBottom = 24.dp,
     ) {
         item {
-            GroupHeader("当前实现（保持不变）")
-            GroupCard {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(
-                        text = "ProgressButtonDefaults 默认值：disabledSecondaryVariant + disabledOnPrimaryButton",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                        SchemeButton(
-                            track = colors.disabledSecondaryVariant,
-                            content = colors.disabledOnPrimaryButton,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
+            NoteText(
+                "已采用：方案 A（2026-11-18 敲定）—— disabledPrimaryButton + disabledOnPrimaryButton。" +
+                    "下面四组保留作对照记录，正式按钮的取值与 A 一致。",
+            )
         }
 
         schemes.forEach { scheme ->
             item(key = "scheme_${scheme.id}") {
                 GroupHeader(
-                    "${scheme.id} · ${scheme.trackRole} + ${scheme.contentRole}",
+                    "${scheme.id}${if (scheme.id == "A") "（已采用）" else ""} · " +
+                        "${scheme.trackRole} + ${scheme.contentRole}",
                 )
                 GroupCard {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
