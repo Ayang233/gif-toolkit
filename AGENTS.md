@@ -65,6 +65,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    采样区间整块落在录制层之外，玻璃只剩材质、看不到背景（第六轮"作品菜单不模糊"的真因，
    `docs/os4-round7-audit.md` §3 有实测数字）。所以弹层用 `LocalRootBackdrop`（录在 Pager 外），
    不用页面自己那一层。二级页没有 Pager，才回落到页面录制层。
+
+   **新增一条覆盖硬约束：采样源必须在组件的整个绘制区域里都有像素。**
+   录制层比组件小、或在某些状态下是空的（透明度归零、区域内没有不透明内容）时，
+   `textureBlur` / `progressiveTextureBlur` 会采到全透明，画出来是**边缘生硬的深色带**
+   或**一小块错位色斑**，而不是"没有模糊"。
+   已经踩过的两个例子：
+   - 关于页顶栏原来采正文录制层，而正文层刻意不垫底色（渐变在页面根部）、顶部还有 40dp 图标留白
+     → 顶栏区域全透明 → 真机上顶栏一条黑带 + 返回键胶囊花屏（`_archive/round11/`）。
+     修法：`PageTopBar(backdrop = rememberCombinedBackdrop(渐变层, 正文层))`。
+   - 渐变层自己会在滚动到底后淡出，所以**不能**只采它 —— 这就是要叠两层的理由（`ui/CombinedBackdrop.kt`）。
+   判断方法：问一句"这个组件所在的位置，在被采样的那层里是谁画的？画了没有？"
 2. **颜色分三层，别混用：`pageBaseColor()` / `pageColor()` / `cardColor()`。**
    - `pageBaseColor()` = 页面**真正铺在屏幕上**的那层（= `MiuixTheme.colorScheme.surface`，AMOLED 下纯黑）。
      玻璃录制层垫底色、底部主操作条遮挡、`Os4ListPage` 的 `containerColor` 只用这一个。
@@ -179,8 +190,11 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       且 Scaffold 要 `containerColor = Transparent` + `contentWindowInsets = 0`：
       渐变要一直延伸到状态栏下面，放进 Scaffold 内容区会在顶栏下方切出一条硬边。
     - 它的 `rememberGlassScope(opaqueBase = false)` 不垫页面底色 —— 背后已经是整屏不透明渐变，
-      垫了就把渐变盖掉。顶栏仍然采样正文录制层（兄弟节点），**不要**为了"让顶栏采到渐变"
-      在页面根部再套一层 `layerBackdrop`：那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
+      垫了就把渐变盖掉。**顶栏的采样源要单独传**：正文层在这里是空的（顶部 40dp 是图标留白），
+      渐变层在滚动到底后又会淡出，所以传
+      `rememberCombinedBackdrop(渐变层, 正文层)`（`ui/CombinedBackdrop.kt`），见第 1 条覆盖硬约束。
+      **不要**为了"让顶栏采到渐变"在页面根部再套一层 `layerBackdrop`：
+      那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
     - 图标与软件名称**必须走参考项目的原生 `textureBlur`**：一份背景录制层
       （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
       `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。

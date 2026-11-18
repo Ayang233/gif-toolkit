@@ -46,6 +46,7 @@ import com.ayang.giftoolkit.ui.bg.BgEffectBackground
 import com.ayang.giftoolkit.ui.cardColor
 import com.ayang.giftoolkit.ui.pageScrollModifiers
 import com.ayang.giftoolkit.ui.rememberAppVersion
+import com.ayang.giftoolkit.ui.rememberCombinedBackdrop
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import com.ayang.giftoolkit.ui.rememberHorizontalSafeInsets
 import top.yukonga.miuix.kmp.basic.Card
@@ -170,9 +171,25 @@ fun AboutScreen(
     // 它本身是 @Composable（内部按参数 remember），所以不能再套一层 remember。
     val logoColors = BlurDefaults.blurColors(blendColors = logoBlend)
 
+    // 顶栏的采样源（见下方 PageTopBar 的注释）：渐变层 + 正文层的叠加。
+    // 两层都可能有一段时间是空的，叠起来才在**任何时刻**都有像素可采。
+    val contentBackdrop = glass.contentBackdrop
+    val topBarBackdrop: top.yukonga.miuix.kmp.blur.Backdrop? = when {
+        !blurEnabled -> null
+        contentBackdrop != null -> rememberCombinedBackdrop(bgBackdrop, contentBackdrop)
+        else -> bgBackdrop
+    }
+
     // 大标题区高度：先量再对齐，不写死 —— 字体缩放、横屏都会改变它。
+    //
+    // **首帧必须有兜底值**：`onSizeChanged` 要到第一帧布局之后才回调，用 0 当默认会让
+    // 列表中那块透明占位高度为 0 —— 卡片在第一帧就压在图标/标题上、且滚动进度恒为 0
+    // （`headerHeightPx > 0` 不成立），标题永远不淡出。真机截图见 `_archive/round11/`。
+    // 300dp 与官方 `AboutPage.kt` 的 `logoHeightDp` 初始值一致（那边也是 `mutableStateOf(300.dp)`）。
     var headerHeightPx by remember { mutableIntStateOf(0) }
-    val headerHeight = with(density) { headerHeightPx.toDp() }
+    val headerHeight = with(density) {
+        (if (headerHeightPx > 0) headerHeightPx else 300.dp.roundToPx()).toDp()
+    }
 
     // 0..1 的滚动进度，只由列表首项的滚动偏移算出。
     // **不要在组合期直接读它**：下面一律以 lambda 传给 graphicsLayer 阶段读取，
@@ -213,6 +230,14 @@ fun AboutScreen(
                     onBack = onBack,
                     expandable = false,
                     titleAlpha = { ((progressProvider() - 0.35f) / 0.65f).coerceIn(0f, 1f) },
+                    // **顶栏的采样源是「渐变层 + 正文层」的叠加，不是单独某一层。**
+                    // 单独取哪一层都会有一段时间采到空像素：
+                    //   - 渐变层：首屏有像素，但列表滚到底后 `alpha` 归零（整层淡出）；
+                    //   - 正文层：首屏顶栏那块区域是透明的（顶部是 40dp 图标留白），滚起来才有卡片。
+                    // 空采样 = `progressiveTextureBlur` 贴图全透明 → 顶栏画成生硬深色带、
+                    // 返回键胶囊变成错位色斑（真机截图 `_archive/round11/`）。
+                    // 两层都是顶栏的兄弟节点，叠起来不会采到自己（AGENTS.md 第 1 条）。
+                    backdrop = topBarBackdrop,
                     // 玻璃关闭时退回普通 TopAppBar：它的默认底色是 surface（不透明白），
                     // 会在页面顶部切出一条白带、把渐变盖掉。参考项目的写法是
                     // "没滚到收起状态就透明，收起后才给实色"，这里照抄。

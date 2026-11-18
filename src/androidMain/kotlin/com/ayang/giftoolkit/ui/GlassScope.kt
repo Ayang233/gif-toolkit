@@ -19,6 +19,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.glass.ChevronBackward
+import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -186,6 +187,18 @@ fun PageTopBar(
      * 玻璃档不看这个参数：它的背景带由库按滚动进度自己上色。
      */
     background: Color? = null,
+    /**
+     * 顶栏玻璃的采样源，默认是页面正文录制层（[GlassScope.contentBackdrop]）。
+     *
+     * **只有"正文录制层在某些状态下覆盖不到顶栏区域"的页面需要覆盖它** —— 目前只有关于页：
+     * 它的正文录制层刻意不垫底色（渐变在页面根部，垫了会盖住），首屏顶栏那块区域是透明的；
+     * 而它的渐变层在列表滚到底后又整体淡出。两层各缺一段时间，所以关于页传的是
+     * `rememberCombinedBackdrop(渐变层, 正文层)` —— 任何时刻至少一层有真实像素。
+     *
+     * 采到空像素的后果很直接：`progressiveTextureBlur` 贴图全透明，顶栏会画成一条边缘生硬的
+     * 深色带，返回键的玻璃胶囊会变成一小块错位色斑（真机截图见 `_archive/round11/`）。
+     */
+    backdrop: Backdrop? = null,
 ) {
     // 返回键照官方 `component/BackNavigationIcon.kt` 写：
     // 玻璃档用 Glass 族 **ChevronBackward + 28dp + GlassIconButton**，非玻璃档才退回
@@ -254,7 +267,7 @@ fun PageTopBar(
             // 也就是 `progressiveBlur = false`（`GlassTopAppBar` 自己的默认值）。
             // 注意：这不是自造的替代视觉 —— 两条都是同一个组件的官方绘制路径。
             progressiveBlur = !isSoftwareRenderer,
-            backdrop = glass.contentBackdrop,
+            backdrop = backdrop ?: glass.contentBackdrop,
             contentModifier = contentInset,
             largeTitle = largeTitle,
             subtitle = subtitle,
