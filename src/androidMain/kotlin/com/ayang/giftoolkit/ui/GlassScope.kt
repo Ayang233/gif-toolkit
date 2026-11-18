@@ -100,19 +100,28 @@ val LocalRootBackdrop = compositionLocalOf<LayerBackdrop?> { null }
  * 之前两处各写了一遍同样的 `drawRect + drawContent`。
  */
 @Composable
-fun rememberPageBackdrop(): LayerBackdrop {
+fun rememberPageBackdrop(opaqueBase: Boolean = true): LayerBackdrop {
     val surfaceColor = pageColor()
     return rememberLayerBackdrop {
-        drawRect(surfaceColor)
+        // opaqueBase = false 只给「背景本身不透明」的页面用（目前只有关于页：
+        // 它背后是一整块动态渐变，录制层再垫一层页面色会把渐变整块盖掉）。
+        if (opaqueBase) drawRect(surfaceColor)
         drawContent()
     }
 }
 
+/**
+ * @param opaqueBase 录制层是否先垫一层页面底色。默认 true；只有背景自己已经铺满不透明像素的
+ *   页面（关于页的渐变）才传 false —— 垫了会把背景盖住。
+ */
 @Composable
-fun rememberGlassScope(enabled: Boolean = LocalGlassEnabled.current): GlassScope {
+fun rememberGlassScope(
+    enabled: Boolean = LocalGlassEnabled.current,
+    opaqueBase: Boolean = true,
+): GlassScope {
     // 无论开不开都建一个实例：创建本身只是分配对象，
     // 真正花 GPU 的是 layerBackdrop 这个 Modifier，只在 enabled 时才挂上去。
-    val backdrop = rememberPageBackdrop()
+    val backdrop = rememberPageBackdrop(opaqueBase)
     return remember(enabled, backdrop) { GlassScope(enabled, backdrop) }
 }
 
@@ -149,6 +158,18 @@ fun PageTopBar(
     expandable: Boolean = true,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+    /**
+     * 标题透明度的覆盖值。
+     *
+     * 默认吃 [LocalTopBarTitleAlpha]（宽屏折叠胶囊让标题淡出）。关于页要另接一套：
+     * 官方那边的标题透明度跟着**页面滚动进度**走，首屏干脆不显示标题。
+     * 传 `null` 就用默认那一套。
+     */
+    titleAlpha: (() -> Float)? = null,
+    /**
+     * 顶栏背景带的透明度乘子。默认 1f（吃库的默认观感）。
+     */
+    backgroundAlpha: (() -> Float)? = null,
 ) {
     // 返回键照官方 `component/BackNavigationIcon.kt` 写：
     // 玻璃档用 Glass 族 **ChevronBackward + 28dp + GlassIconButton**，非玻璃档才退回
@@ -184,7 +205,8 @@ fun PageTopBar(
         }
     }
     // 宽屏折叠态：标题让位给顶部胶囊（官方 LocalTopAppBarTitleAlpha 同款机制）。
-    val titleAlpha = LocalTopBarTitleAlpha.current
+    // 关于页传自己的实现（跟滚动进度走），其余页面用默认。
+    val effectiveTitleAlpha = titleAlpha ?: LocalTopBarTitleAlpha.current
     if (glass.enabled) {
         // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
         //
@@ -215,21 +237,21 @@ fun PageTopBar(
             // 玻璃厚度/高光与官方不同；明暗由材质内部的 `isDarkTheme()` 处理，不需要调用方判断。
             // 背景带与标题的透明度乘子。官方在"模糊未生效"时会把它降到 0，避免
             // progressive 与 band 两层同时上色；我们没有那层判断，恒为 1 即可。
-            backgroundAlpha = { 1f },
+            backgroundAlpha = backgroundAlpha ?: { 1f },
             bandBrush = bandBrush,
             bandOverhang = GlassTopAppBarDefaults.BandOverhang,
             navigationIcon = backIcon,
             actions = actions,
             // 绘制期读取，折叠动画期间不重组。
-            titleAlpha = titleAlpha,
+            titleAlpha = effectiveTitleAlpha,
         )
     } else {
         TopAppBar(
             title = title,
             expandable = expandable,
             largeTitle = largeTitle,
-            largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha()),
-            titleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha()),
+            largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = effectiveTitleAlpha()),
+            titleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = effectiveTitleAlpha()),
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
             navigationIcon = backIcon,

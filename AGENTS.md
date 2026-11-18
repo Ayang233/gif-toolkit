@@ -23,6 +23,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── GlassScope.kt     页面玻璃作用域 + PageTopBar（玻璃/普通两态）
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
 │   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
+│   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例，Apache-2.0）
 │   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
 │   └── LicenseCatalog.kt 第三方组件清单
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
@@ -136,7 +137,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     折叠态就是**顶部居中胶囊、只显示文字**（`GlassNavigationRail.kt:276`）——
     那不是顶部导航栏，是 Rail 的另一种形态。不要写死 `initialExpanded = true`，
     也不要用 `showToggle = false` 把折叠入口藏掉（1.5 之前就是这么写的）。
-    内容让位由 `LocalRailInset = (ExpandedWidth + Margin) * railState.progress` 下发到页面内边距，
+    内容让位由 `LocalRailInset`（**函数**，`() -> Dp`）下发：
+    `{ (ExpandedWidth + Margin) * railState.progress }`。
+    `progress` 是逐帧动画值，**不许在组合期解包**：`pageContentPadding` 在
+    `PaddingValues.calculate*Padding` 里读、`PrimaryActionBar` 走 `Modifier.railStartInset()`
+    在量测期读。写成 `val inset = LocalRailInset.current()` 再 `padding(start = ...)`，
+    侧栏展开的每一帧都会重组整个页面并重排列表（迁移指南第 2 条红线）。
     **录制层不许跟着收窄** —— 收窄会让 Rail 左半段没有像素可采，玻璃只剩一块平色。
     官方 `AppContent.kt:300-350` 也是"满宽录制 + 页面内边距让位"。
 14. **页面级弹层（Dialog / BottomSheet）走 `Os4ListPage` 的 `pageOverlay` 槽位，不要挂在页面外面。**
@@ -146,6 +152,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     **不再有 `modalOverlayOpen`**：弹层由最外层 Scaffold 绘制，永远在底栏之上，
     面板开着时底栏只是被遮罩压暗（与官方一致）。之前那套"开面板就把一层导航让出去"的联动已删除，
     不要加回来 —— 它会在面板异常关闭时把导航留在隐藏状态。
+
+15. **关于页是唯一"自己铺背景"的页面，结构和别的页不一样，照抄会踩两个坑。**
+    - 渐变（`ui/bg/BgEffectBackground`）必须铺在**页面根部、Scaffold 之外**，
+      且 Scaffold 要 `containerColor = Transparent` + `contentWindowInsets = 0`：
+      渐变要一直延伸到状态栏下面，放进 Scaffold 内容区会在顶栏下方切出一条硬边。
+    - 它的 `rememberGlassScope(opaqueBase = false)` 不垫页面底色 —— 背后已经是整屏不透明渐变，
+      垫了就把渐变盖掉。顶栏仍然采样正文录制层（兄弟节点），**不要**为了"让顶栏采到渐变"
+      在页面根部再套一层 `layerBackdrop`：那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
+    - 标题用主题色实字，不用 `textureBlur` 的玻璃字；卡片用 `cardColor().copy(alpha = 0.82f)`，
+      不用 `textureBlur`。原因：该路径在模拟器 GPU 上**静默不产出像素**（官方 APK 同一页同样空白），
+      照抄的结果是"关于页没有应用名、没有卡片"。详见 `docs/os4-round8-audit.md` §6.3。
 
 ## 常见改动怎么下手
 
@@ -183,10 +200,13 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix `d45ca181`（2026-11-17）。升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar`
-   的默认值有没有变 —— 这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
-   截至第七轮结束上游已到 `189ef10a`（三个提交：两个示例重构 + 渐进模糊的内部着色器微调，
-   公共 API 无变化），评估结论与下一次升级要注意的点见 `docs/os4-round7-audit.md` §0.1。
+1. 基线是 Miuix **`3177a684`**（2026-11-18，`library: Refine glass floating action button`）。
+   升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
+   这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
+   **从 0.9.5-beta01 起上游把 `compileSdk` 提到 37.2**，下游必须同步：
+   `compileSdk { version = release(37) { minorApiLevel = 2 } }`，否则 AGP 配置期直接拒绝
+   （`requires ... compile against version 37.2 or later`）。`targetSdk` 可以继续停在 36。
+   每轮升级的差异与结论见 `docs/os4-round*-audit.md`。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。
    `scripts/setup-miuix.sh` 会把这两件事都做掉。

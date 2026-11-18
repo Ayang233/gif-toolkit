@@ -50,7 +50,14 @@ kotlin {
 
 android {
     namespace = "com.ayang.giftoolkit"
-    compileSdk = 37
+    // Miuix 0.9.5-beta01（3177a684）起把自身编译目标提到 SDK 37.2，
+    // 下游必须同档编译，否则 AGP 在配置期直接拒绝（"requires compile against 37.2 or later"）。
+    // 这里只影响编译期可用 API，targetSdk 仍是 36，不改运行时行为。
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "com.ayang.giftoolkit"

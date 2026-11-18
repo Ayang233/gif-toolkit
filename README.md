@@ -10,7 +10,7 @@
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
-> 改这个项目之前请先读 [AGENTS.md](AGENTS.md)：目录地图、常用命令，以及 14 条硬约束
+> 改这个项目之前请先读 [AGENTS.md](AGENTS.md)：目录地图、常用命令，以及 15 条硬约束
 > （玻璃录制层、配色推导、图标规范、Scaffold 宿主、状态栏适配等）。
 
 | 主页 | 工具页 | 设置 | 关于 |

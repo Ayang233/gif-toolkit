@@ -49,29 +49,53 @@ fun LicensesScreen(
     }
 }
 
-/** 许可正文。文本来自 assets，不是硬编码在代码里。 */
+/** 第三方组件清单里某一项的许可正文。 */
 @Composable
 fun LicenseDetailScreen(
     index: Int,
     onBack: () -> Unit,
 ) {
+    val entry = thirdPartyLibraries.getOrNull(index)
+    LicenseTextScreen(
+        asset = entry?.asset.orEmpty(),
+        title = entry?.name ?: "开源许可",
+        license = entry?.license.orEmpty(),
+        onBack = onBack,
+    )
+}
+
+/**
+ * 许可正文。文本来自 assets，不是硬编码在代码里。
+ *
+ * 从 [LicenseDetailScreen] 拆出来的原因：关于页多了一行「开源许可」，
+ * 正文是本项目自己的 GPL-3.0，不在第三方清单里。两处共用这一个阅读页，
+ * 传 asset 即可，不必再复制一遍正文渲染。
+ */
+@Composable
+fun LicenseTextScreen(
+    asset: String,
+    title: String,
+    license: String,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val glass = rememberGlassScope()
-    val entry = thirdPartyLibraries.getOrNull(index)
-    val body = remember(index) {
-        entry?.let {
+    val body = remember(asset) {
+        if (asset.isBlank()) {
+            ""
+        } else {
             runCatching {
-                context.assets.open(it.asset).bufferedReader().use { reader ->
+                context.assets.open(asset).bufferedReader().use { reader ->
                     normalizeLicense(reader.readText())
                 }
-            }.getOrNull()
-        }.orEmpty()
+            }.getOrNull().orEmpty()
+        }
     }
 
     Os4ListPage(
-        title = entry?.name ?: "开源许可",
+        title = title,
         glass = glass,
-        subtitle = entry?.license ?: "",
+        subtitle = license,
         onBack = onBack,
         extraBottom = 24.dp,
         horizontalPadding = 16.dp,

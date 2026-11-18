@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.ayang.giftoolkit.data.SettingsStore
@@ -33,6 +34,7 @@ import com.ayang.giftoolkit.screens.AboutScreen
 import com.ayang.giftoolkit.screens.HomeScreen
 import com.ayang.giftoolkit.screens.LibraryScreen
 import com.ayang.giftoolkit.screens.LicenseDetailScreen
+import com.ayang.giftoolkit.screens.LicenseTextScreen
 import com.ayang.giftoolkit.screens.LicensesScreen
 import com.ayang.giftoolkit.screens.SettingsScreen
 import com.ayang.giftoolkit.screens.ThemeScreen
@@ -123,10 +125,16 @@ fun GifApp() {
     val railVisible = wide && showPrimaryNav
     // 内容让位：跟着侧栏的形变进度走（官方 AppContent.kt:219-229 同款式子），
     // 折叠态 progress = 0，页面不需要让出任何宽度。
-    val railInset = if (railVisible) {
-        (GlassNavigationRailDefaults.ExpandedWidth + GlassNavigationRailDefaults.Margin) * railState.progress
-    } else {
-        0.dp
+    // 下发的是**函数**：progress 逐帧变化，这里若解包成 Dp，`LocalRailInset` 的每个消费者
+    // （页面内边距、底部主操作条）会在侧栏展开的每一帧重组。读取统一推到量测/绘制期。
+    val railInset: () -> Dp = remember(railVisible) {
+        if (railVisible) {
+            ({
+                (GlassNavigationRailDefaults.ExpandedWidth + GlassNavigationRailDefaults.Margin) * railState.progress
+            })
+        } else {
+            ({ 0.dp })
+        }
     }
 
     CompositionLocalProvider(
@@ -340,6 +348,7 @@ fun GifApp() {
                             AboutScreen(
                                 onBack = pop,
                                 onOpenLicenses = { stack.add(Route.Licenses) },
+                                onOpenOwnLicense = { stack.add(Route.OwnLicense) },
                             )
                         }
                         entry<Route.Licenses> {
@@ -350,6 +359,14 @@ fun GifApp() {
                         }
                         entry<Route.License> { route ->
                             LicenseDetailScreen(index = route.index, onBack = pop)
+                        }
+                        entry<Route.OwnLicense> {
+                            LicenseTextScreen(
+                                asset = "licenses/gpl-3.0.txt",
+                                title = "GNU 通用公共许可协议",
+                                license = "GPL-3.0",
+                                onBack = pop,
+                            )
                         }
                     }
 

@@ -2,7 +2,11 @@ package com.ayang.giftoolkit.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 
@@ -31,15 +35,41 @@ fun rememberWideLayout(): Boolean {
 val LocalWideLayout = compositionLocalOf { false }
 
 /**
- * 宽屏下页面要为玻璃侧栏让出的水平宽度（dp）。
+ * 宽屏下页面要为玻璃侧栏让出的水平宽度（dp），以**函数**形式下发。
  *
  * 由 `App.kt` 单点计算、单点下发：`(ExpandedWidth + Margin) * railState.progress`。
  * 折叠态（手机上横屏）progress 为 0，页面不需要让位；展开态（≥1200dp）才让出整条面板。
  * 官方 `AppContent.kt:219-229` 用的是同一个式子：让位跟着侧栏的形变进度走，而不是"有侧栏就让 250dp"。
  *
+ * **下发函数而不是 Dp 值**：`railState.progress` 是逐帧变化的动画值，
+ * 在组合期解包会让整页（含 LazyColumn）随侧栏动画每帧重组。
+ * 现在是量测/绘制期才读（`PaddingValues.calculate*Padding`、`Modifier.layout`），
+ * 只触发重新测量 —— 这正是官方迁移指南第 5.2 条的要求。
+ *
  * **录制层不能跟着这个值收窄** —— 那会让侧栏左半段没有像素可采，玻璃只剩一块平色。
  */
-val LocalRailInset = compositionLocalOf { 0.dp }
+val LocalRailInset = androidx.compose.runtime.staticCompositionLocalOf<() -> Dp> { { 0.dp } }
+
+/**
+ * 按当前侧栏让位宽度给左边（RTL 为右边）加内边距，**在量测期读取**。
+ *
+ * `Modifier.padding()` 只接受立即值，写 `padding(start = sideGap + LocalRailInset)` 就等于
+ * 在组合期解包逐帧值。这里用 `layout` 把读取挪到量测期，行为不变、重组消失。
+ */
+@Composable
+fun Modifier.railStartInset(base: Dp): Modifier {
+    val railInset = LocalRailInset.current
+    val density = LocalDensity.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    return this.layout { measurable, constraints ->
+        val extra = with(density) { railInset().roundToPx() }.coerceAtLeast(0)
+        val startPx = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) extra else 0
+        val placeable = measurable.measure(constraints.offset(horizontal = -extra))
+        layout(placeable.width + extra, placeable.height) {
+            placeable.placeRelative(startPx, 0)
+        }
+    }
+}
 
 /**
  * 宽屏折叠态下顶栏标题的透明度（官方 `LocalTopAppBarTitleAlpha` 同款）。

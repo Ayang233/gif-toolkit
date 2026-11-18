@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -110,11 +111,29 @@ fun pageContentPadding(
     //
     // **只让 start 一侧**：Rail 只在起始边（LTR 是左边）。之前 start / end 都加了同一个值，
     // 展开态下右侧也白白空出 250dp，内容被压成一条竖带（1200dp 下实测可见）。
-    val side = horizontal + LocalRailInset.current
+    //
+    // 侧栏让位宽度是**逐帧变化**的值，所以这里拿到函数后不立即求值：
+    // 交给 `PaddingValues.calculate*Padding`（LazyColumn 在量测期调用），
+    // 侧栏展开动画期间只重新测量、不重组整个页面。
+    val railInset = LocalRailInset.current
     val top = innerPadding.calculateTopPadding() + extraTop
     val bottom = maxOf(innerPadding.calculateBottomPadding(), clearance) + extraBottom
-    return remember(top, bottom, side, horizontal) {
-        PaddingValues(start = side, end = horizontal, top = top, bottom = bottom)
+    return remember(top, bottom, horizontal, railInset) {
+        object : PaddingValues {
+            override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp {
+                val extra = if (layoutDirection == LayoutDirection.Ltr) railInset() else 0.dp
+                return horizontal + extra
+            }
+
+            override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp {
+                val extra = if (layoutDirection == LayoutDirection.Rtl) railInset() else 0.dp
+                return horizontal + extra
+            }
+
+            override fun calculateTopPadding(): Dp = top
+
+            override fun calculateBottomPadding(): Dp = bottom
+        }
     }
 }
 

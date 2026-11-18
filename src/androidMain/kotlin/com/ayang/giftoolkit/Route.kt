@@ -19,4 +19,7 @@ sealed interface Route : NavKey {
     data object About : Route
     data object Licenses : Route
     data class License(val index: Int) : Route
+
+    /** 本项目自己的许可证正文（GPL-3.0），与第三方清单分开。 */
+    data object OwnLicense : Route
 }

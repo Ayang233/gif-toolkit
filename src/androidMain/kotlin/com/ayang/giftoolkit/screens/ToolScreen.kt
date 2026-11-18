@@ -329,6 +329,11 @@ private val puzzleColsItems = listOf("2 列", "3 列", "4 列")
 @Composable
 private fun ColorSwatches(form: ToolForm) {
     val presets = listOf(0xFF00B441, 0xFF3482FF, 0xFFFFFFFF, 0xFF000000, 0xFFFF3B30)
+    // 触觉反馈：这是本项目唯一自绘的"选择"控件，官方对应物是 RadioButtonPreference /
+    // RadioButton —— 它们在选中项变化时调用 `HapticFeedbackType.ToggleOn`
+    // （miuix-preference `RadioButtonPreference.kt:131`、miuix-ui `RadioButton.kt:101`）。
+    // 点已经选中的颜色不发生状态变化，按迁移指南"无状态变化不加反馈"的规矩直接跳过。
+    val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -348,7 +353,14 @@ private fun ColorSwatches(form: ToolForm) {
                         else MiuixTheme.colorScheme.outline,
                         shape = CircleShape,
                     )
-                    .clickable { form.keyColor = value.toInt() },
+                    .clickable {
+                        if (form.keyColor != value.toInt()) {
+                            hapticFeedback.performHapticFeedback(
+                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
+                            )
+                            form.keyColor = value.toInt()
+                        }
+                    },
             )
         }
     }
