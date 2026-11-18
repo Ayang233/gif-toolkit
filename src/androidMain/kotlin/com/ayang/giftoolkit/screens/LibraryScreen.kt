@@ -3,10 +3,12 @@ package com.ayang.giftoolkit.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -246,14 +248,20 @@ private fun FileActionSheet(
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished,
     ) {
+        // 行内边距去掉左右：面板本身已经有 24dp 内边距（`BottomSheetDefaults.insideMargin`），
+        // 行再叠 16dp 会让标题距面板边 40dp、和面板标题的 24dp 对不齐。
+        // 官方示例（`component/GlassBottomSheetDemo.kt`）也是"面板给横向、行只给纵向"。
+        val rowMargin = PaddingValues(horizontal = 0.dp, vertical = 16.dp)
         BasicComponent(
             title = "保存到相册",
             startAction = { LeadingIcon(MiuixIcons.Glass.Light.Download) },
+            insideMargin = rowMargin,
             onClick = onSave,
         )
         BasicComponent(
             title = "分享",
             startAction = { LeadingIcon(MiuixIcons.Glass.Light.Share) },
+            insideMargin = rowMargin,
             onClick = onShare,
         )
         BasicComponent(
@@ -262,8 +270,14 @@ private fun FileActionSheet(
                 color = MiuixTheme.colorScheme.error,
             ),
             startAction = { LeadingIcon(MiuixIcons.Glass.Light.Delete, MiuixTheme.colorScheme.error) },
+            insideMargin = rowMargin,
             onClick = onDelete,
         )
+        // 手势导航条留白：面板的 `defaultWindowInsetsPadding` 只处理 IME，
+        // 底部导航条要内容自己让（官方 `GlassBottomSheet` KDoc 原文：
+        // "Apply navigation-bar padding inside scrollable content"）。
+        // 少了这一行，"删除"会贴着导航条（真机手势导航下最明显）。
+        Spacer(Modifier.navigationBarsPadding().height(8.dp))
     }
 }
 

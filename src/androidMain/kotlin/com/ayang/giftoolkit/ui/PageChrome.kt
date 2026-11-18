@@ -187,6 +187,11 @@ fun Os4ListPage(
     val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
 
     Scaffold(
+        // 页面底色显式写出来，不依赖 Scaffold 的默认值（默认是 `surface`，现在与它同值）。
+        // 必须与 `rememberPageBackdrop` 垫的那一层、底部主操作条的遮挡色是**同一个**
+        // `pageBaseColor()`：三处只要有一处走偏，玻璃/操作条就会在页面上留一块色差方块。
+        containerColor = pageBaseColor(),
+        //
         // 录制层**不能**挂在 Scaffold 上，只能挂在内容区（见 ContentBackdropBox）。
         //
         // 曾尝试照官方 `GlassPage.kt:242`（`Scaffold(modifier = Modifier.layerBackdrop(pageBackdrop))`）

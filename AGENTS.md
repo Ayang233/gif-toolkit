@@ -24,7 +24,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
 │   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
 │   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例，Apache-2.0）
-│   │                      + BgPalette：背景与「跟随背景」的前景共用一份配色
+│   │                      + BgEffectBackground 的 bgModifier：给关于页的 textureBlur 挂录制层
 │   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
 │   └── LicenseCatalog.kt 许可清单：本项目 / 第三方组件 / NOTICE
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
@@ -65,9 +65,16 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    采样区间整块落在录制层之外，玻璃只剩材质、看不到背景（第六轮"作品菜单不模糊"的真因，
    `docs/os4-round7-audit.md` §3 有实测数字）。所以弹层用 `LocalRootBackdrop`（录在 Pager 外），
    不用页面自己那一层。二级页没有 Pager，才回落到页面录制层。
-2. **颜色一律走 `ui/Widgets.kt` 的 `pageColor()` / `cardColor()`。**
-   Miuix 在 Monet 下会把 `surface` 与 `surfaceContainer` 压成同一个值，
-   直接用主题角色会让页面和卡片糊成一片。
+2. **颜色分三层，别混用：`pageBaseColor()` / `pageColor()` / `cardColor()`。**
+   - `pageBaseColor()` = 页面**真正铺在屏幕上**的那层（= `MiuixTheme.colorScheme.surface`，AMOLED 下纯黑）。
+     玻璃录制层垫底色、底部主操作条遮挡、`Os4ListPage` 的 `containerColor` 只用这一个。
+     用错会在页面上留一块比页面亮的方块：深色静态下 `pageColor()` 是 `#1E1E1E`、页面是 `#000000`
+     （第十轮实测，`docs/os4-round10-audit.md` §1.3）。
+   - `pageColor()` = 由卡片色反推的**次级表面**（比页面深/浅一档），给预览舞台这类
+     "要跟页面拉开一档"的位置。它不是页面底色。
+   - `cardColor()` = `surfaceContainer`，卡片用。
+   旧结论「Monet 会把 `surface`/`surfaceContainer` 压成同一个值」在 `3177a684` 上**已不成立**
+   （第十轮四套配色实测都不同值），所以页面直接用 `surface` 不会和卡片糊在一起。
 3. **玻璃只有一个决策点：`ui/GlassSupport.kt` 的 `LocalGlassEnabled`。**
    页面里不许再出现 `isRenderEffectSupported()` 之类的判断 —— 一度 `App.kt`、`GlassScope`、
    `Widgets.kt` 各判各的，就出过「顶栏玻璃、底栏实心」的割裂。
@@ -85,13 +92,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    （第六轮"作品面板不模糊"的真因，第七轮用探针实测，见 `docs/os4-round7-audit.md` §3）。
    所以一级页的弹层必须采 `LocalRootBackdrop`（录在 Pager 外面）。
    1.4 之前一律传 `null` 是躲脏斑的补丁；脏斑的真实成因是录制层没垫底色，
-   `rememberPageBackdrop` 现在先 `drawRect(pageColor())`，前提已经不成立。
+   `rememberPageBackdrop` 现在先 `drawRect(pageBaseColor())`，前提已经不成立。
    **前提**：弹层宿主不能在被采样的录制层里面（第 1、11 条）。
-5. **分段控件用自绘的 `SegmentedControl`，不要用 `TabRow` 去做"分段"。**
-   库里其实有三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`），
-   它们都是**可横向滚动的页签**，不是「一整条凹槽 + 一个滑块」的分段控件；
-   `TabRowWithContour` 还会额外画 5dp 轮廓 padding，看起来像一排小按钮。
-   离散选项（2~4 个）优先用 `DropdownRow`（玻璃浮层下拉）。
+   **下拉走同一条规则**：`DropdownRow` 的 `backdrop` = `LocalRootBackdrop ?: LocalPageBackdrop`，
+   不是只看页面层 —— `GlassDropdownPreference` 默认 `renderInRootScaffold = true`，
+   弹层由最外层 Scaffold 绘制、上报真实坐标（第十轮修，`docs/os4-round10-audit.md` §4.2 #5）。
+5. **离散选项（2~4 个）优先用 `DropdownRow`；做分段控件时用上游的 `GlassSegmentedTabRow`。**
+   库里三个页签组件（`TabRow` / `TabRowWithContour` / `GlassTabRow`）都是**可横向滚动的页签**，
+   不是「一整条凹槽 + 一个滑块」的分段控件；`TabRowWithContour` 还会额外画 5dp 轮廓 padding，
+   看起来像一排小按钮。上游后来补了 `GlassSegmentedTabRow`（`GlassTabRow.kt`），那才是分段控件。
+   > 第十轮更正：本条以前写「分段控件用自绘的 `SegmentedControl`」，
+   > 但源码里**从来没有**这个组件（全项目 grep 零命中），属于文档漂移，已改写。
    滑块取色也不能用 `colorScheme.background`（Monet 下不是白色），要取 `cardColor()`。
 6. **卡片内不加 `HorizontalDivider`。** 靠 56dp 最小行高 + 16dp 内边距区分，这与 KernelSU / HyperOS 设置页一致。
 7. **不要引入 `androidx.compose.material3`。** 会和 Miuix 的设计语言打架，且显著增大包体。
@@ -114,7 +125,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
     Glass 族是 **28dp 画布**（`buildHyperOSIcon` 里 `defaultWidth = 28.dp`），
     塞进 24dp 槽位会明显偏小；列表统一 26dp（`IconSizes.Row`）。
-    尺寸只有 `IconSizes` 一个出处：`Row` 26 / `Action` 28 / `Empty` 44 / `Media` 28（媒体区占位）。
+    尺寸只有 `IconSizes` 一个出处：`Row` 26 / `Action` 28 / `Inline` 19（行内小动作）/ `Empty` 44 / `Media` 28（媒体区占位）。
     注意新版权重/命名变化：`Glass.Folder` / `Glass.Settings` 已改名成 `*Outline` / `*Fill`。
     顶栏返回键玻璃档用 `Glass.ChevronBackward`（28dp），非玻璃档才用 extended 的 `Back`（24dp），
     官方 `component/BackNavigationIcon.kt` 就是这么分的。
@@ -170,16 +181,20 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     - 它的 `rememberGlassScope(opaqueBase = false)` 不垫页面底色 —— 背后已经是整屏不透明渐变，
       垫了就把渐变盖掉。顶栏仍然采样正文录制层（兄弟节点），**不要**为了"让顶栏采到渐变"
       在页面根部再套一层 `layerBackdrop`：那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
-    - 图标与软件名称跟随背景上色，**与背景共用同一个 `BgPalette`**（`rememberBgPalette()` 由页面建、
-      传给 `BgEffectBackground`）。参考实现（KernelSU `AboutMiuix.kt`、InstallerX `MiuixAboutPage.kt`）
-      用的是 `textureBlur(backdrop, contentBlendMode = DstIn)` 采样已渲染的背景；
-      该路径在本机 GPU 上静默不产出像素（官方示例 APK 的关于页因此没有标题和卡片），
-      所以这里走 `gradientFilled(brush)`：`drawContent()` + `drawRect(SrcIn)`，只依赖普通混合。
-      **不要再建第二套渐变/第二个动画** —— 相位会错开，变成"背景在变、字不变"。
-    - 标题用 `Color.White` 打底再由 `SrcIn` 换成渐变；图标用 `ic_app_mark`（纯白剪影）+ 底板。
-      `ic_app_badge` 的主体比 `ic_launcher_monochrome` 大一圈，两者**不能直接叠**。
+    - 图标与软件名称**必须走参考项目的原生 `textureBlur`**：一份背景录制层
+      （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
+      `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。
+      三档混合色与 KSU `AboutMiuix.kt:189-203` / InstallerX `MiuixAboutPage.kt:420-431` 逐字相同。
+      图标容器 100dp（`clip = true`）、主体 `requiredSize(132dp)`、`ColorFilter.tint(onBackground)`；
+      标题 35sp Bold、同 backdrop 同混合色。
+      **不要**改成 `gradientFilled` / `SrcIn` / ShaderBrush / 任何自制渐变（第九轮做过，第十轮已删除）。
+    - 本机模拟器（`swiftshader_indirect`）上 `textureBlur` 不产出像素，
+      于是图标与标题**整块不可见**（`DstIn` 用空结果替换了内容）；关掉玻璃开关时二者正常显示。
+      这是 GPU 能力问题，不是接线问题 —— 保留原生实现，标注真机待验证，
+      **不要**为了在模拟器上看出来而换一套视觉。详见 `docs/os4-round10-audit.md` §2.5。
+    - 图标**不带白底/底板**，只有单色剪影。第九轮那块 `cardColor(alpha = 0.72f)` 底板已删除。
     - 卡片用 `cardColor().copy(alpha = 0.82f)`，不用 `textureBlur`。详见 `docs/os4-round8-audit.md` §6.3
-      与本轮 `docs/os4-round9-audit.md` §3。
+      与 `docs/os4-round10-audit.md` §2.7。
     - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
       不要再拆成两个 Route。
@@ -191,7 +206,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加一个工具 | `ToolCatalog` 加枚举项和图标 → `TaskRunner` 加分支 → `ToolScreen.ParamPanel` 加参数行 |
 | 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` / `ThemeScreen` 加行 |
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
-| 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
+| 改配色层次 | 只动 `pageBaseColor()` / `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*`（分工见硬约束 2） |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
 | 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |
 | 加一个第三方依赖 / 改许可 | `ui/LicenseCatalog.kt` 的 `thirdPartyLibraries` 补一行；正文放 `assets/licenses/`。不要新开 Route，`licenseEntries` 的下标就是 `Route.License(index)` |
@@ -216,7 +231,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 - 版本号在 `build.gradle.kts` 的 `versionCode` / `versionName`
 - release 使用 **debug 签名**，只为方便装机试用；正式分发必须换 keystore
-- debug 包约 38MB（未混淆），release 约 3MB
+- debug 包约 45MB（未混淆），release 约 3.3MB
 - 改完 UI 要跑一遍「静态 / Monet × 明 / 暗」四种组合，只看一种会漏掉配色塌陷
 
 ## 构建环境的两个坑

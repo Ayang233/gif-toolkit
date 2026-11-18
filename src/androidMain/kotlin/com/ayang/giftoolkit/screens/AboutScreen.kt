@@ -1,15 +1,16 @@
 package com.ayang.giftoolkit.screens
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,7 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -36,11 +40,9 @@ import com.ayang.giftoolkit.R
 import com.ayang.giftoolkit.ui.ContentBackdropBox
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
+import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.PageTopBar
 import com.ayang.giftoolkit.ui.bg.BgEffectBackground
-import com.ayang.giftoolkit.ui.bg.accentBrush
-import com.ayang.giftoolkit.ui.bg.gradientFilled
-import com.ayang.giftoolkit.ui.bg.rememberBgPalette
 import com.ayang.giftoolkit.ui.cardColor
 import com.ayang.giftoolkit.ui.pageScrollModifiers
 import com.ayang.giftoolkit.ui.rememberAppVersion
@@ -51,32 +53,79 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurBlendMode
+import top.yukonga.miuix.kmp.blur.BlurColors
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 
 /** 源代码地址。为空时那一行照常显示、点击提示"尚未公开"，不会出现死链。 */
 private const val SOURCE_URL = "https://github.com/Ayang233/gif-toolkit"
 
 /**
+ * 图标主体在 backdrop 里的采样尺寸。
+ *
+ * 不是随手给的数：`ic_app_mark` 是 108×108 画布，实际图形只占 x=14..94（80 单位宽，
+ * 占画布 74.1%）。要让**看得见的胶片条**正好落在 100dp 的容器里（KSU 是
+ * `245dp` 图形 / `100dp` 容器、InstallerX 是 `160dp` / `88dp`，两者都靠图形自带的透明
+ * 留白把主体收进容器），需要的采样尺寸 = 100dp × 108/80 ≈ 135dp，这里取 132dp
+ * （左右各留 1dp 余量，避免圆角被裁）。可见主体约 97.8 × 48.9dp。
+ */
+private val MarkSampleSize = 132.dp
+
+/** 图标外层容器。与 KSU 的 `Modifier.size(100.dp)` 同档，比第九轮的 88dp 底板大一圈。 */
+private val MarkBoxSize = 100.dp
+
+/**
  * 关于页。
  *
- * 版式对齐 InstallerX Revived 的 Miuix 关于页（`MiuixAboutPage.kt`，26.11.caccb78）
- * 与 MIUIX 官方示例 `AboutPage.kt`：整块 OS3 动态渐变 + 大图标 + 大标题 + 版本号，
- * 滚动时这三块按不同斜率淡出并缩到 0.95；下面是一张「关于」卡片。
+ * 版式对齐 InstallerX Revived 的 Miuix 关于页（`MiuixAboutPage.kt`，26.11.caccb78）、
+ * KernelSU 原版管理器的 `AboutMiuix.kt` 与 MIUIX 官方示例 `AboutPage.kt`：
+ * 整块 OS3 动态渐变 + 大图标 + 大标题 + 版本号，滚动时这三块按不同斜率淡出并缩到 0.95；
+ * 下面是一张「关于」卡片。
+ *
+ * 图标与软件名称走的是参考项目**同一套原生机制**，没有第二套绘制路径：
+ *
+ * ```
+ * textureBlur(backdrop = 背景录制层,
+ *             blurRadius = 150f,
+ *             colors = BlurColors(blendColors = logoBlend),
+ *             contentBlendMode = DstIn)   ← 采样背景 → 混色 → 按内容 alpha 裁形
+ * ```
+ *
+ * 采样源是 [bgBackdrop]——只录 `BgEffectBackground` 那层渐变（`bgModifier`），
+ * 所以图标、标题、背景三者同源：同一帧、同一色段、同一组混合色，不会各跑一套动画。
+ *
+ * **不要改成 `gradientFilled` / `SrcIn` / ShaderBrush 之类的自制渐变**（第九轮做过，
+ * 本轮已删除）：那是另一条绘制路径，颜色与背景不同步，而且不是"液态玻璃"。
+ *
+ * **本机模拟器（`swiftshader_indirect`）上实测：图标与标题整块不可见。**
+ * 原因是 `textureBlur` 在这个 GPU 上编译得出来、但不产出像素，
+ * 而 `DstIn` 是用采样结果去替换内容 —— 采样为空，内容就一起没了。
+ * 官方示例 APK 在同一台机器上关于页同样没有标题。
+ * 这条**不是接线错误**：把玻璃开关关掉（`blurEnabled = false`，走参考项目的
+ * "不模糊就正常画"分支）时图标与标题立刻正常显示 —— 截图见
+ * `_archive/round10/final/final_glassoff_07_about.png`。
+ * 所以图标上的 `ColorFilter.tint(onBackground)`（与 KSU 一致）只是让内容层带上正确颜色，
+ * **不要**指望它在模糊失败时兜出一个可见剪影。
+ * 真机验证前保持原生实现不动。
  *
  * 三处按参考应用固定的写法：
  *
- * 1. **入口行不带前置图标**：InstallerX 用的是 `ArrowPreference(title, summary)`（无 `startAction`），
- *    描述写在副标题里（「在 GitHub 上查看源代码」）。这里照抄，不再塞 `Glass.Light.Link` 这类小图标。
- * 2. **图标与软件名称跟随背景渐变**：参考实现是
- *    `textureBlur(backdrop, colors = BlurColors(blendColors = …), contentBlendMode = DstIn)` ——
- *    采样已渲染的背景、用混合色叠一层，再裁进字形。本机 GPU 上 `textureBlur` 静默不产出像素
- *    （官方示例 APK 同一台模拟器上关于页干脆没有标题、没有卡片，见 `_archive/round8/off_about3.png`），
- *    所以这里改用与背景**同一套色段**的渐变 + `SrcIn` 掩膜（`ui/bg` 的 `gradientFilled`）：
- *    颜色与相位同源，不依赖 AGSL，任何 GPU 都有像素。
- * 3. **只有一个许可入口**：本项目自身许可证与第三方组件许可合成一页（[LicensesScreen]），
- *    关于页不再分「开源许可 / 第三方许可」两个入口。
+ * 1. **图标不带白底/底板**：参考项目只有"单色剪影 + 透明背景"，主体靠 `requiredSize`
+ *    撑大、再按容器裁剪。这里容器 100dp（KSU 同值）、采样 132dp，
+ *    可见主体实测 **98 × 49dp**（2026-11-18 截图量测），横向占满容器的 98%。
+ *    KSU 的 245dp、InstallerX 的 160dp 之所以更大，是因为它们的
+ *    `ic_launcher_foreground` / `ic_launcher_monochrome` 是近方形图标、留白多，
+ *    撑到 245dp 后**可视主体仍会被 100dp 容器裁掉一圈**；本项目的 `ic_app_mark`
+ *    是 2:1 的胶片条，横向再放大就会把两端齿孔裁掉，所以取"刚好填满"。
+ * 2. **入口行不带前置图标**：InstallerX 用的是 `ArrowPreference(title, summary)`（无 `startAction`）。
+ * 3. **只有一个许可入口**：本项目自身许可证与第三方组件许可合成一页（[LicensesScreen]）。
  */
 @Composable
 fun AboutScreen(
@@ -84,19 +133,42 @@ fun AboutScreen(
     onOpenLicenses: () -> Unit,
 ) {
     val context = LocalContext.current
-    // 录制层不垫页面底色：这一页的背景是整块渐变，垫了就把渐变盖住了（见 rememberPageBackdrop）。
+    // 顶栏的采样源：页面正文录制层。垫底色会把整块渐变盖掉（见 rememberPageBackdrop）。
     val glass = rememberGlassScope(opaqueBase = false)
-    // 注意：渐变**不能**再套一层 `layerBackdrop` 当顶栏采样源。
-    // 试过在页面根部录一条满屏层给顶栏用，结果顶栏成了录制层的**子节点**（Scaffold 在它里面），
-    // 采样到自己 → `RenderNode::prepareTreeImpl` 原生栈溢出闪退（logcat 见
-    // `_archive/round8/crash_about_libhwui.txt`）。录制层只能是消费者的兄弟节点（AGENTS.md 第 1 条）。
+    val blurEnabled = LocalGlassEnabled.current
     val version = rememberAppVersion()
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
     val density = LocalDensity.current
-    // 背景与"跟随背景"的图标/标题共用一份配色状态：一个色段、一套相位。
-    val palette = rememberBgPalette()
-    val markBrush = { palette.takeIf { it.gradientAvailable }?.accentBrush() }
+
+    // 背景录制层：只录渐变那一层，给图标/标题的 textureBlur 当采样源。
+    // 官方 `AboutPage.kt:141` 的 `backdrop = rememberBlurBackdrop()` + `bgModifier = layerBackdrop(backdrop)`
+    // 是同一处接线；KSU 在内容里另建一份 `rememberLayerBackdrop()` 挂在 BgEffectBackground 上。
+    // **不能**把录制层套到内容外面：内容是渐变层的兄弟，套进去就成"采样到自己"（AGENTS.md 第 1 条）。
+    val bgBackdrop = rememberLayerBackdrop()
+
+    // 深浅主题各一套混合色，取自 KSU `AboutMiuix.kt:189-203` / InstallerX `MiuixAboutPage.kt:420-434`，
+    // 与 MIUIX 官方 `AboutPage.kt` 的 logoBlend 完全相同（三档：ColorBurn/ColorDodge、LinearLight、Lab）。
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val logoBlend = remember(isDark) {
+        if (isDark) {
+            listOf(
+                BlendColorEntry(Color(0xe6a1a1a1), BlurBlendMode.ColorDodge),
+                BlendColorEntry(Color(0x4de6e6e6), BlurBlendMode.LinearLight),
+                BlendColorEntry(Color(0xff1af500), BlurBlendMode.Lab),
+            )
+        } else {
+            listOf(
+                BlendColorEntry(Color(0xcc4a4a4a), BlurBlendMode.ColorBurn),
+                BlendColorEntry(Color(0xff4f4f4f), BlurBlendMode.LinearLight),
+                BlendColorEntry(Color(0xff1af200), BlurBlendMode.Lab),
+            )
+        }
+    }
+    // 用 BlurDefaults 的工厂而不是直接构造：List 对 Compose 不稳定，
+    // 直接构造会让 textureBlur 每帧重建 effect（官方注释里专门写了这一条）。
+    // 它本身是 @Composable（内部按参数 remember），所以不能再套一层 remember。
+    val logoColors = BlurDefaults.blurColors(blendColors = logoBlend)
 
     // 大标题区高度：先量再对齐，不写死 —— 字体缩放、横屏都会改变它。
     var headerHeightPx by remember { mutableIntStateOf(0) }
@@ -124,13 +196,14 @@ fun AboutScreen(
     Box(Modifier.fillMaxSize()) {
         BgEffectBackground(
             modifier = Modifier.fillMaxSize(),
-            palette = palette,
+            // 录制层挂在这一层（只画渐变的那一层），不是内容外面。
+            bgModifier = if (blurEnabled) Modifier.layerBackdrop(bgBackdrop) else Modifier,
             alpha = { 1f - progressProvider() },
         ) {}
 
         Scaffold(
             containerColor = Color.Transparent,
-            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 PageTopBar(
                     title = "关于",
@@ -140,6 +213,10 @@ fun AboutScreen(
                     onBack = onBack,
                     expandable = false,
                     titleAlpha = { ((progressProvider() - 0.35f) / 0.65f).coerceIn(0f, 1f) },
+                    // 玻璃关闭时退回普通 TopAppBar：它的默认底色是 surface（不透明白），
+                    // 会在页面顶部切出一条白带、把渐变盖掉。参考项目的写法是
+                    // "没滚到收起状态就透明，收起后才给实色"，这里照抄。
+                    background = if (collapsed) MiuixTheme.colorScheme.surface else Color.Transparent,
                 )
             },
         ) { innerPadding ->
@@ -161,27 +238,46 @@ fun AboutScreen(
                         .onSizeChanged { headerHeightPx = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    // 图标：底板 + 跟随背景色段的剪影（参考 KSU / InstallerX 的做法，见文件头）。
+                    // 图标：纯剪影，无底板。容器 100dp 只负责裁剪与定位，主体按 132dp 采样后放大。
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(88.dp)
-                            // 官方是 88dp 图标 + 24dp 圆角；这里用连续曲率裁剪，和卡片圆角同一套观感。
-                            .squircleClip(24.dp)
-                            .background(cardColor().copy(alpha = 0.72f))
+                            .size(MarkBoxSize)
                             .graphicsLayer {
                                 val p = ((progressProvider() - 0.35f) / 0.15f).coerceIn(0f, 1f)
                                 alpha = 1f - p
                                 scaleX = 1f - p * 0.05f
                                 scaleY = 1f - p * 0.05f
+                                // 与 KSU 的 `clipToBounds()` 同义：主体溢出容器的部分是透明的，
+                                // 但裁一下更稳（换图标资源时不会突然露到外面）。
+                                clip = true
                             },
                     ) {
                         Image(
                             painter = painterResource(R.drawable.ic_app_mark),
                             contentDescription = null,
+                            // 与 KSU `AboutMiuix.kt:313` 一致：始终 tint，
+                            // 模糊不产出像素时仍是一个正常着色的剪影（回退不是另一套实现）。
+                            colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onBackground),
                             modifier = Modifier
-                                .size(88.dp)
-                                .gradientFilled(markBrush),
+                                .requiredSize(MarkSampleSize)
+                                .then(
+                                    if (blurEnabled) {
+                                        Modifier.textureBlur(
+                                            backdrop = bgBackdrop,
+                                            // 形状只裁"采样区域"；可见结果由 DstIn 的 alpha 决定。
+                                            // 参考项目传 RoundedCornerShape(0.dp)，等价于矩形。
+                                            shape = RectangleShape,
+                                            // 150f 与 KSU 图标同值（库内部按 BlurDefaults.MaxBlurRadius=100 夹紧）。
+                                            blurRadius = 150f,
+                                            colors = logoColors,
+                                            contentBlendMode = ComposeBlendMode.DstIn,
+                                            enabled = true,
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                         )
                     }
                     Text(
@@ -194,9 +290,23 @@ fun AboutScreen(
                                 scaleX = 1f - p * 0.05f
                                 scaleY = 1f - p * 0.05f
                             }
-                            // 渐变填充靠字形 alpha：颜色本身会被 SrcIn 替换掉，这里给实白即可。
-                            .gradientFilled(markBrush),
-                        color = Color.White,
+                            .then(
+                                if (blurEnabled) {
+                                    Modifier.textureBlur(
+                                        backdrop = bgBackdrop,
+                                        shape = RectangleShape,
+                                        blurRadius = 150f,
+                                        colors = logoColors,
+                                        contentBlendMode = ComposeBlendMode.DstIn,
+                                        enabled = true,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                        // 与参考项目一致：字形只提供 alpha，颜色由采样结果决定；
+                        // 模糊不可用时这行就是主题色实字（回退，不是第二套渐变）。
+                        color = MiuixTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold,
                         fontSize = 35.sp,
                     )
@@ -267,8 +377,11 @@ fun AboutScreen(
 /**
  * 关于页的卡片。
  *
- * 底色取 `cardColor()` 再压到 0.82 不透明度：渐变背景能透一层上来，
- * 又不像官方那样把整张卡的底色交给 `textureBlur`（那条路径在部分 GPU 上不产出像素，见文件头）。
+ * 底色取 `cardColor()` 再压到 0.82 不透明度：渐变背景能透一层上来。
+ *
+ * 这一处**故意不跟**参考项目用 `textureBlur`：参考项目整张卡（含两行入口）都由模糊层画出，
+ * 而本机 GPU 上模糊层不产出像素时，卡片会连同两个入口一起消失 —— 那是功能性回退，
+ * 不是观感问题。图标与标题可以等真机验证，入口必须一直可点。
  */
 @Composable
 private fun AboutCard(

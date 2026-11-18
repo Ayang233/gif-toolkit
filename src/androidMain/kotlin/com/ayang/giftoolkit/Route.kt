@@ -25,4 +25,12 @@ sealed interface Route : NavKey {
 
     /** 许可正文，index 指向 `licenseEntries`。 */
     data class License(val index: Int) : Route
+
+    /**
+     * **仅 debug 包**：开始按钮禁用态四种配色的实机对比页。
+     *
+     * 只在 `ApplicationInfo.FLAG_DEBUGGABLE` 为真时注册（`App.kt`）与显示入口（`ThemeScreen`），
+     * release 包里既没有入口也进不来。目的只是让四种方案并排看效果，不属于产品界面。
+     */
+    data object ButtonColors : Route
 }

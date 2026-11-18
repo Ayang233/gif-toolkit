@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 关于页的「可着色主体」：只有胶片条剪影 + 齿孔，整块纯白。
-     纯白是为了当掩膜用 —— 关于页把它按当前背景色段填成渐变（ui/bg 的 gradientFilled），
-     所以这里不能保留徽章里的黑色主体与白色波浪（同色叠在一起会糊成一块）。
+     纯白的用途是给 `textureBlur(..., contentBlendMode = DstIn)` 当 alpha 掩膜
+     （与 KSU 的 `ic_launcher_foreground`、InstallerX 的 `ic_launcher_monochrome` 同一种用法），
+     再加上 `ColorFilter.tint(onBackground)` 着色 —— 所以这里不能保留徽章里的
+     黑色主体与白色波浪（同色叠在一起会糊成一块）。
+     主体占画布 x=14..94（80/108 = 74.1%），关于页按 132dp 采样时可见宽度约 98dp。
      路径与 ic_app_badge.xml 的主体完全一致，换色后位置不会偏。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"

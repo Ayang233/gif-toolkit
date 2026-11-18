@@ -2,6 +2,34 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 未发布
+
+**修复**
+
+- 深色主题下页面底部出现一条比页面亮的色带：底部主操作条与玻璃录制层垫的底色
+  取自 `pageColor()`（深色 #1E1E1E），而页面实际是 `surface`（#000000）。
+  新增 `pageBaseColor()` 统一"页面真实底色"，录制层垫色、操作条遮挡、页面底色都改用它。
+- 顶栏在软件光栅化环境（模拟器 SwiftShader）下，渐进模糊产出的是错位副本、内容直接压到标题上：
+  这类渲染器上回退到 `GlassTopAppBar` 默认的渐变背景带（仍是库的官方路径），真机不受影响。
+- 「GIF 编辑」的旋转滑块档位错误：`0..270` 配 3 个中间档实际得到 0/67.5/135/202.5/270°，
+  非直角会把画面斜切。改为 0/90/180/270 四档。
+- 动态取色下底栏与侧栏的选中项不是主色（用了 `onBackground`）：主题包装用的是
+  `MiuixTheme(colors = …)` 重载，拿不到 `LocalColorSchemeMode`。改为在调用点显式传 `selectedColor`，
+  并补上该重载缺失的 `LocalContentColor`。
+- 下拉弹层的玻璃材质深色下与顶栏不同档：去掉显式传入的 `visuals`，回到库默认。
+- 下拉弹层在一级页会采错坐标（页面录制层上报槽位坐标）：采样源改为
+  `LocalRootBackdrop ?: LocalPageBackdrop`，与 Dialog / BottomSheet 同一条规则。
+- 作品操作面板的行标题与面板标题不对齐（24dp + 16dp 叠成 40dp），且最后一行会贴住手势导航条。
+
+**调整**
+
+- 关于页改用 KernelSU / InstallerX Revived 的原生 `textureBlur + BlurColors + DstIn` 实现图标与软件名称，
+  删除第九轮自制的渐变填充路径（`BgPalette` / `gradientFilled` / `accentBrush`）。
+- 关于页图标去掉白底底板，改为纯单色剪影，容器 100dp、主体采样 132dp（可见主体约 98 × 49dp）。
+- 抠图颜色色块补无障碍语义（单选角色、选中状态、颜色名），选中时不再改变尺寸、整行不再跳动。
+- 新增仅调试包可见的「开始按钮配色对比」页（设置 → 主题 → 调试），
+  用真实 `ProgressButton` 并排展示无素材禁用态的四种候选配色。正式按钮配色本轮不变。
+
 ## 1.7 — 2026-11-18
 
 **修复**

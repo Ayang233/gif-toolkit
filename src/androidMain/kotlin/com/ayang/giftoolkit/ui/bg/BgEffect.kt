@@ -1,7 +1,6 @@
 package com.ayang.giftoolkit.ui.bg
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -9,16 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
@@ -36,7 +30,6 @@ import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.cos
 import kotlin.math.floor
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /*
@@ -118,79 +111,37 @@ private fun presetOf(deviceType: BgDeviceType, isDark: Boolean): BgPreset = when
 }
 
 /**
- * 关于页的「背景配色状态」：预设 + 逐段推进的色段 + 明暗/设备档位。
+ * 关于页的 OS3 动态渐变背景。
  *
- * 抽出来的原因：图标与软件名称要**跟着同一套渐变**变颜色（参考 KernelSU / InstallerX Revived）。
- * 如果各自再建一份配色和动画，就会有两套相位不同的渐变 —— 背景在变、字不变，
- * 或者字变色比背景慢半拍。这里让背景和前景共用一个实例、一个 `colorStage`。
+ * 背景本身是**静态铺满 + 颜色缓慢轮换**（官方也是这套：底色不动，只有色带在渐变），
+ * 内容滚动时靠 [alpha] 整体淡出，让位给列表。
  *
- * 只暴露读取，不暴露修改：色段由 [rememberBgPalette] 内部推进。
- */
-@Stable
-class BgPalette internal constructor(
-    internal val preset: BgPreset,
-    internal val deviceType: BgDeviceType,
-    internal val isDark: Boolean,
-    internal val surface: Color,
-    internal val colorStage: Animatable<Float, AnimationVector1D>,
-    /** 设备是否支持 RuntimeShader；不支持时背景是纯色，前景也不该再上渐变。 */
-    val gradientAvailable: Boolean,
-) {
-    /**
-     * 当前色段的 4 个色标，与背景着色器用的是同一组数（`uColors` 的 4 × RGBA）。
-     *
-     * 不能直接拿来画字：背景是低饱和的粉/蓝（HSV 饱和度只有 0.1 上下），
-     * 同色描上去等于没有字。这里按 HSV 统一压到一档亮度、并给饱和度设下限 ——
-     * 色相/色相漂移保留（这才是"跟随背景"），亮度和对比度由固定值兜住：
-     * 浅色主题 V=0.42（与页面底色的对比度约 4.5:1）、深色主题 V=0.92（约 8:1），
-     * 都高于 WCAG 对大号粗体文本的 3:1 要求。
-     */
-    internal fun accentColors(): List<Color> {
-        val stage = colorStage.value
-        val base = stage.toInt()
-        val fraction = stage - base
-        val start = colorsForCycle(base)
-        val end = colorsForCycle(base + 1)
-        val targetValue = if (isDark) 0.92f else 0.42f
-        val hsv = FloatArray(3)
-        return (0 until 4).map { i ->
-            val o = i * 4
-            val c = Color(
-                red = start[o] + (end[o] - start[o]) * fraction,
-                green = start[o + 1] + (end[o + 1] - start[o + 1]) * fraction,
-                blue = start[o + 2] + (end[o + 2] - start[o + 2]) * fraction,
-                alpha = 1f,
-            )
-            android.graphics.Color.RGBToHSV(
-                (c.red * 255f).roundToInt(),
-                (c.green * 255f).roundToInt(),
-                (c.blue * 255f).roundToInt(),
-                hsv,
-            )
-            hsv[1] = maxOf(hsv[1], 0.55f)
-            hsv[2] = targetValue
-            Color(android.graphics.Color.HSVToColor(hsv))
-        }
-    }
-
-    private fun colorsForCycle(index: Int): FloatArray = when (index.mod(4)) {
-        1 -> preset.colors1
-        3 -> preset.colors3
-        else -> preset.colors2
-    }
-}
-
-/**
- * 建立（并推进）关于页背景的配色状态。
+ * [bgModifier] 挂在**只画渐变的那一层**上：图标与软件名称的 `textureBlur` 需要一份
+ * "已渲染的背景"当采样源，官方 `AboutPage.kt` 的 `bgModifier = Modifier.layerBackdrop(backdrop)`
+ * 就是这个用途。录制层只能套这一层，**不能**套在 [content] 外面 —— 内容是它的兄弟节点，
+ * 一旦套进去，图标采样时就把"正在采样的自己"录进去了（AGENTS.md 第 1 条，历史真崩过）。
  *
- * 背景与"跟随背景"的图标/标题必须共用同一个实例，所以由页面创建后传给 [BgEffectBackground]。
+ * 设备不支持 RuntimeShader 时直接退化成普通 Box —— 颜色轮换不跑，页面是纯色底，
+ * 不抛异常、不留空白（与官方一致）。
  */
 @Composable
-fun rememberBgPalette(dynamic: Boolean = true): BgPalette {
+fun BgEffectBackground(
+    modifier: Modifier = Modifier,
+    /** 只叠在渐变层（不是内容层）上的修饰符，本项目用来挂 backdrop 录制层。 */
+    bgModifier: Modifier = Modifier,
+    /** 整体透明度，随滚动进度递减。 */
+    alpha: () -> Float = { 1f },
+    /** 色段是否继续轮换。 */
+    dynamic: Boolean = true,
+    content: @Composable (BoxScope.() -> Unit),
+) {
     val shaderSupported = remember { isRuntimeShaderSupported() }
+    // 明暗判定用 `background.luminance()`：项目里全部这么判，不用示例的 isInDarkTheme()。
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    // 宽/窄屏判定用项目的 LocalWideLayout（阈值与官方 AdaptiveUtils 一致）。
     val deviceType = if (LocalWideLayout.current) BgDeviceType.PAD else BgDeviceType.PHONE
     val preset = remember(deviceType, isDark) { presetOf(deviceType, isDark) }
+    // 底色铺 pageColor()：项目里页面底色统一由它推导，见 Widgets.kt。
     val surfaceColor = pageColor()
     // 颜色循环：每 period*500ms 推进一个"色段"，段与段之间用弹簧插值。
     val colorStage = remember { Animatable(0f) }
@@ -205,43 +156,11 @@ fun rememberBgPalette(dynamic: Boolean = true): BgPalette {
             target += 1f
         }
     }
-    return remember(preset, deviceType, isDark, surfaceColor, colorStage, shaderSupported) {
-        BgPalette(preset, deviceType, isDark, surfaceColor, colorStage, shaderSupported)
-    }
-}
-
-/**
- * 关于页的 OS3 动态渐变背景。
- *
- * 背景本身是**静态铺满 + 颜色缓慢轮换**（官方也是这套：底色不动，只有色带在渐变），
- * 内容滚动时靠 [alpha] 整体淡出，让位给列表。
- *
- * 设备不支持 RuntimeShader 时直接退化成普通 Box —— 此时页面就是原来的纯色底，
- * 不抛异常、不留空白（与官方一致）。
- */
-@Composable
-fun BgEffectBackground(
-    modifier: Modifier = Modifier,
-    /** 背景之外还要叠的修饰符（本项目用不上，保留以对齐官方签名）。 */
-    bgModifier: Modifier = Modifier,
-    /**
-     * 配色状态。**必须由页面创建后传入**（[rememberBgPalette]），
-     * 这样图标 / 软件名称的渐变才能和背景共用同一个色段，不会各跑一套相位。
-     */
-    palette: BgPalette = rememberBgPalette(),
-    /** 整体透明度，随滚动进度递减。 */
-    alpha: () -> Float = { 1f },
-    content: @Composable (BoxScope.() -> Unit),
-) {
-    if (!palette.gradientAvailable) {
+    if (!shaderSupported) {
         Box(modifier = modifier, content = content)
         return
     }
     val painter = remember { BgEffectPainter() }
-    val preset = palette.preset
-    val surfaceColor = palette.surface
-    val colorStage = palette.colorStage
-
     Box(modifier = modifier) {
         Spacer(
             modifier = Modifier
@@ -250,8 +169,8 @@ fun BgEffectBackground(
                 .bgEffectDraw(
                     painter = painter,
                     preset = preset,
-                    deviceType = palette.deviceType,
-                    isDark = palette.isDark,
+                    deviceType = deviceType,
+                    isDark = isDark,
                     surface = surfaceColor,
                     playing = true,
                     colorStage = { colorStage.value },
@@ -261,42 +180,6 @@ fun BgEffectBackground(
         content()
     }
 }
-
-/**
- * 「跟随背景渐变」的前景填充：把内容（文字字形 / 图标剪影）整体换成当前色段的渐变。
- *
- * 参考实现（KernelSU `AboutMiuix.kt:302`、InstallerX Revived `MiuixAboutPage.kt:493`）
- * 用的是 `textureBlur(backdrop = 背景录制层, contentBlendMode = DstIn)` ——
- * 把**已渲染的背景**采样、与混合色叠一层，再用 `DstIn` 把结果裁进字形。
- * 本机 GPU 上 `textureBlur` 静默不产出像素（官方示例 APK 的关于页因此没有标题、没有卡片，
- * 见 `_archive/round8/off_about3.png`），所以这里不用那条路，改用**同一套颜色**的线性渐变：
- *
- * ```
- * drawContent()                       // 先画字形/剪影，作为 alpha 掩膜
- * drawRect(brush, blendMode = SrcIn)  // 只在有像素的地方铺渐变
- * ```
- *
- * `SrcIn` 与 `DstIn` 在这里等价（都是"保留内容 alpha、替换颜色"），
- * 但不需要 RGBA16F 图层、也不需要 AGSL，任何 GPU 都有像素。
- * 代价是不再逐像素采样背景，渐变位置与背景不完全同步 —— 颜色和相位仍是同一套。
- */
-fun Modifier.gradientFilled(brush: () -> Brush?): Modifier =
-    this
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithCache {
-            // 在绘制期求值：色段是每帧插值出来的，放到组合期会整页重组。
-            val current = brush()
-            onDrawWithContent {
-                drawContent()
-                if (current != null) {
-                    drawRect(brush = current, blendMode = BlendMode.SrcIn)
-                }
-            }
-        }
-
-/** 供 [gradientFilled] 使用的渐变：沿对角线铺开当前色段的 4 个色标。 */
-internal fun BgPalette.accentBrush(): Brush =
-    Brush.linearGradient(accentColors())
 
 private fun Modifier.bgEffectDraw(
     painter: BgEffectPainter,

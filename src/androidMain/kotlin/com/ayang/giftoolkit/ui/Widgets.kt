@@ -42,8 +42,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
-import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
-import top.yukonga.miuix.kmp.material.GlassDefaults
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -105,6 +103,34 @@ fun pageColor(): Color {
         Color.Black.copy(alpha = 0.035f)
     }
     return shade.compositeOver(card)
+}
+
+/**
+ * 页面**真正铺在屏幕上**的那层底色（= `MiuixTheme.colorScheme.surface`）。
+ *
+ * 与 [pageColor()] 不是一回事，两个都要留着：
+ *
+ * - [pageColor()] 是「由卡片色推出来的次级表面」，比页面深一档（浅色 #F6F6F6）
+ *   或浅一档（深色 #1E1E1E），用在预览舞台、脚本对比卡这类**要跟页面拉开一档**的位置。
+ * - [pageBaseColor] 是页面本身。页面是 `Scaffold` 的 `containerColor`，默认就是 `surface`
+ *   （静态浅色 #F7F7F7、静态深色 #000000、Monet 深色 #131316 —— 均为第十轮实测截图取色）。
+ *
+ * 为什么必须分开：玻璃录制层「垫底色」和底部主操作条「遮挡穿透」这两个用途，
+ * 垫的必须是**页面真实底色**，否则玻璃面板/操作条会在页面上留下一块比页面亮的方块。
+ * 历史上这两处都写成了 [pageColor()]，浅色下只差 1/255 看不出来，
+ * 深色静态下是 #1E1E1E 铺在 #000000 上 —— 这就是第十轮「横屏侧栏玻璃发灰」
+ * 的直接成因（`docs/os4-round10-audit.md` §2.2）。
+ *
+ * 顺带记一条已经过时的旧结论：`pageColor()` 最早的注释说「Monet 会把
+ * `surface` / `surfaceContainer` 压成同一个值」。第十轮在本基线 `3177a684` 上逐套配色取色，
+ * 四套都不同（Monet 浅色页面 #F9F9FF / 卡片 #EDEDF4，Monet 深色 #131316 / #1F1F22），
+ * 所以页面直接用 `surface` 不会和卡片糊在一起。
+ */
+@Composable
+fun pageBaseColor(): Color {
+    val dark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    if (LocalAmoled.current && dark) return Color.Black
+    return MiuixTheme.colorScheme.surface
 }
 
 /**
@@ -171,6 +197,14 @@ object IconSizes {
     /** 顶栏动作按钮（`GlassIconButton` 内部 44dp 胶囊）。 */
     val Action: Dp = 28.dp
 
+    /**
+     * 行内小动作（例如素材行的「清除」）。
+     *
+     * 这类图标跟行标题同排、视觉上要比行首图标轻一档，单独给一个值，
+     * 不要在调用点写 `19.dp` —— 尺寸只留一个出处。
+     */
+    val Inline: Dp = 19.dp
+
     /** 空态插画。 */
     val Empty: Dp = 44.dp
 
@@ -190,14 +224,22 @@ object IconSizes {
  * 和 InstallerX 的 `InstallerMiuixSpinnerPreference` 同一个做法；
  * 普通 `WindowDropdownPreference` 弹出来是白底卡片，一眼就不是 OS4。
  *
- * `backdrop` 取 [LocalPageBackdrop]（页面正文录制层），与官方 `GlassPage.kt:447` 一致。
- * 之前传的是「卡片局部录制层」（照 `BlurSection.kt:125` 抄的，但那页的录制层是套住整列行的大容器，
- * 不是单张卡片）：单行卡片上的弹层会伸出卡片下边界，边界之外没有像素可采，
- * 弹层下半截只剩材质、看不到背景模糊 —— 实机截图见
- * `_archive/screenshots/os4-round5/cmp_popup2_backanim.png`。
+ * 采样源取 [LocalRootBackdrop] **优先**，页面正文层 [LocalPageBackdrop] 只作二级页回退。
+ *
+ * 这条规则与 Dialog / BottomSheet 是同一条（`PageChrome.kt` 的 `pageOverlay`）：
+ * `GlassDropdownPreference` 默认 `renderInRootScaffold = true`，弹层由**最外层** Scaffold 绘制，
+ * 上报的是真实窗口坐标；而一级页的页面正文层在 `HorizontalPager` 里，上报的是槽位坐标
+ * （第 2 个 tab 报 x = 1080）。两者相减差一整页宽，采样区间整块落在录制层之外 ——
+ * 第六轮「作品菜单不模糊」就是这个原因。一级页现在还没有下拉行，所以这个缺陷一直潜伏着，
+ * 第十轮按同一条规则提前修掉（`docs/os4-round10-audit.md` §4.3）。
  *
  * 传整页层不会偏移：库用 `layerCoordinates.localPositionOf(...)` 换算坐标。
- * 早期那次的脏斑是录制层没垫底色，`rememberPageBackdrop` 已经用 `drawRect(pageColor())` 补掉了。
+ * 早期那次的脏斑是录制层没垫底色，`rememberPageBackdrop` 已经用 `drawRect(pageBaseColor())` 补掉了。
+ *
+ * `visuals` 不再显式传：默认就是 `GlassDefaults.Style`（`GlassPopup.kt` 的
+ * `GlassPopupDefaults.visuals()`），与顶栏显式传的 `GlassDefaults.Style` 同档。
+ * 第九轮之前这里传 `GlassDefaults.style(isDark)`，深色下会取到
+ * `CommonMediumRegularDark`，弹层材质比顶栏厚一档 —— 同一个决策不要在两个地方各写一遍。
  */
 @Composable
 fun DropdownRow(
@@ -209,7 +251,8 @@ fun DropdownRow(
     enabled: Boolean = true,
 ) {
     val glassEnabled = LocalGlassEnabled.current
-    val pageBackdrop = LocalPageBackdrop.current
+    // 一级页走 Pager 外那层（真实坐标），二级页没有 root 层就回落到页面层。
+    val backdrop = LocalRootBackdrop.current ?: LocalPageBackdrop.current
     GlassDropdownPreference(
         onSelectedIndexChange = onSelect,
         items = items,
@@ -217,12 +260,9 @@ fun DropdownRow(
         title = title,
         // 没有页面上下文（不在 ContentBackdropBox 里）或关掉玻璃时退回不透明底卡，
         // 这是库的官方兜底，不是我们的主路径。
-        backdrop = pageBackdrop.takeIf { glassEnabled },
+        backdrop = backdrop.takeIf { glassEnabled },
         summary = summary,
         enabled = enabled,
-        visuals = GlassPopupDefaults.visuals(
-            style = GlassDefaults.style(MiuixTheme.colorScheme.background.luminance() < 0.5f),
-        ),
     )
 }
 
@@ -288,8 +328,8 @@ fun NoteText(text: String, modifier: Modifier = Modifier) {
 /**
  * 预览舞台。
  *
- * 卡片本身是浅灰（surface），舞台用 surfaceContainer 托一层，
- * 透明背景的 GIF 也能看清边界；空态给一个图标 + 提示语，避免一大块空白。
+ * 舞台底色取 [pageColor]（页面色再深一档的次级表面），透明背景的 GIF 也能看清边界；
+ * 空态给一个图标 + 提示语，避免一大块空白。
  */
 @Composable
 fun PreviewStage(
@@ -364,7 +404,7 @@ fun PreviewStage(
  *    但完全不加也不成立 —— 二级页底部只有一个按钮，列表内容会从按钮周围的缝隙里透出来
  *    （实机上能看到滑块的蓝色圆弧从按钮左下角露出来），官方的 `GlassPage` 之所以不用背景，
  *    是因为它的 `bottomBar` 里是带材质的玻璃导航胶囊，本身就挡住了。
- *    所以这里用 `pageColor()` 纯色：与页面底色**完全相同**，视觉上等于没有额外背景，
+ *    所以这里用 `pageBaseColor()` 纯色：与页面底色**完全相同**，视觉上等于没有额外背景，
  *    同时把穿透内容挡住。
  * 3. **生成中仍可点击 = 取消任务**，文案直接写「取消生成 · 45%」，
  *    比禁用掉按钮更符合"我在等一个可以中断的任务"的直觉。
@@ -401,7 +441,9 @@ fun PrimaryActionBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(pageColor())
+            // 遮挡穿透用的必须是**页面真实底色**，不是次级表面 pageColor()：
+            // 写错时深色下这条操作条会比页面亮一档，横屏时尤其明显（本轮 §2.2 实测 #1E1E1E vs #000000）。
+            .background(pageBaseColor())
             .navigationBarsPadding()
             .padding(end = sideGap + safeEnd, top = 20.dp)
             .padding(bottom = bottomGap)
@@ -427,8 +469,13 @@ fun PrimaryActionBar(
  * 文字会同时压在两块底色上、谁都读不清。我们之前用「白 22% 叠浅蓝 + 灰白字」，
  * 恰好落在这个最差区间里。
  *
- * 空闲：轨道直接是 `primary`，禁用态改成与页面色不透明混合，
- * 而不是 `alpha` —— 半透明会让底下的列表文字透上来。
+ * 空闲：轨道直接是 `primary`。
+ *
+ * **禁用态目前没有额外处理** —— `enabled = false` 时 `ProgressButton` 回落到
+ * `ProgressButtonDefaults` 的默认禁用三色：`disabledSecondaryVariant`（浅色 #F2F2F2）+
+ * `disabledOnPrimaryButton`（#FFFFFF），对比度 1.12:1，「无素材」时文字几乎读不出来。
+ * 四种候选配色的实机对比页在「设置 → 主题 → 调试」里（仅 debug 包），
+ * 正式按钮**暂时保持默认**，等看过对比再定 —— 不要在这里单方面改。
  */
 @Composable
 private fun ActionButton(

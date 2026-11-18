@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.lerp
 import top.yukonga.miuix.kmp.theme.Colors
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 
@@ -49,7 +51,21 @@ fun AnimatedMiuixTheme(
     }
 
     val animated = lerpColors(from, to, progress.value)
-    MiuixTheme(colors = animated, content = content)
+    // `MiuixTheme(colors = ...)` 这个重载**只**提供 LocalColors / LocalTextStyles / LocalIndication /
+    // LocalOverscrollFactory，比 `MiuixTheme(controller = ...)` 少两样：
+    //   - `LocalContentColor`：少了它文字色回落到 `Color.Black`（`ContentColor.kt:19`）。
+    //     目前界面里每个 Text 都显式给色、或包在 Card 里（Card 自己提供 contentColor），
+    //     所以还没露馅 —— 但那是碰巧，补上才是对的。
+    //   - `LocalColorSchemeMode`：它决定 `MiuixTheme.isDynamicColor`（`MiuixTheme.kt:87-96`）。
+    //     补不了（`ThemeController.kt` 里是 internal），所以动态取色下依赖它的组件
+    //     （底栏/侧栏选中色、Switch 未选中拇指色）要在调用点显式传参 —— 见 `App.kt` 的
+    //     `selectedColor`。这一条写进 `docs/os4-round10-audit.md` §5.2。
+    MiuixTheme(colors = animated) {
+        CompositionLocalProvider(
+            LocalContentColor provides animated.onBackground,
+            content = content,
+        )
+    }
 }
 
 /** 按 [Colors.copy] 的字段顺序逐项插值；t = 1 时直接返回目标色，省掉一次构造。 */

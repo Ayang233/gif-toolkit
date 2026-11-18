@@ -9,6 +9,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -94,14 +95,18 @@ val LocalRootBackdrop = compositionLocalOf<LayerBackdrop?> { null }
  * **必须先铺底色再录内容**（官方 `rememberBlurBackdrop` 同款）：裸的 `rememberLayerBackdrop()`
  * 只录内容，卡片之间的空隙、列表 padding 区都是透明的；玻璃采样并模糊后，这些位置仍然是透明
  * —— 于是顶上那条带上内容原样透出来（看着像"糊影/重影"），而不是被糊成一层柔和的底色。
- * 填充用 `pageColor()` 而不是 `surface`：页面实际画的就是这个色。
+ * 填充用页面**真实**底色 `pageBaseColor()`（= `MiuixTheme.colorScheme.surface`）：
+ * 玻璃在没有内容可采的地方只能看到这层垫色，垫色与页面不一致就会显出一块色差方块。
  *
  * 抽成一处是因为 `App.kt`（给底栏/侧栏采样）和每个页面（给顶栏采样）各需要一份，
  * 之前两处各写了一遍同样的 `drawRect + drawContent`。
  */
 @Composable
 fun rememberPageBackdrop(opaqueBase: Boolean = true): LayerBackdrop {
-    val surfaceColor = pageColor()
+    // 垫的是**页面真实底色**（pageBaseColor），不是次级表面 pageColor()。
+    // 玻璃在没有内容的地方只能看到这层垫色；两者不一致时，玻璃面板会在页面上
+    // 显出一块比页面亮的方块 —— 深色静态下是 #1E1E1E 铺在 #000000 上（本轮 §2.2 实测）。
+    val surfaceColor = pageBaseColor()
     return rememberLayerBackdrop {
         // opaqueBase = false 只给「背景本身不透明」的页面用（目前只有关于页：
         // 它背后是一整块动态渐变，录制层再垫一层页面色会把渐变整块盖掉）。
@@ -170,6 +175,17 @@ fun PageTopBar(
      * 顶栏背景带的透明度乘子。默认 1f（吃库的默认观感）。
      */
     backgroundAlpha: (() -> Float)? = null,
+    /**
+     * **非玻璃档**的顶栏底色。默认吃 `TopAppBar` 的默认值（`surface`，不透明）。
+     *
+     * 只有"背景自己铺满不透明像素"的页面要传别的值 —— 目前只有关于页：
+     * 它背后是整块动态渐变，非玻璃档下不透明的白条会把渐变从顶部切断
+     * （`docs/os4-round10-audit.md` §3.5）。参考项目写的是"滚动到顶栏收起后才是实色"，
+     * 所以那边传 `if (collapsed) surface else Transparent`。
+     *
+     * 玻璃档不看这个参数：它的背景带由库按滚动进度自己上色。
+     */
+    background: Color? = null,
 ) {
     // 返回键照官方 `component/BackNavigationIcon.kt` 写：
     // 玻璃档用 Glass 族 **ChevronBackward + 28dp + GlassIconButton**，非玻璃档才退回
@@ -185,7 +201,7 @@ fun PageTopBar(
                     imageVector = MiuixIcons.Glass.ChevronBackward,
                     contentDescription = "返回",
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(IconSizes.Action)
                         .graphicsLayer {
                             // RTL 下箭头要跟着反向（官方同款处理）
                             if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
@@ -232,7 +248,12 @@ fun PageTopBar(
             title = title,
             isContentScrolled = isScrolled,
             expandable = expandable,
-            progressiveBlur = true,
+            // 渐进模糊（AGSL）只在硬件渲染器上开。软件光栅化（模拟器 SwiftShader）上
+            // 它不产出模糊像素、只留一层错位副本：顶栏看起来"内容直接顶到标题上"，
+            // 横屏行距密的时候最明显（本轮 §1 的实测）。此时走库默认的 bandBrush 渐变带，
+            // 也就是 `progressiveBlur = false`（`GlassTopAppBar` 自己的默认值）。
+            // 注意：这不是自造的替代视觉 —— 两条都是同一个组件的官方绘制路径。
+            progressiveBlur = !isSoftwareRenderer,
             backdrop = glass.contentBackdrop,
             contentModifier = contentInset,
             largeTitle = largeTitle,
@@ -256,6 +277,7 @@ fun PageTopBar(
         TopAppBar(
             title = title,
             modifier = contentInset,
+            color = background ?: MiuixTheme.colorScheme.surface,
             expandable = expandable,
             largeTitle = largeTitle,
             largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = effectiveTitleAlpha()),

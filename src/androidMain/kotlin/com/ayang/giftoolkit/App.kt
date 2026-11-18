@@ -39,6 +39,7 @@ import com.ayang.giftoolkit.screens.SettingsScreen
 import com.ayang.giftoolkit.screens.ThemeScreen
 import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
+import com.ayang.giftoolkit.ui.ButtonColorPreviewScreen
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
@@ -49,9 +50,10 @@ import com.ayang.giftoolkit.ui.LocalWideLayout
 import com.ayang.giftoolkit.ui.Tool
 import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.isGlassSupported
-import com.ayang.giftoolkit.ui.pageColor
+import com.ayang.giftoolkit.ui.pageBaseColor
 import com.ayang.giftoolkit.ui.rememberBottomBarClearance
 import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
+import com.ayang.giftoolkit.ui.rememberIsDebuggable
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import com.ayang.giftoolkit.ui.shouldExpandNavigationRail
@@ -84,6 +86,8 @@ import top.yukonga.miuix.kmp.utils.springAnimateToPage
 fun GifApp() {
     val context = LocalContext.current
     val app = remember(context) { AppState(SettingsStore(context)) }
+    // 调试页开关：debug 包才注册「按钮配色对比」目的地（见下方 NavDisplay 的 entry）。
+    val debuggable = rememberIsDebuggable()
 
     val mode = when {
         !app.monetEnabled -> when (app.themeMode) {
@@ -196,8 +200,8 @@ fun GifApp() {
                 goTab(0)
             }
 
-            // 页面底色见 ui/Widgets.kt 的 pageColor()：卡片是 surfaceContainer，
-            // 页面必须是另一个角色，两套配色（Miuix 静态 / Monet）才都有层次。
+            // 页面底色见 ui/Widgets.kt 的 pageBaseColor()：卡片是 surfaceContainer，
+            // 页面是 surface，两套配色（Miuix 静态 / Monet）都不同值，层次成立。
             //
             // 这一层 Scaffold 是**弹层宿主**，不负责布局（contentWindowInsets = 0、底色透明）。
             // 官方 `GlassPageHost`（GlassPage.kt:652）就是这层壳：GlassDialog / GlassBottomSheet /
@@ -212,10 +216,10 @@ fun GifApp() {
                 containerColor = Color.Transparent,
                 contentWindowInsets = WindowInsets(0),
             ) {
-                Box(Modifier.fillMaxSize().background(pageColor())) {
+                Box(Modifier.fillMaxSize().background(pageBaseColor())) {
                     // 转场档位来自主题设置；圆角裁剪半径取设备真实屏幕圆角 ——
                     // 之前没传 effects，默认 cornerClipRadius = 0.dp，等于把圆角裁剪关掉了。
-                    val pageBackground = pageColor()
+                    val pageBackground = pageBaseColor()
                     val pageTransition = remember(app.backAnimation, app.backExitDirection) {
                         backTransition(app.backAnimation, app.backExitDirection)
                     }
@@ -321,6 +325,16 @@ fun GifApp() {
                                         // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
                                         // 不会塌回通栏白底条。
                                         backdrop = rootBackdrop.takeIf { glassEnabled },
+                                        // 选中色显式传：库默认按 `MiuixTheme.isDynamicColor` 取
+                                        // primary / onBackground，而这个值来自 `LocalColorSchemeMode`，
+                                        // 我们用 `MiuixTheme(colors = …)` 的重载提供不了它
+                                        // （internal，见 `ui/AnimatedTheme.kt`），于是永远落到
+                                        // onBackground —— Monet 下选中项就不变主色了。这里按同一规则补上。
+                                        selectedColor = if (app.monetEnabled) {
+                                            MiuixTheme.colorScheme.primary
+                                        } else {
+                                            MiuixTheme.colorScheme.onBackground
+                                        },
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
@@ -341,7 +355,16 @@ fun GifApp() {
                             }
                         }
                         entry<Route.Theme> {
-                            ThemeScreen(app = app, onBack = pop)
+                            ThemeScreen(
+                                app = app,
+                                onBack = pop,
+                                // release 里传 null：那一组入口根本不存在。
+                                onOpenButtonColors = if (debuggable) {
+                                    { stack.add(Route.ButtonColors) }
+                                } else {
+                                    null
+                                },
+                            )
                         }
                         entry<Route.About> {
                             AboutScreen(
@@ -358,6 +381,14 @@ fun GifApp() {
                         entry<Route.License> { route ->
                             LicenseDetailScreen(index = route.index, onBack = pop)
                         }
+                        // **仅 debug 包**：开始按钮四种禁用态配色的实机对比页。
+                        // 条件在组合期只算一次（FLAG_DEBUGGABLE 是常量），release 包里
+                        // 这个目的地根本不存在 → 没有任何入口可以进来。
+                        if (debuggable) {
+                            entry<Route.ButtonColors> {
+                                ButtonColorPreviewScreen(onBack = pop)
+                            }
+                        }
                     }
 
                     // 侧栏必须与一级页的录制层**不是父子**关系：它采样那一层，自己不能在里面，
@@ -370,6 +401,12 @@ fun GifApp() {
                             selectedIndex = tab,
                             onSelect = { goTab(it) },
                             backdrop = if (glassEnabled) rootBackdrop else null,
+                            // 与底栏同一条规则，只是库给 Rail 的静态档是 onSurface。
+                            selectedColor = if (app.monetEnabled) {
+                                MiuixTheme.colorScheme.primary
+                            } else {
+                                MiuixTheme.colorScheme.onSurface
+                            },
                             state = railState,
                             // 折叠态就是官方的"顶部居中胶囊"（只显示文字），左侧那个方块按钮
                             // 是库自带的展开/收起入口 —— 交回默认值，不再用 showToggle = false 把它藏起来。

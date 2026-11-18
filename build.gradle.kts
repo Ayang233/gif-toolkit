@@ -69,11 +69,23 @@ android {
     }
 
     buildTypes {
+        // `DEBUG_UI` 是**字面量**布尔（不是 AGP 默认那个 `Boolean.parseBoolean("...")`），
+        // 所以 Kotlin 会把它当编译期常量内联，R8 也就能把 `if (BuildConfig.DEBUG_UI)` 的分支
+        // 连同里面的界面与文案整段删掉。release 包的验收方式是
+        // "dex 里搜不到「开始按钮配色对比」"（`docs/os4-round10-audit.md` §8.3）。
+        debug {
+            buildConfigField("boolean", "DEBUG_UI", "true")
+        }
         release {
+            buildConfigField("boolean", "DEBUG_UI", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

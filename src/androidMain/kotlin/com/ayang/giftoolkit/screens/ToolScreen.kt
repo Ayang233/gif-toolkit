@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.ToolForm
@@ -46,6 +51,7 @@ import com.ayang.giftoolkit.task.runTask
 import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
+import com.ayang.giftoolkit.ui.IconSizes
 import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.PreviewStage
@@ -53,6 +59,7 @@ import com.ayang.giftoolkit.ui.PrimaryActionBar
 import com.ayang.giftoolkit.ui.SliderRow
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.Tool
+import com.ayang.giftoolkit.ui.pageColor
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -150,7 +157,7 @@ fun ToolScreen(
                                 Icon(
                                     imageVector = MiuixIcons.Glass.Light.Clear,
                                     contentDescription = "清除",
-                                    modifier = Modifier.size(19.dp),
+                                    modifier = Modifier.size(IconSizes.Inline),
                                 )
                             }
                         }
@@ -262,7 +269,11 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
             }
 
             Tool.GIF_EDIT -> {
-                SliderRow("旋转", "${form.rotate.toInt()}°", form.rotate, 0f..270f, steps = 3) {
+                // steps 是**中间档位数**（`basic/Slider.kt`），不是总档位：
+                // 0..270 配 steps = 3 会得到 0/67.5/135/202.5/270 五档，而下游是
+                // `postRotate(rotate)` 直接转浮点角 —— 67.5° 会把画面斜切、四角露出空区。
+                // steps = 2 才是 0/90/180/270 四档。
+                SliderRow("旋转", "${form.rotate.toInt()}°", form.rotate, 0f..270f, steps = 2) {
                     form.rotate = it
                 }
                 // 这几行的标题已经把动作说完了，副标题只复述同义词，直接去掉。
@@ -328,40 +339,67 @@ private val puzzleColsItems = listOf("2 列", "3 列", "4 列")
 /** 抠图颜色：固定几个常用色，比取色器更快。 */
 @Composable
 private fun ColorSwatches(form: ToolForm) {
-    val presets = listOf(0xFF00B441, 0xFF3482FF, 0xFFFFFFFF, 0xFF000000, 0xFFFF3B30)
+    // 色值 + 读屏用的名字。`contentDescription` 必须给：自绘色块没有文字，
+    // 不给的话 TalkBack 只会读出一个空标签（官方 `RadioButtonPreference` 的语义是
+    // `selectable(role = Role.RadioButton)` + 标题文字，这里按同一套语义补齐）。
+    val presets = listOf(
+        0xFF00B441 to "绿色",
+        0xFF3482FF to "蓝色",
+        0xFFFFFFFF to "白色",
+        0xFF000000 to "黑色",
+        0xFFFF3B30 to "红色",
+    )
     // 触觉反馈：这是本项目唯一自绘的"选择"控件，官方对应物是 RadioButtonPreference /
     // RadioButton —— 它们在选中项变化时调用 `HapticFeedbackType.ToggleOn`
     // （miuix-preference `RadioButtonPreference.kt:131`、miuix-ui `RadioButton.kt:101`）。
     // 点已经选中的颜色不发生状态变化，按迁移指南"无状态变化不加反馈"的规矩直接跳过。
     val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            // 12 + 28 + 12 = 52dp：补到官方 56dp 最小行高（`Component.kt` 的 BasicComponent）。
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("抠图颜色", style = MiuixTheme.textStyles.body1, modifier = Modifier.weight(1f))
-        presets.forEach { value ->
+        // 标题与同卡其它行同一档（`BasicComponent` 的 title 用 headline1，`Component.kt:92`）。
+        Text("抠图颜色", style = MiuixTheme.textStyles.headline1, modifier = Modifier.weight(1f))
+        presets.forEach { (value, name) ->
             val selected = form.keyColor == value.toInt()
+            // **固定 28dp 槽位**：之前选中时 24→28dp，整行会跟着变宽、右侧色块一起位移。
             Box(
                 modifier = Modifier
-                    .size(if (selected) 28.dp else 24.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
-                    .background(Color(value))
-                    .border(
-                        width = if (selected) 2.dp else 1.dp,
-                        color = if (selected) MiuixTheme.colorScheme.primary
-                        else MiuixTheme.colorScheme.outline,
-                        shape = CircleShape,
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = {
+                            if (!selected) {
+                                hapticFeedback.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
+                                )
+                                form.keyColor = value.toInt()
+                            }
+                        },
                     )
-                    .clickable {
-                        if (form.keyColor != value.toInt()) {
-                            hapticFeedback.performHapticFeedback(
-                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
-                            )
-                            form.keyColor = value.toInt()
-                        }
-                    },
-            )
+                    .semantics { contentDescription = name },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(Color(value))
+                        .border(
+                            width = if (selected) 2.dp else 1.dp,
+                            color = if (selected) MiuixTheme.colorScheme.primary
+                            else MiuixTheme.colorScheme.outline,
+                            shape = CircleShape,
+                        ),
+                )
+            }
         }
     }
 }
@@ -401,7 +439,7 @@ private fun AnimatedPreview(frames: List<GifFrame>, speed: Float) {
             .fillMaxWidth()
             .aspectRatio(frame.bitmap.width.toFloat() / frame.bitmap.height.coerceAtLeast(1))
             .clip(RoundedCornerShape(12.dp))
-            .background(MiuixTheme.colorScheme.surface),
+            .background(pageColor()),
         contentAlignment = Alignment.Center,
     ) {
         Image(
