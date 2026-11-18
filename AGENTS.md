@@ -24,8 +24,9 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
 │   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
 │   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例，Apache-2.0）
+│   │                      + BgPalette：背景与「跟随背景」的前景共用一份配色
 │   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
-│   └── LicenseCatalog.kt 第三方组件清单
+│   └── LicenseCatalog.kt 许可清单：本项目 / 第三方组件 / NOTICE
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
 ├── task/TaskRunner.kt    任务分发 + 进度 + 预览取帧
 └── core/                 GifCodec / GifTasks / MediaTools / Stabilizer / ColorKey / MotionPhoto
@@ -103,11 +104,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    底栏是浮层、不占 Scaffold 槽位，高度由 `LocalBottomBarClearance` 单点下发（`App.kt` 算）。
    二级页（工具页 / 主题 / 关于 / 许可）要传 `reserveNavBar = false` —— 二级页根本不挂载底栏，
    再预留 100dp 会在列表末尾留一块空带。
+   **横向安全区也归它管**：左右 = `innerPadding.calculate{Left,Right}Padding + railInset()`。
+   `innerPadding` 的横向部分就是 `systemBars ∪ displayCutout`，横屏时挖孔落在起始边（本机 64dp）。
+   曾经只让 `railInset`、把这段丢掉，结果侧栏自己吃了安全区、内容没跟上，横屏下被压住 52dp
+   （`docs/os4-round9-audit.md` §1）。**不在 Scaffold 内容槽位里的控件**（底部主操作条、
+   关于页自己的列表）用 `rememberHorizontalSafeInsets()` 自己取，不要再写第三套算式。
 10. **图标只用官方 Glass 族，不自绘、不混 `extended`。**
     `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
     `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
     Glass 族是 **28dp 画布**（`buildHyperOSIcon` 里 `defaultWidth = 28.dp`），
     塞进 24dp 槽位会明显偏小；列表统一 26dp（`IconSizes.Row`）。
+    尺寸只有 `IconSizes` 一个出处：`Row` 26 / `Action` 28 / `Empty` 44 / `Media` 28（媒体区占位）。
     注意新版权重/命名变化：`Glass.Folder` / `Glass.Settings` 已改名成 `*Outline` / `*Fill`。
     顶栏返回键玻璃档用 `Glass.ChevronBackward`（28dp），非玻璃档才用 extended 的 `Back`（24dp），
     官方 `component/BackNavigationIcon.kt` 就是这么分的。
@@ -140,9 +147,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     内容让位由 `LocalRailInset`（**函数**，`() -> Dp`）下发：
     `{ (ExpandedWidth + Margin) * railState.progress }`。
     `progress` 是逐帧动画值，**不许在组合期解包**：`pageContentPadding` 在
-    `PaddingValues.calculate*Padding` 里读、`PrimaryActionBar` 走 `Modifier.railStartInset()`
+    `PaddingValues.calculate*Padding` 里读、`PrimaryActionBar` 与顶栏走 `Modifier.railStartInset()`
     在量测期读。写成 `val inset = LocalRailInset.current()` 再 `padding(start = ...)`，
     侧栏展开的每一帧都会重组整个页面并重排列表（迁移指南第 2 条红线）。
+    `railStartInset(base)` 的 `base` 是**起始边基准**（常规边距 + 安全区），它和 `railInset` 相加；
+    这个参数曾经被忽略过，后果是窄屏下底部主操作条左端贴屏幕边缘（R9 §2.2 #5）。
+    顶栏也要让位：玻璃档传 `contentModifier`（只挪前景，背景带仍满宽），非玻璃档挂 `modifier`。
     **录制层不许跟着收窄** —— 收窄会让 Rail 左半段没有像素可采，玻璃只剩一块平色。
     官方 `AppContent.kt:300-350` 也是"满宽录制 + 页面内边距让位"。
 14. **页面级弹层（Dialog / BottomSheet）走 `Os4ListPage` 的 `pageOverlay` 槽位，不要挂在页面外面。**
@@ -160,9 +170,19 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     - 它的 `rememberGlassScope(opaqueBase = false)` 不垫页面底色 —— 背后已经是整屏不透明渐变，
       垫了就把渐变盖掉。顶栏仍然采样正文录制层（兄弟节点），**不要**为了"让顶栏采到渐变"
       在页面根部再套一层 `layerBackdrop`：那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
-    - 标题用主题色实字，不用 `textureBlur` 的玻璃字；卡片用 `cardColor().copy(alpha = 0.82f)`，
-      不用 `textureBlur`。原因：该路径在模拟器 GPU 上**静默不产出像素**（官方 APK 同一页同样空白），
-      照抄的结果是"关于页没有应用名、没有卡片"。详见 `docs/os4-round8-audit.md` §6.3。
+    - 图标与软件名称跟随背景上色，**与背景共用同一个 `BgPalette`**（`rememberBgPalette()` 由页面建、
+      传给 `BgEffectBackground`）。参考实现（KernelSU `AboutMiuix.kt`、InstallerX `MiuixAboutPage.kt`）
+      用的是 `textureBlur(backdrop, contentBlendMode = DstIn)` 采样已渲染的背景；
+      该路径在本机 GPU 上静默不产出像素（官方示例 APK 的关于页因此没有标题和卡片），
+      所以这里走 `gradientFilled(brush)`：`drawContent()` + `drawRect(SrcIn)`，只依赖普通混合。
+      **不要再建第二套渐变/第二个动画** —— 相位会错开，变成"背景在变、字不变"。
+    - 标题用 `Color.White` 打底再由 `SrcIn` 换成渐变；图标用 `ic_app_mark`（纯白剪影）+ 底板。
+      `ic_app_badge` 的主体比 `ic_launcher_monochrome` 大一圈，两者**不能直接叠**。
+    - 卡片用 `cardColor().copy(alpha = 0.82f)`，不用 `textureBlur`。详见 `docs/os4-round8-audit.md` §6.3
+      与本轮 `docs/os4-round9-audit.md` §3。
+    - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
+      许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
+      不要再拆成两个 Route。
 
 ## 常见改动怎么下手
 
@@ -174,6 +194,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 改配色层次 | 只动 `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*` |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
 | 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |
+| 加一个第三方依赖 / 改许可 | `ui/LicenseCatalog.kt` 的 `thirdPartyLibraries` 补一行；正文放 `assets/licenses/`。不要新开 Route，`licenseEntries` 的下标就是 `Route.License(index)` |
 
 ## 文案与对外内容
 

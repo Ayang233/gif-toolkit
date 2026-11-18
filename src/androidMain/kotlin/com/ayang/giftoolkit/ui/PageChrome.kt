@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -115,19 +116,29 @@ fun pageContentPadding(
     // 侧栏让位宽度是**逐帧变化**的值，所以这里拿到函数后不立即求值：
     // 交给 `PaddingValues.calculate*Padding`（LazyColumn 在量测期调用），
     // 侧栏展开动画期间只重新测量、不重组整个页面。
+    //
+    // **起始/结束边的系统安全区必须一起算进来。** Scaffold 的 `innerPadding` 横向部分
+    // = `systemBars ∪ displayCutout`，横屏时挖孔会落在起始边（本机 128px = 64dp）。
+    // 侧栏自己是吃这段安全区的（`GlassNavigationRail` 内部 `windowInsetsPadding`），
+    // 内容以前只让 `railInset`，于是横屏下侧栏整体右移 64dp、内容没跟上 ——
+    // 面板右边界压在列表行图标上，这就是「1200dp 横屏侧栏遮挡一级页面内容」的根因。
+    // 竖屏时挖孔在顶部、横向安全区为 0，两个数字刚好相等，所以上一轮漏掉了这个场景。
     val railInset = LocalRailInset.current
+    val layoutDirection = LocalLayoutDirection.current
+    val safeStart = innerPadding.calculateLeftPadding(layoutDirection)
+    val safeEnd = innerPadding.calculateRightPadding(layoutDirection)
     val top = innerPadding.calculateTopPadding() + extraTop
     val bottom = maxOf(innerPadding.calculateBottomPadding(), clearance) + extraBottom
-    return remember(top, bottom, horizontal, railInset) {
+    return remember(top, bottom, horizontal, safeStart, safeEnd, railInset) {
         object : PaddingValues {
             override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp {
                 val extra = if (layoutDirection == LayoutDirection.Ltr) railInset() else 0.dp
-                return horizontal + extra
+                return horizontal + safeStart + extra
             }
 
             override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp {
                 val extra = if (layoutDirection == LayoutDirection.Rtl) railInset() else 0.dp
-                return horizontal + extra
+                return horizontal + safeEnd + extra
             }
 
             override fun calculateTopPadding(): Dp = top

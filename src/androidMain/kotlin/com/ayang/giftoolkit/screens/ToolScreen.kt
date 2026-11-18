@@ -166,7 +166,7 @@ fun ToolScreen(
         item {
             GroupHeader("预览")
             GroupCard {
-                Box(Modifier.padding(12.dp)) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     val still = form.stillPreview
                     if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
                         AnimatedPreview(form.preview, form.playSpeed)
@@ -377,7 +377,9 @@ private fun SubtitleField(form: ToolForm) {
         state = state,
         label = "字幕内容",
         useLabelAsPlaceholder = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        // 不再自己加横向内边距：TextField 自带 16dp（TextFieldDefaults.InsideMargin），
+        // 卡片 12dp + 16dp 正好和行标题的 28dp 对齐。再补 12dp 会右移一截。
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     )
 }
@@ -420,7 +422,7 @@ private fun ResultCard(
     onSaved: () -> Unit,
 ) {
     GroupCard {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
             if (mime == "image/gif" && previewFrames.isNotEmpty()) {
                 AnimatedPreview(previewFrames, 1f)
                 Spacer(Modifier.height(10.dp))

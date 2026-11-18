@@ -173,6 +173,14 @@ object IconSizes {
 
     /** 空态插画。 */
     val Empty: Dp = 44.dp
+
+    /**
+     * 媒体区 / 提示语里的内联图形（预览占位图标）。
+     *
+     * 与 [Empty] 分开：空态是"整页没有内容"的插画，视觉要重；这里是卡片里一块画布的占位，
+     * 超过 28dp 会把提示语挤到画布外面。
+     */
+    val Media: Dp = 28.dp
 }
 
 /**
@@ -260,12 +268,18 @@ fun SwitchRow(
     )
 }
 
-/** 说明段落。 */
+/**
+ * 说明段落。
+ *
+ * 左边距 28dp = 卡片外边距 12dp + `BasicComponentDefaults.InsideMargin` 16dp，
+ * 与卡片里的行标题落在同一条左边线上。之前是 16dp，比卡片正文左 12dp，
+ * 工具页「已生成 …」那行看着就像没对齐。
+ */
 @Composable
 fun NoteText(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = modifier.padding(horizontal = 28.dp, vertical = 10.dp),
         style = MiuixTheme.textStyles.footnote1,
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
     )
@@ -325,7 +339,7 @@ fun PreviewStage(
                     Icon(
                         imageVector = MiuixIcons.Glass.ImageOutline,
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(IconSizes.Media),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                     Text(
@@ -372,8 +386,16 @@ fun PrimaryActionBar(
     // 距离底部越近，水平方向的可用宽度越窄，贴边会被切掉一角。
     // 24dp 是官方 `bottomBar` 的下限（`maxOf(24.dp, insets + 8.dp)`），
     // 大圆角机型上 safeBottomGap 会算出比它更大的值。
+    //
+    // 系统安全区（横屏挖孔、侧边系统栏）也要算进来：这一层不在 Scaffold 的内容槽位里，
+    // 拿不到 `innerPadding`，必须自己取（`rememberHorizontalSafeInsets`）。之前完全没算，
+    // 于是横屏下按钮左端会压在挖孔/margin 上，右端又会顶到侧边系统栏。
+    val safeInsets = rememberHorizontalSafeInsets()
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val safeStart = safeInsets.calculateLeftPadding(layoutDirection)
+    val safeEnd = safeInsets.calculateRightPadding(layoutDirection)
     val bottomGap = maxOf(
-        safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + 4.dp),
+        safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + safeStart + 4.dp),
         24.dp,
     )
     Column(
@@ -381,9 +403,10 @@ fun PrimaryActionBar(
             .fillMaxWidth()
             .background(pageColor())
             .navigationBarsPadding()
-            .padding(end = sideGap, top = 20.dp)
+            .padding(end = sideGap + safeEnd, top = 20.dp)
             .padding(bottom = bottomGap)
-            .railStartInset(sideGap),
+            // base = 常规边距 + 起始边安全区；railStartInset 再加侧栏让位（量测期读）。
+            .railStartInset(sideGap + safeStart),
     ) {
         ActionButton(
             text = text,

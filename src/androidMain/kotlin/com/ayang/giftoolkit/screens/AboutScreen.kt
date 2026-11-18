@@ -1,6 +1,7 @@
 package com.ayang.giftoolkit.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,34 +21,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayang.giftoolkit.R
 import com.ayang.giftoolkit.ui.ContentBackdropBox
-import com.ayang.giftoolkit.ui.LeadingIcon
+import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.PageTopBar
 import com.ayang.giftoolkit.ui.bg.BgEffectBackground
+import com.ayang.giftoolkit.ui.bg.accentBrush
+import com.ayang.giftoolkit.ui.bg.gradientFilled
+import com.ayang.giftoolkit.ui.bg.rememberBgPalette
 import com.ayang.giftoolkit.ui.cardColor
 import com.ayang.giftoolkit.ui.pageScrollModifiers
 import com.ayang.giftoolkit.ui.rememberAppVersion
 import com.ayang.giftoolkit.ui.rememberGlassScope
+import com.ayang.giftoolkit.ui.rememberHorizontalSafeInsets
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.Link
-import top.yukonga.miuix.kmp.icon.glass.NotesOutline
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -58,31 +61,27 @@ private const val SOURCE_URL = "https://github.com/Ayang233/gif-toolkit"
 /**
  * 关于页。
  *
- * 版式照 MIUIX 官方示例的 `AboutPage`（0.9.5-beta01 / `3177a684`）：
- * 固定的动态渐变背景 + 大图标 + 大标题 + 版本号，滚动时整块淡出并缩小，
- * 让下面的卡片行浮上来；顶栏到滚动起来才浮出标题（官方 `expandable = false` + 标题透明度跟滚动）。
+ * 版式对齐 InstallerX Revived 的 Miuix 关于页（`MiuixAboutPage.kt`，26.11.caccb78）
+ * 与 MIUIX 官方示例 `AboutPage.kt`：整块 OS3 动态渐变 + 大图标 + 大标题 + 版本号，
+ * 滚动时这三块按不同斜率淡出并缩到 0.95；下面是一张「关于」卡片。
  *
- * 与官方有两处**有意的**差异，都是因为示例里那两种材质在本项目里没有等价物：
+ * 三处按参考应用固定的写法：
  *
- * 1. **大标题用实色字，不用 `textureBlur` 的"液态玻璃字"。**
- *    官方把标题做成一块 `textureBlur(backdrop, contentBlendMode = DstIn)` 的玻璃片，
- *    依赖 AGSL 逐像素混色。实测官方 APK（同一台模拟器）那一行**完全不产出像素**，
- *    整页看不到应用名（截图 `_archive/round8/off_about3.png`）。
- *    照抄进 GIF 助手等于在同类 GPU 上"关于页没有名字"，所以这里只用主题色实字，
- *    字号 / 字重 / 滚动淡出 / 缩放全部照官方。
- * 2. **卡片用半透明底色，不用 `textureBlur` 玻璃卡片。**
- *    同一个原因：官方那两张卡的底色是 `Color.Transparent` + `textureBlur`，
- *    在该模拟器上卡片彻底消失（只剩几行浮着的文字）。这里用 `cardColor()` 压到 0.82 不透明度，
- *    背景渐变能透一点出来，观感接近玻璃卡，但不依赖着色器。
- *
- * 顶栏标题透明度：`(progress - 0.35) / 0.65`，与官方一致 —— 首屏顶栏只有返回键，
- * 内容滚起来之后标题才出现。这不是"标题丢了"，官方就是这样。
+ * 1. **入口行不带前置图标**：InstallerX 用的是 `ArrowPreference(title, summary)`（无 `startAction`），
+ *    描述写在副标题里（「在 GitHub 上查看源代码」）。这里照抄，不再塞 `Glass.Light.Link` 这类小图标。
+ * 2. **图标与软件名称跟随背景渐变**：参考实现是
+ *    `textureBlur(backdrop, colors = BlurColors(blendColors = …), contentBlendMode = DstIn)` ——
+ *    采样已渲染的背景、用混合色叠一层，再裁进字形。本机 GPU 上 `textureBlur` 静默不产出像素
+ *    （官方示例 APK 同一台模拟器上关于页干脆没有标题、没有卡片，见 `_archive/round8/off_about3.png`），
+ *    所以这里改用与背景**同一套色段**的渐变 + `SrcIn` 掩膜（`ui/bg` 的 `gradientFilled`）：
+ *    颜色与相位同源，不依赖 AGSL，任何 GPU 都有像素。
+ * 3. **只有一个许可入口**：本项目自身许可证与第三方组件许可合成一页（[LicensesScreen]），
+ *    关于页不再分「开源许可 / 第三方许可」两个入口。
  */
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
     onOpenLicenses: () -> Unit,
-    onOpenOwnLicense: () -> Unit,
 ) {
     val context = LocalContext.current
     // 录制层不垫页面底色：这一页的背景是整块渐变，垫了就把渐变盖住了（见 rememberPageBackdrop）。
@@ -95,6 +94,9 @@ fun AboutScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+    // 背景与"跟随背景"的图标/标题共用一份配色状态：一个色段、一套相位。
+    val palette = rememberBgPalette()
+    val markBrush = { palette.takeIf { it.gradientAvailable }?.accentBrush() }
 
     // 大标题区高度：先量再对齐，不写死 —— 字体缩放、横屏都会改变它。
     var headerHeightPx by remember { mutableIntStateOf(0) }
@@ -122,11 +124,12 @@ fun AboutScreen(
     Box(Modifier.fillMaxSize()) {
         BgEffectBackground(
             modifier = Modifier.fillMaxSize(),
+            palette = palette,
             alpha = { 1f - progressProvider() },
         ) {}
 
         Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            containerColor = Color.Transparent,
             contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
             topBar = {
                 PageTopBar(
@@ -137,35 +140,50 @@ fun AboutScreen(
                     onBack = onBack,
                     expandable = false,
                     titleAlpha = { ((progressProvider() - 0.35f) / 0.65f).coerceIn(0f, 1f) },
-
                 )
             },
         ) { innerPadding ->
             // 录制层照旧只包正文：顶栏是它的兄弟节点，采样它又不在它里面（AGENTS.md 第 1 条）。
             ContentBackdropBox(glass) {
+                // 这一页不用 Os4ListPage，横向安全区得自己取（横屏挖孔在起始边）。
+                val safeInsets = rememberHorizontalSafeInsets()
+                val layoutDirection = LocalLayoutDirection.current
+                val safeStart = safeInsets.calculateLeftPadding(layoutDirection)
+                val safeEnd = safeInsets.calculateRightPadding(layoutDirection)
                 val logoTopPadding = innerPadding.calculateTopPadding() + 40.dp
+                val listTop = innerPadding.calculateTopPadding() + 2.dp
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(start = safeStart, end = safeEnd)
                         .padding(top = logoTopPadding, bottom = 8.dp)
                         .onSizeChanged { headerHeightPx = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_app_badge),
-                        contentDescription = null,
+                    // 图标：底板 + 跟随背景色段的剪影（参考 KSU / InstallerX 的做法，见文件头）。
+                    Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(88.dp)
-                            // 官方是 88dp 图标 + 24dp 圆角；徽章本身已是白底圆角方块，
-                            // 这里只做连续曲率裁剪，不再叠一层白底 Box。
+                            // 官方是 88dp 图标 + 24dp 圆角；这里用连续曲率裁剪，和卡片圆角同一套观感。
                             .squircleClip(24.dp)
+                            .background(cardColor().copy(alpha = 0.72f))
                             .graphicsLayer {
                                 val p = ((progressProvider() - 0.35f) / 0.15f).coerceIn(0f, 1f)
                                 alpha = 1f - p
                                 scaleX = 1f - p * 0.05f
                                 scaleY = 1f - p * 0.05f
                             },
-                    )
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_app_mark),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(88.dp)
+                                .gradientFilled(markBrush),
+                        )
+                    }
                     Text(
                         text = "GIF 助手",
                         modifier = Modifier
@@ -175,8 +193,10 @@ fun AboutScreen(
                                 alpha = 1f - p
                                 scaleX = 1f - p * 0.05f
                                 scaleY = 1f - p * 0.05f
-                            },
-                        color = MiuixTheme.colorScheme.onBackground,
+                            }
+                            // 渐变填充靠字形 alpha：颜色本身会被 SrcIn 替换掉，这里给实白即可。
+                            .gradientFilled(markBrush),
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 35.sp,
                     )
@@ -196,13 +216,14 @@ fun AboutScreen(
                 }
 
                 // 列表盖在标题区之上，首项是一块透明占位，把卡片推到标题区下面。
-                val listTop = innerPadding.calculateTopPadding() + 2.dp
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .pageScrollModifiers(scrollBehavior),
                     contentPadding = PaddingValues(
+                        start = safeStart,
+                        end = safeEnd,
                         top = listTop,
                         bottom = maxOf(innerPadding.calculateBottomPadding(), LocalBottomBarClearance.current) + 32.dp,
                     ),
@@ -211,18 +232,14 @@ fun AboutScreen(
                         // 标题区高度 + 标题区比列表多出来的顶部留白，再给 20dp 呼吸。
                         Spacer(Modifier.height(headerHeight + (logoTopPadding - listTop) + 20.dp))
                     }
-                    item(key = "app") {
+                    item(key = "about") {
+                        GroupHeader("关于")
                         AboutCard {
+                            // 入口不带前置图标、描述写在副标题里 —— 与 InstallerX 的
+                            // `MiuixNavigationItemWidget`（内部就是 ArrowPreference）一致。
                             ArrowPreference(
                                 title = "查看源代码",
-                                endActions = {
-                                    Text(
-                                        text = "GitHub",
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                    )
-                                },
-                                startAction = { LeadingIcon(MiuixIcons.Glass.Light.Link) },
+                                summary = "在 GitHub 上查看源代码",
                                 onClick = {
                                     runCatching {
                                         context.startActivity(
@@ -234,24 +251,9 @@ fun AboutScreen(
                                     }
                                 },
                             )
-                        }
-                    }
-                    item(key = "license") {
-                        AboutCard(topPadding = 12.dp) {
                             ArrowPreference(
                                 title = "开源许可",
-                                endActions = {
-                                    Text(
-                                        text = "GPL-3.0",
-                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                    )
-                                },
-                                onClick = onOpenOwnLicense,
-                            )
-                            ArrowPreference(
-                                title = "第三方许可",
-                                startAction = { LeadingIcon(MiuixIcons.Glass.Light.NotesOutline) },
+                                summary = "本应用自身许可证与所用第三方开源库的许可条款",
                                 onClick = onOpenLicenses,
                             )
                         }
@@ -270,13 +272,12 @@ fun AboutScreen(
  */
 @Composable
 private fun AboutCard(
-    topPadding: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .padding(horizontal = 12.dp)
-            .padding(top = topPadding),
+            .padding(bottom = 12.dp),
         colors = CardDefaults.defaultColors(color = cardColor().copy(alpha = 0.82f)),
     ) {
         content()

@@ -2,8 +2,15 @@ package com.ayang.giftoolkit.ui
 
 import android.os.Build
 import android.view.RoundedCorner
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -12,6 +19,21 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
+
+/**
+ * 横向系统安全区（挖孔、侧边系统栏），与页面 Scaffold 的 `contentWindowInsets` 同一套来源：
+ * `systemBars ∪ displayCutout`。
+ *
+ * 横屏时挖孔落在起始边（本机 128px = 64dp）。Scaffold 的 `innerPadding` 已经带了这段，
+ * 但**不在 Scaffold 内容槽位里**的控件（底部主操作条、页面根部自绘列表）拿不到 `innerPadding`，
+ * 只能自己取一次。抽出来是为了让全项目对"横向安全区"只有一个定义。
+ */
+@Composable
+fun rememberHorizontalSafeInsets(): PaddingValues =
+    WindowInsets.systemBars
+        .union(WindowInsets.displayCutout)
+        .only(WindowInsetsSides.Horizontal)
+        .asPaddingValues()
 
 /**
  * 设备屏幕底部圆角半径。

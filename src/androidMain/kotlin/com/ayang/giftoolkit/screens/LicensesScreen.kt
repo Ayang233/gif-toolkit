@@ -8,17 +8,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.ui.GroupCard
-import com.ayang.giftoolkit.ui.LeadingIcon
+import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.Os4ListPage
+import com.ayang.giftoolkit.ui.licenseEntries
+import com.ayang.giftoolkit.ui.licenseGroups
 import com.ayang.giftoolkit.ui.rememberGlassScope
-import com.ayang.giftoolkit.ui.thirdPartyLibraries
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.File
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 第三方组件列表。整页只有一种许可（Apache-2.0），点进去看正文。 */
+/**
+ * 开源许可（统一入口）。
+ *
+ * 关于页只有这一个许可入口：本项目自身的 GPL-3.0 与第三方依赖的 Apache-2.0 在同一页按分组列出，
+ * 点任意一行进 [LicenseTextScreen] 看正文。上一轮是「开源许可 / 第三方许可」两个入口、
+ * 两个页面，内容还各占一处；合并后路由也只剩 `Route.Licenses` + `Route.License(index)`。
+ *
+ * 入口行不带前置图标：与关于页同样的排版（InstallerX Revived 的 `MiuixNavigationItemWidget`
+ * 就是 `ArrowPreference(title, summary)`，无 `startAction`）。
+ */
 @Composable
 fun LicensesScreen(
     onBack: () -> Unit,
@@ -28,34 +36,46 @@ fun LicensesScreen(
     Os4ListPage(
         title = "开源许可",
         glass = glass,
-        subtitle = "共 ${thirdPartyLibraries.size} 个组件",
+        subtitle = "GPL-3.0 · ${licenseEntries.size} 项许可与声明",
         onBack = onBack,
         reserveNavBar = false,
     ) {
-        // 只有一个分组，不需要再顶一个"第三方组件"分组标题 —— 那是给多分组页面用的。
-        // 顶部间距由卡片的 top padding 补，和 GroupHeader 的视觉留白接近。
-        item {
-            GroupCard(modifier = Modifier.padding(top = 8.dp)) {
-                thirdPartyLibraries.forEachIndexed { index, entry ->
-                    ArrowPreference(
-                        title = entry.name,
-                        summary = "${entry.owner} · ${entry.license}",
-                        startAction = { LeadingIcon(MiuixIcons.Glass.Light.File) },
-                        onClick = { onOpen(index) },
-                    )
+        // 分组下标要落到扁平清单上，才能直接当 Route.License 的参数用。
+        var index = 0
+        licenseGroups.forEach { group ->
+            val start = index
+            index += group.entries.size
+            item(key = "h_${group.title}") { GroupHeader(group.title) }
+            item(key = "c_${group.title}") {
+                GroupCard {
+                    group.entries.forEachIndexed { offset, entry ->
+                        ArrowPreference(
+                            title = entry.name,
+                            summary = "${entry.owner} · ${entry.license}",
+                            onClick = { onOpen(start + offset) },
+                        )
+                    }
                 }
             }
+        }
+        item(key = "note") {
+            Text(
+                text = "第三方组件按各自的原始许可分发，其许可不因本工程的整体许可而改变。",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp),
+            )
         }
     }
 }
 
-/** 第三方组件清单里某一项的许可正文。 */
+/** 许可清单里某一项的许可正文。 */
 @Composable
 fun LicenseDetailScreen(
     index: Int,
     onBack: () -> Unit,
 ) {
-    val entry = thirdPartyLibraries.getOrNull(index)
+    val entry = licenseEntries.getOrNull(index)
     LicenseTextScreen(
         asset = entry?.asset.orEmpty(),
         title = entry?.name ?: "开源许可",
@@ -67,9 +87,7 @@ fun LicenseDetailScreen(
 /**
  * 许可正文。文本来自 assets，不是硬编码在代码里。
  *
- * 从 [LicenseDetailScreen] 拆出来的原因：关于页多了一行「开源许可」，
- * 正文是本项目自己的 GPL-3.0，不在第三方清单里。两处共用这一个阅读页，
- * 传 asset 即可，不必再复制一遍正文渲染。
+ * 本项目许可证、第三方许可证、NOTICE 共用这一个阅读页，传 asset 即可。
  */
 @Composable
 fun LicenseTextScreen(
@@ -98,7 +116,8 @@ fun LicenseTextScreen(
         subtitle = license,
         onBack = onBack,
         extraBottom = 24.dp,
-        horizontalPadding = 16.dp,
+        // 与其它页面的正文同一条左边线：卡片外边距 12dp + 行内边距 16dp = 28dp。
+        horizontalPadding = 28.dp,
         reserveNavBar = false,
     ) {
         item {

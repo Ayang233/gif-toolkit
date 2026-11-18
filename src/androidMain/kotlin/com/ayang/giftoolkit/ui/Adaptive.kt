@@ -51,22 +51,28 @@ val LocalWideLayout = compositionLocalOf { false }
 val LocalRailInset = androidx.compose.runtime.staticCompositionLocalOf<() -> Dp> { { 0.dp } }
 
 /**
- * 按当前侧栏让位宽度给左边（RTL 为右边）加内边距，**在量测期读取**。
+ * 按「起始边基准内边距 + 当前侧栏让位宽度」把内容推到起始边，**在量测期读取**。
  *
  * `Modifier.padding()` 只接受立即值，写 `padding(start = sideGap + LocalRailInset)` 就等于
  * 在组合期解包逐帧值。这里用 `layout` 把读取挪到量测期，行为不变、重组消失。
+ *
+ * **`base` 必须真的用上。** 之前这个参数被忽略，只让了侧栏宽度：于是窄屏（railInset = 0）
+ * 时底部主操作条左端直接贴到屏幕边缘，右边却有 12dp —— 一张截图就能看出来的不对称。
+ *
+ * 起始边的系统安全区（横屏挖孔、侧边系统栏）由调用方并进 `base`：
+ * 这里只负责"让位 = 基准 + 侧栏"，不替调用方猜安全区，避免和 `pageContentPadding`
+ * 里的 `innerPadding` 重复计算。
  */
 @Composable
-fun Modifier.railStartInset(base: Dp): Modifier {
+fun Modifier.railStartInset(base: Dp = 0.dp): Modifier {
     val railInset = LocalRailInset.current
     val density = LocalDensity.current
-    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
     return this.layout { measurable, constraints ->
-        val extra = with(density) { railInset().roundToPx() }.coerceAtLeast(0)
-        val startPx = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) extra else 0
+        val extra = with(density) { (base + railInset()).roundToPx() }.coerceAtLeast(0)
         val placeable = measurable.measure(constraints.offset(horizontal = -extra))
         layout(placeable.width + extra, placeable.height) {
-            placeable.placeRelative(startPx, 0)
+            // placeRelative 自带 RTL 镜像：RTL 下 extra 就是贴在右边（起始边），不用分支。
+            placeable.placeRelative(extra, 0)
         }
     }
 }

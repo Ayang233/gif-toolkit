@@ -34,7 +34,6 @@ import com.ayang.giftoolkit.screens.AboutScreen
 import com.ayang.giftoolkit.screens.HomeScreen
 import com.ayang.giftoolkit.screens.LibraryScreen
 import com.ayang.giftoolkit.screens.LicenseDetailScreen
-import com.ayang.giftoolkit.screens.LicenseTextScreen
 import com.ayang.giftoolkit.screens.LicensesScreen
 import com.ayang.giftoolkit.screens.SettingsScreen
 import com.ayang.giftoolkit.screens.ThemeScreen
@@ -348,7 +347,6 @@ fun GifApp() {
                             AboutScreen(
                                 onBack = pop,
                                 onOpenLicenses = { stack.add(Route.Licenses) },
-                                onOpenOwnLicense = { stack.add(Route.OwnLicense) },
                             )
                         }
                         entry<Route.Licenses> {
@@ -359,14 +357,6 @@ fun GifApp() {
                         }
                         entry<Route.License> { route ->
                             LicenseDetailScreen(index = route.index, onBack = pop)
-                        }
-                        entry<Route.OwnLicense> {
-                            LicenseTextScreen(
-                                asset = "licenses/gpl-3.0.txt",
-                                title = "GNU 通用公共许可协议",
-                                license = "GPL-3.0",
-                                onBack = pop,
-                            )
                         }
                     }
 

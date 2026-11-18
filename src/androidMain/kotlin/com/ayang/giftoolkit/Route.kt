@@ -3,12 +3,14 @@ package com.ayang.giftoolkit
 import top.yukonga.miuix.kmp.nav.core.NavKey
 
 /**
- * 五个目的地：根页面（内含三个 tab）、工具页、主题设置、关于页、开源许可（列表 / 全文）。
+ * 目的地：根页面（内含三个 tab）、工具页、主题设置、关于页、开源许可（统一入口 + 正文）。
  *
  * 主题设置是独立页：设置页只留一行入口，和 KernelSU / InstallerX 的组织方式一致。
  *
- * 关于页与许可是 2.1 新增：设置里不再把「版本 / 隐私 / 导出位置」摊在同一页，
- * 而是收成一行入口，点进去才是独立的关于页（参考 KernelSU 的做法）。
+ * **许可只有一个入口**：`Licenses` 一页里按「本项目 / 第三方组件 / 归属」分组，
+ * `License(index)` 的 index 是 `ui/LicenseCatalog.kt` 里扁平清单的下标。
+ * 上一轮那个只承载 GPL-3.0 的 `OwnLicense` 已合并进来，不再保留 ——
+ * 两个入口、两个页面、内容各占一处，用户要多点一次才能看全。
  *
  * 没有用 `@Serializable` + rememberNavBackStack：进程死亡后的栈恢复留到后续版本。
  */
@@ -17,9 +19,10 @@ sealed interface Route : NavKey {
     data class Tool(val id: String) : Route
     data object Theme : Route
     data object About : Route
-    data object Licenses : Route
-    data class License(val index: Int) : Route
 
-    /** 本项目自己的许可证正文（GPL-3.0），与第三方清单分开。 */
-    data object OwnLicense : Route
+    /** 统一的许可列表：本项目许可证 + 第三方组件 + NOTICE。 */
+    data object Licenses : Route
+
+    /** 许可正文，index 指向 `licenseEntries`。 */
+    data class License(val index: Int) : Route
 }

@@ -207,6 +207,12 @@ fun PageTopBar(
     // 宽屏折叠态：标题让位给顶部胶囊（官方 LocalTopAppBarTitleAlpha 同款机制）。
     // 关于页传自己的实现（跟滚动进度走），其余页面用默认。
     val effectiveTitleAlpha = titleAlpha ?: LocalTopBarTitleAlpha.current
+    // 宽屏展开态：顶栏内容也要跟页面内容一起让位，标题才会居中在「卡片所在的那块区域」里。
+    // 官方 `GlassPage.kt:334` 给 `contentModifier` 挂 `appPageTopBarInsets()` 就是这件事。
+    // 玻璃档只挪前景、不挪背景带（`contentModifier` 的语义），状态栏下那层模糊仍然满宽；
+    // 非玻璃档没有 contentModifier，只能整个条一起挪。
+    // 量测期读取（railStartInset 内部 layout），侧栏展开动画期间不重组。
+    val contentInset: Modifier = Modifier.railStartInset()
     if (glass.enabled) {
         // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
         //
@@ -228,6 +234,7 @@ fun PageTopBar(
             expandable = expandable,
             progressiveBlur = true,
             backdrop = glass.contentBackdrop,
+            contentModifier = contentInset,
             largeTitle = largeTitle,
             subtitle = subtitle,
             scrollBehavior = scrollBehavior,
@@ -248,6 +255,7 @@ fun PageTopBar(
     } else {
         TopAppBar(
             title = title,
+            modifier = contentInset,
             expandable = expandable,
             largeTitle = largeTitle,
             largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = effectiveTitleAlpha()),
