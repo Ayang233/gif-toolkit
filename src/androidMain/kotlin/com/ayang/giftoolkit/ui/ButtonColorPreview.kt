@@ -108,7 +108,7 @@ fun ButtonColorPreviewScreen(onBack: () -> Unit) {
                         "${scheme.trackRole} + ${scheme.contentRole}",
                 )
                 GroupCard {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                         Text(
                             text = "${hex(scheme.track)} / ${hex(scheme.content)} · 对比度 ${contrast(scheme)}",
                             style = MiuixTheme.textStyles.footnote1,

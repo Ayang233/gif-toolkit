@@ -174,7 +174,9 @@ fun ToolScreen(
         item {
             GroupHeader("预览")
             GroupCard {
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                // 官方自定义内容放 Card 里时用 `insideMargin = PaddingValues(16.dp)`；
+                // 这里等价：水平 16 与行标题对齐，垂直也取 16（原来是 12，比官方紧一档）。
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
                     val still = form.stillPreview
                     if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
                         AnimatedPreview(form.preview, form.playSpeed)
@@ -197,6 +199,15 @@ fun ToolScreen(
         item {
             GroupHeader("参数")
             GroupCard { ParamPanel(tool, form) }
+        }
+
+        // 字幕输入**不能**塞进上面那张卡片：MIUIX 的 `TextField` 自己就是一张卡
+        // （外层 12dp 边距 + 16dp 圆角 + `secondaryContainer` 底色 + 16dp 内边距），
+        // 套进 Card 就成了两层圆角贴在一起、还紧贴卡片边缘 —— 这是"比例不像 OS4"的来源。
+        // 官方示例 `component/TextFieldSection.kt` 就是独立摆放：
+        // `Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)`。
+        if (tool == Tool.GIF_EDIT) {
+            item(key = "subtitle") { SubtitleField(form) }
         }
 
         if (form.message.isNotBlank()) {
@@ -293,7 +304,6 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
                         onSelect = { form.mosaicPos = it },
                     )
                 }
-                SubtitleField(form)
             }
 
             Tool.GIF_COMPRESS -> {
@@ -400,7 +410,18 @@ private fun ColorSwatches(form: ToolForm) {
     )
 }
 
-/** 字幕输入：Miuix TextField + TextFieldState，失焦不丢内容。 */
+/**
+ * 字幕输入：Miuix `TextField` + `TextFieldState`，失焦不丢内容。
+ *
+ * 摆法照官方 `component/TextFieldSection.kt`：TextField **独立**占一条，
+ * `padding(horizontal = 12.dp).padding(bottom = 12.dp)` —— 它自己就是一张卡
+ * （`TextFieldDefaults.CornerRadius` 16dp、`secondaryContainer` 底色、`InsideMargin` 16dp）。
+ *
+ * 早先它被塞进 `GroupCard` 里、只给 `vertical = 10.dp`：结果是两层圆角套在一起、
+ * 输入框紧贴卡片边缘、底部圆角还被卡片圆角截掉一截，和 OS4 的比例明显不同。
+ * 横向内边距也不要自己补 —— TextField 内部 `InsideMargin.width` 就是 16dp，
+ * 和卡片里行标题的 28dp（12 外边距 + 16 内边距）本来就对齐。
+ */
 @Composable
 private fun SubtitleField(form: ToolForm) {
     val state = remember { androidx.compose.foundation.text.input.TextFieldState(form.text) }
@@ -411,9 +432,7 @@ private fun SubtitleField(form: ToolForm) {
         state = state,
         label = "字幕内容",
         useLabelAsPlaceholder = true,
-        // 不再自己加横向内边距：TextField 自带 16dp（TextFieldDefaults.InsideMargin），
-        // 卡片 12dp + 16dp 正好和行标题的 28dp 对齐。再补 12dp 会右移一截。
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     )
 }
@@ -456,7 +475,7 @@ private fun ResultCard(
     onSaved: () -> Unit,
 ) {
     GroupCard {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
             if (mime == "image/gif" && previewFrames.isNotEmpty()) {
                 AnimatedPreview(previewFrames, 1f)
                 Spacer(Modifier.height(10.dp))
@@ -468,7 +487,8 @@ private fun ResultCard(
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 官方 `component/CardSection.kt:66` 的并排按钮组用 12dp
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onShared, modifier = Modifier.weight(1f)) { Text("分享") }
                 Button(onClick = onSaved, modifier = Modifier.weight(1f)) { Text("保存到相册") }
             }

@@ -370,15 +370,15 @@ fun SwitchRow(
 /**
  * 说明段落。
  *
- * 左边距 28dp = 卡片外边距 12dp + `BasicComponentDefaults.InsideMargin` 16dp，
- * 与卡片里的行标题落在同一条左边线上。之前是 16dp，比卡片正文左 12dp，
- * 工具页「已生成 …」那行看着就像没对齐。
+ * 左边距 28dp、上下 8dp，与官方 `SmallTitleDefaults.InsideMargin`（28dp, 8dp）同一套节奏 ——
+ * 28dp = 卡片外边距 12dp + `BasicComponentDefaults.InsideMargin` 16dp，
+ * 和分组标题、卡片里的行标题落在同一条左边线上（之前写 10dp，比分组标题松一档）。
  */
 @Composable
 fun NoteText(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        modifier = modifier.padding(horizontal = 28.dp, vertical = 10.dp),
+        modifier = modifier.padding(horizontal = 28.dp, vertical = 8.dp),
         style = MiuixTheme.textStyles.footnote1,
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
     )

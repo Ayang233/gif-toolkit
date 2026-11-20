@@ -249,6 +249,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加一项设置 | `SettingsStore` 加字段 → `AppState` 加代理属性（读写联动） → `SettingsScreen` / `ThemeScreen` 加行 |
 | 加一个页面 | `Route` 加 object → `App.kt` 的 NavDisplay 加 `entry<Route.X>` → `screens/` 新建文件（列表页直接套 `Os4ListPage`） |
 | 加整屏背景 / 固定大标题 | 用 `Os4ListPage` 的 `background` / `largeHeader` / `topBarBackdrop`，不要自建 Scaffold（见第 15 条） |
+| 加输入框 | `basic.TextField` **独立一条**，`padding(horizontal = 12.dp).padding(bottom = 12.dp)`；它自己就是一张卡（16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），**不要塞进 `GroupCard`**（两层圆角会套在一起、底部会被卡片圆角裁掉） |
 | 改配色层次 | 只动 `pageBaseColor()` / `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*`（分工见硬约束 2） |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
 | 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |

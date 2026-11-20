@@ -339,3 +339,62 @@ Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度�
 - 返回键那处**不是 BUG**，是 MIUIX 官方对「玻璃 / 非玻璃」两套顶栏的规定，且官方 example 就是两套图标。
 - 同一类问题里**确实存在**「该随页面底色走、却写死成 surface」的缺陷，已修（§8.3 问题 1）。
 - 其余分叉全部属于「材质 vs 填充回退」，由库统一提供，不需要也不应该在业务层抹平。
+
+---
+
+## 9. 追加：尺寸 / 间距 / 比例复核
+
+起因：GIF 编辑页的「字幕内容」输入框看着不像 OS4。查下来不是像素级微调，而是**容器套错了**。
+
+### 9.1 字幕输入框：MIUIX 的 TextField 自己就是一张卡
+
+`TextFieldDefaults`（`basic/TextField.kt:400-435`）：
+
+| 参数 | 值 |
+|---|---|
+| `CornerRadius` | 16 dp |
+| `InsideMargin` | 16 dp × 16 dp |
+| 底色 | `secondaryContainer`（**不是**卡片色） |
+
+官方示例 `component/TextFieldSection.kt` 把它**独立摆放**，外边距 `horizontal = 12.dp` +
+`bottom = 12.dp` —— 与 `Card` / `Button` 同一套外边距。
+
+我们原来把它塞进 `GroupCard` 里，只给了 `vertical = 10.dp`。后果三个：
+两层 16dp 圆角套在一起、输入框左右紧贴卡片边缘、底部圆角被卡片圆角截掉一截。
+这就是"比例不对"的来源。
+
+改法：从参数卡片里移出来，按官方摆法独立一条（`padding(horizontal = 12).padding(bottom = 12)`）。
+左右边距因此与卡片完全对齐，圆角、底色、内边距全部回到 `TextFieldDefaults` 的默认值。
+
+### 9.2 顺带对齐的三处
+
+| 位置 | 原来 | 改成 | 依据 |
+|---|---|---|---|
+| 卡片内自定义内容（预览区、结果卡、调试页） | `padding(16, 12)` | `padding(16, 16)` | 官方把自定义内容放进 Card 时用 `insideMargin = PaddingValues(16.dp)`（`BlurSection.kt:193`、`ColorPage.kt:108`） |
+| 说明段落 `NoteText` | `horizontal 28, vertical 10` | `28 / 8` | 与 `SmallTitleDefaults.InsideMargin`（28dp, 8dp）同一节奏 |
+| 结果卡并排按钮 | `spacedBy(10.dp)` | `spacedBy(12.dp)` | 官方并排按钮组用 12dp（`CardSection.kt:66`、`SnackbarSection.kt`） |
+
+### 9.3 逐项核对后确认无需改动的
+
+| 位置 | 我们的值 | 官方值 | 结论 |
+|---|---|---|---|
+| 卡片外边距 | `horizontal 12 / bottom 12` | 同 | 一致 |
+| 卡片圆角 | `CardDefaults.CornerRadius` 16dp | 同 | 一致 |
+| 分组标题 | `SmallTitle` 默认（28/8） | 同 | 一致 |
+| 行高 / 行内边距 / 图文间距 | 全部吃 Preference 默认（56dp / 16dp / 8dp） | 同 | 一致 |
+| 行首图标 | 28 dp | Glass 族 28dp 画布 | 一致 |
+| 玻璃底栏左右留白 | 24 dp | `AppContent.kt:796` 24dp | 一致 |
+| 顶栏左右内边距 | 吃 `GlassTopAppBarDefaults.HorizontalPadding` 12dp | 同 | 一致 |
+| 关于页图标下方标题 / 版本 | 12 / 5 dp | `AboutPage.kt:261-300` 同 | 一致 |
+| 预览舞台圆角 | 12 dp | 官方媒体缩略图 `squircleClip(12.dp)` | 一致 |
+| 弹层双按钮间距 | 12 dp | `GlassPage.kt:435` 12dp | 一致 |
+| 主操作条左右留白 | 12 dp（与卡片对齐） | 官方 demo 用 24 dp | **保留差异**：对齐卡片边缘，与系统设置页一致；官方 demo 是演示页留白 |
+| 关于页图标容器 / 主体 | 100 dp / 132 dp（裁切到 100） | 88 dp / 74 dp | **保留差异**：图标满容器是参考 KSU 的观感，属于产品选择，不在本轮改 |
+| 页面内容 `extraTop` | 2 dp | 0 | 保留：与「固定大标题」占位换算绑定，2dp 是可视呼吸量 |
+
+### 9.4 复验
+
+- 浅色 / 深色两种模式下字幕框都显示为独立卡：左右与卡片对齐、16dp 圆角、`secondaryContainer` 底色可见；
+  与上方参数卡间距 12dp、与底部主按钮不重叠。
+- `:assembleDebug` / `:assembleRelease` 通过；不涉及这三处的页面（首页 / 设置 / 主题 / 关于 / 许可）
+  与改动前逐像素比对 0.04%（只差状态栏时钟）。

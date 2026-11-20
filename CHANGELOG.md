@@ -22,6 +22,14 @@
   四角与其它 Miuix 按钮同为连续曲率，不再用 `Surface + RoundedCornerShape`。
 - 底栏占位高度补上 `captionBar`：与上游 `GlassNavigationBar` 的取值顺序一致（手机恒 0，自由窗口下才生效）。
 
+**调整**
+
+- 「字幕内容」输入框从参数卡片里移出来，按 MIUIX 官方摆法独立成一条（外边距 12dp）：
+  `TextField` 自己就是一张卡（16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），
+  塞进 `GroupCard` 会变成两层圆角套在一起、底部被卡片圆角截掉。
+- 卡片内自定义内容的垂直内边距 12dp → 16dp（官方 `Card(insideMargin = PaddingValues(16.dp))`）。
+- 说明段落上下留白 10dp → 8dp，与分组标题的 28/8 同一节奏；结果卡并排按钮间距 10dp → 12dp。
+
 **修复**
 
 - 「AMOLED 纯黑 + 动态取色 + 深色」下，关掉玻璃材质后顶栏是一条比页面亮 19/255 的实色带：
