@@ -46,7 +46,6 @@ import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -281,9 +280,11 @@ fun Os4ListPage(
             } else {
                 null
             },
-            // 自己铺背景的页面：收起前透明、收起后上实色，避免把渐变切出一块白条
+            // 自己铺背景的页面：收起前透明、收起后上实色，避免把渐变切出一块白条。
+            // 收起后的实色必须是 `pageBaseColor()`，不能用 `colorScheme.surface` ——
+            // AMOLED + 动态取色下两者不同值（#000000 vs #131316），顶栏会浮出一条比页面亮的带子。
             background = if (background != null) {
-                if (collapsed) MiuixTheme.colorScheme.surface else Color.Transparent
+                if (collapsed) pageBaseColor() else Color.Transparent
             } else {
                 null
             },

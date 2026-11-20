@@ -137,8 +137,8 @@ AGSL 可用。滚动后顶栏确实出现渐进模糊带，内容被糊开、边
 | Debug `:assembleDebug` | 通过（1 个告警：`MediaTools.kt` 里 `COLOR_FormatYUV420SemiPlanar` 是 Java 侧 deprecated 常量，历史遗留，与本轮无关） |
 | Release `:assembleRelease` | 通过（R8 + shrinkResources） |
 | 依赖树 | `releaseRuntimeClasspath` 全部 Compose 构件收敛到 `1.13.0rc01`，无 `FAILED` / 冲突；`top.yukonga.miuix.kmp:*` 全部被 composite build 的 project 替换（预期） |
-| 升级后 Debug | 47,865,117 B，`1.12 / 14`，SHA-256 `86689c0f…7d2c1` |
-| 升级后 Release | 3,409,711 B，`1.12 / 14`，SHA-256 `d05f6b55…3e7887` |
+| 升级后 Debug | 47,865,117 B，`1.12 / 14`，SHA-256 `b4265be9…58cd8` |
+| 升级后 Release | 3,409,711 B，`1.12 / 14`，SHA-256 `e5c861b1…43741` |
 | 升级前 Debug（对照） | 45,327,506 B（由 `b74a0e0` 重建），SHA-256 `e4d5ed04…e334ff` |
 | 升级前 Release（对照） | 3,360,963 B，SHA-256 `71cbec0a…e4839` |
 
@@ -254,3 +254,88 @@ OpenGL ES 转译层）上的绘制开销抬升，属于上游 RC 的已知风险
    （真机历史上出现过"内容不糊开、只被压暗"，那是 `isRuntimeShaderSupported()` 查不出来的东西，
    所以用户开关必须一直留着）。
 3. `unused` 告警：`MediaTools.kt` 的 deprecated 常量，与本轮无关，未动。
+
+---
+
+## 8. 追加：玻璃开关造成的「两套外观」核查
+
+起因是一张对照提问：**主题设置页左上角的返回键，玻璃开是细箭头 `<`、玻璃关是粗箭头 `←`** ——
+这是不是 native？
+
+### 8.1 返回键：是 MIUIX 官方设计，不是本项目造出来的
+
+官方 `example/shared/src/commonMain/kotlin/component/BackNavigationIcon.kt` 逐行如下：
+
+```kotlin
+val glassStyle = LocalAppState.current.topAppBarStyle == 1
+val button = if (glassStyle) GlassIconButton(...) else IconButton(...)
+button {
+    Icon(
+        modifier = Modifier.size(if (glassStyle) 28.dp else 24.dp),
+        imageVector = if (glassStyle) MiuixIcons.Glass.ChevronBackward else MiuixIcons.Back,
+        tint = if (glassStyle) colorScheme.onSurface else colorScheme.onBackground,
+    )
+}
+```
+
+也就是说**两档是两套图标，按官方规定就该不同**：
+
+| | 玻璃开 | 玻璃关 |
+|---|---|---|
+| 容器 | `GlassIconButton`（44dp，静止时材质 alpha = 0，滚动后才浮现玻璃胶囊） | `IconButton` |
+| 图标 | `MiuixIcons.Glass.ChevronBackward`（尖角、细线、无横杠） | `MiuixIcons.Back`（带横杠的箭头、粗一档） |
+| 尺寸 | 28 dp（Glass 族是 28dp 画布） | 24 dp |
+| 颜色 | `onSurface` | `onBackground` |
+
+本项目 `ui/GlassScope.kt` 的 `PageTopBar` 就是照这个写的，属于**设计如此**。
+另外「玻璃开、未滚动时返回键没有胶囊底」也是官方的：`GlassIconButton` 的材质层挂在
+`graphicsLayer { alpha = progress.value }` 上，静止态 progress = 0，滚动后才有玻璃。
+
+### 8.2 顺带把「开关会改变外观」的分叉全查了一遍
+
+| 位置 | 玻璃开 | 玻璃关 | 判定 |
+|---|---|---|---|
+| 顶栏 | `GlassTopAppBar`（渐进模糊带） | `TopAppBar`（实色条） | 官方两档组件，设计如此 |
+| 返回键 | 见 8.1 | 见 8.1 | 设计如此 |
+| 底栏 / 侧栏 | 玻璃材质 + 采样 | 库的填充回退（浮起胶囊 + 阴影） | 库的官方 fallback |
+| 下拉弹层 | 玻璃浮层 | 不透明白卡 + 勾选 | 库的官方 fallback |
+| BottomSheet / Dialog | 玻璃面板 | 不透明面板 | 库的官方 fallback |
+| 关于页卡片 | 透明卡 + `textureBlur` 采背景 | 不透明卡（`cardColor()`） | 设计如此（玻璃关了入口不能消失） |
+| 关于页图标 / 标题 | `textureBlur` + `DstIn` 跟随渐变着色 | 主题色实字 | 设计如此 |
+| 关于页顶栏 | 渐进模糊带 | 收起前透明、收起后实色 | 与官方 `AboutPage` 同款逻辑 |
+| 页面录制层 | `layerBackdrop` 挂载 | 不挂 | 设计如此（省 GPU） |
+| 滚动条 / 卡片 / 行 / 图标 | 不随开关变化 | 同 | 已核查 |
+
+### 8.3 查出并修掉的两处真问题
+
+**问题 1：非玻璃档顶栏底色不是页面底色。**
+
+`PageTopBar` 的非玻璃分支写的是 `color = background ?: MiuixTheme.colorScheme.surface`，
+而 `pageBaseColor()` 才是页面真正铺的那层。多数情况下两者同值，但
+**「AMOLED 纯黑 + 动态取色 + 深色」时不同**：页面被压成 `#000000`，`surface` 是 `#131316`。
+实测（1080×2400，滚动后取 x=8 的页面留白列）：
+
+| 组合 | 顶栏带 | 页面 | 差 |
+|---|---|---|---|
+| 静态深色 + AMOLED + 玻璃关 | (0,0,0) | (0,0,0) | 0 |
+| **Monet 深色 + AMOLED + 玻璃关** | **(19,19,22)** | **(0,0,0)** | **19/255，肉眼可见的亮带** |
+
+修法：非玻璃档改为 `color = background ?: pageBaseColor()`；关于页「收起后上实色」那处
+同样从 `colorScheme.surface` 改成 `pageBaseColor()`。修复后复测 = (0,0,0)，与页面完全一致。
+
+**问题 2：非玻璃档返回键的颜色没按官方给。**
+
+原来非玻璃分支没写 tint，吃的是顶栏 slot 里的 `LocalContentColor`（= 标题色 `onSurface`）；
+官方明确给 `onBackground`（比标题深一档）。已按官方补上。
+
+**顺带**：玻璃档的 band（遮挡带）画笔底色也从 `colorScheme.surface` 换成 `pageBaseColor()`。
+依据是 AGENTS 第 2 条「遮挡色只能用页面真实底色」（官方用 surface 是因为它没有 AMOLED 档，
+那边两者本来就同值）。**实测像素差异 ≤1/255**（静态深色 (6,6,6) → (6,6,6)，
+Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度主要来自玻璃材质自身的高光，
+不是画笔底色，所以这是**语义修正，不是视觉修复**。真正看得见的那条亮带是非玻璃档的实心条（问题 1）。
+
+### 8.4 结论
+
+- 返回键那处**不是 BUG**，是 MIUIX 官方对「玻璃 / 非玻璃」两套顶栏的规定，且官方 example 就是两套图标。
+- 同一类问题里**确实存在**「该随页面底色走、却写死成 surface」的缺陷，已修（§8.3 问题 1）。
+- 其余分叉全部属于「材质 vs 填充回退」，由库统一提供，不需要也不应该在业务层抹平。

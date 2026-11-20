@@ -22,6 +22,14 @@
   四角与其它 Miuix 按钮同为连续曲率，不再用 `Surface + RoundedCornerShape`。
 - 底栏占位高度补上 `captionBar`：与上游 `GlassNavigationBar` 的取值顺序一致（手机恒 0，自由窗口下才生效）。
 
+**修复**
+
+- 「AMOLED 纯黑 + 动态取色 + 深色」下，关掉玻璃材质后顶栏是一条比页面亮 19/255 的实色带：
+  非玻璃档的顶栏底色写的是 `colorScheme.surface`（#131316），而 AMOLED 会把页面压成纯黑。
+  现在顶栏（含关于页收起后上实色的那一档）统一走 `pageBaseColor()`。
+- 非玻璃档的返回键颜色没按官方给：官方 `BackNavigationIcon.kt` 是玻璃 `onSurface` / 非玻璃
+  `onBackground`，我们非玻璃那档漏了 tint，吃成了标题色。
+
 **已知**
 
 - Compose 1.13.0-rc01 在本机 GPU 模拟器上把绘制侧帧耗时抬高约 1ms：janky 帧 4% → 9%，

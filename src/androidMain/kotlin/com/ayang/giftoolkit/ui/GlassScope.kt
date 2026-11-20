@@ -226,7 +226,16 @@ fun PageTopBar(
                 GlassIconButton(onClick = onBack) { glassIcon() }
             } else {
                 IconButton(onClick = onBack) {
-                    Icon(MiuixIcons.Back, "返回", Modifier.size(24.dp))
+                    // 非玻璃档的图标色也要显式给：官方 `BackNavigationIcon.kt` 两档各给一个
+                    // （玻璃 onSurface / 非玻璃 onBackground），不吃 LocalContentColor ——
+                    // 顶栏 slot 里的 LocalContentColor 是标题色（onSurface），
+                    // 不写就会和标题同色，而不是官方那个"比标题深一档"的图标色。
+                    Icon(
+                        imageVector = MiuixIcons.Back,
+                        contentDescription = "返回",
+                        modifier = Modifier.size(24.dp),
+                        tint = MiuixTheme.colorScheme.onBackground,
+                    )
                 }
             }
         } else {
@@ -258,8 +267,12 @@ fun PageTopBar(
         // 那时库会落回这条分支，参数不对就会露出生硬的矩形边。
         // 官方 `AdaptiveTopAppBar`（`PageUtils.kt:249-273`）也是这么传的：bandBrush 用 remember
         // 保持身份、bandOverhang 显式取默认常量 —— 这两行不是我们的自定义，是和官方同一个写法。
-        val surfaceColor = MiuixTheme.colorScheme.surface
-        val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
+        // 带画笔的底色用**页面真实底色**，不是 `colorScheme.surface`。
+        // 官方用 surface 是因为它没有 AMOLED 档（那边 surface 就等于页面底色）；
+        // 本项目 AMOLED + 深色会把页面压成纯黑，而 surface 仍是 #131316 / #000000，
+        // 用 surface 画出来的带子在纯黑页面上会显出一条比页面亮的色带（AGENTS 第 2 条）。
+        val bandColor = pageBaseColor()
+        val bandBrush = remember(bandColor) { GlassTopAppBarDefaults.bandBrush(bandColor) }
         GlassTopAppBar(
             title = title,
             isContentScrolled = isScrolled,
@@ -298,7 +311,10 @@ fun PageTopBar(
         TopAppBar(
             title = title,
             modifier = contentInset,
-            color = background ?: MiuixTheme.colorScheme.surface,
+            // 非玻璃档的底色同样只用 `pageBaseColor()`：这里以前写的是 `colorScheme.surface`，
+            // 在「AMOLED + 动态取色 + 深色」下 surface(#131316) 与页面(#000000) 不同值，
+            // 滚动后顶栏就是一条比页面亮 19/255 的实色带（实测见 docs/os4-round12-audit.md §8）。
+            color = background ?: pageBaseColor(),
             expandable = expandable,
             largeTitle = largeTitle,
             largeTitleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = effectiveTitleAlpha()),
