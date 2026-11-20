@@ -398,3 +398,63 @@ Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度�
   与上方参数卡间距 12dp、与底部主按钮不重叠。
 - `:assembleDebug` / `:assembleRelease` 通过；不涉及这三处的页面（首页 / 设置 / 主题 / 关于 / 许可）
   与改动前逐像素比对 0.04%（只差状态栏时钟）。
+
+---
+
+## 10. 追加：输入法行为 + Release APK 安装失败
+
+### 10.1 输入框不跟随键盘（真 bug）
+
+**现场**：点「字幕内容」→ 键盘弹出，但列表纹丝不动，输入框被键盘整个盖住。
+
+**根因**（两层）：
+
+1. **IME insets 没人消费。** 清单是 `windowSoftInputMode="adjustResize"`，但 Activity 开了
+   `enableEdgeToEdge()` —— edge-to-edge 下窗口不再真的缩小，IME 高度只以 `WindowInsets.ime`
+   的形式报给应用，必须自己 `imePadding()`。全项目 grep `imePadding` / `WindowInsets.ime` **零命中**，
+   所以键盘浮在内容上面，页面一点没动。
+   官方示例是给 Scaffold 挂 `Modifier.imePadding()`（`ComponentPage.kt:148`、`AppContent.kt:655/703`），
+   现在 `Os4ListPage` 的两个 Scaffold 分支都照这个挂上了。
+
+2. **`LazyColumn` 不会把获得焦点的输入框滚进可视区。** 挂上 `imePadding()` 之后整页确实缩上去了
+   （底部主操作条也一起抬起），但输入框在列表**最后一项**，可视区变矮之后正好落到键盘下面，
+   列表自己不滚。试过的两条路：
+   - `bringIntoViewRequester` + `onFocusChanged`：**不管用**。输入框被顶出可视区后列表项会被回收，
+     requester 随节点失效；而且 IME 是动画变高的，只在获得焦点的那一帧请求一次，
+     滚到的是"旧可视区"算出来的位置。
+   - 现在：`Os4ListPage` 通过 `LocalPageListState` 把列表状态下发，`SubtitleField` 在
+     「获得焦点」和「IME 每一帧 insets 变化」时都 `scrollToItem(最后一项)`。
+     用瞬时的 `scrollToItem` 而不是 `animateScrollToItem`：IME 动画期间 effect 会被重启多次，
+     每帧重开一段滚动动画会和键盘动画互相打架。
+
+**顺带修掉一个丢字问题**：`TextFieldState` 原来建在 LazyColumn 的 item 里，
+`remember { TextFieldState(form.text) }` 会在 item 被回收后重建 —— 刚敲进去、还没同步回
+`form.text` 的那几个字就没了（实测能复现"输入后关键盘变空"）。现在状态提到 `ToolScreen` 页面级，
+`remember(tool.id)`，同步 `form.text` 的 `snapshotFlow` 也一并提到页面级。
+
+**验证**：点输入框 → 整页抬起、列表滚到末尾、输入框带焦点框停在键盘正上方 → 输入 `xyz` 正常 →
+按返回收起键盘 → 页面恢复、文字保留 → 滚走再滚回来 → 文字仍在。
+
+### 10.2 Release APK 装不上（上传方式错了，不是构建问题）
+
+**现场**：从 Releases 下 1.12 的 APK，安装失败。
+
+**根因**：这轮推送时 `git push` 被网络挡了，改用 GitHub REST API；上传资产时我用的是手搓的
+`multipart/form-data`。**GitHub 没有解析这个 multipart，把整个包体（含边界串和分段头）当成资产内容存了下来**。
+证据：下载回来的文件开头是 `----wb<hex>`，而不是 APK 的 `PK\x03\x04`；大小比本地多 346 字节。
+
+```text
+本地 release APK : 3,409,711 B  sha256 89c36a79…  head PK\x03\x04
+线上的（坏的）    : 3,410,057 B                 head ----wb…
+```
+
+**修法**：删掉重建，改成**二进制直传**（`Content-Type: application/vnd.android.package-archive`，
+body 就是 APK 原始字节），不再自己拼 multipart。修完复验：
+
+```text
+下载回来            : 3,409,711 B  sha256 89c36a79…
+`adb install`        : Success（versionName 1.12 / versionCode 14）
+```
+
+**顺带核对历史版本**：v1.11 的资产开头是 `PK`、大小与 SHA 与本地发布包完全一致 —— 只有我这次手搓的
+1.12 资产坏了；v1.11 用的是 gh CLI 上传，没有这个问题。

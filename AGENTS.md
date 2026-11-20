@@ -310,10 +310,19 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。
    `scripts/setup-miuix.sh` 会把这两件事都做掉。
-3. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed` / `Empty reply from server`，
+3. **带输入框的页面不要再自己加 `imePadding()`**：`Os4ListPage` 的 Scaffold 已经挂了
+   （官方 `ComponentPage.kt:148` 同款），edge-to-edge 下 `adjustResize` 不会缩窗口。
+   页面内的输入框若在列表末尾，还要保证获得焦点后能把列表滚到底 —— 见 `ToolScreen.SubtitleField`
+   （从 `LocalPageListState` 取列表状态，焦点 + IME insets 变化时 `scrollToItem(最后一项)`）。
+   `TextFieldState` 必须建在**页面级**，不要建在 LazyColumn 的 item 里：item 被回收后
+   `remember` 会重建，刚输入还没同步回表单的内容会丢。
+4. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed` / `Empty reply from server`，
    而 `api.github.com` 仍然可用（`gh api` 能通）。必要时走 REST API 推送：
    对每个待推提交，用 `git show <sha>:<path>` 取内容 → `POST /git/blobs`（base64）→
    `POST /git/trees`（`base_tree` = 远端当前 tree）→ `POST /git/commits`（parent = 远端当前 head）→
    最后 `PATCH /git/refs/heads/main`。**远端与本地 commit SHA 会不同源**（tree 相同、SHA 不同），
    网络恢复后本地要先 `git fetch` 再 `git reset --hard origin/main` 才不会撞 non-fast-forward。
    1.6 的发布就是这么推的：本地 `b055db7` ↔ 远端 `a43e6029`。
+   **走 API 上传 Release 资产时必须二进制直传**（`Content-Type: application/vnd.android.package-archive`，
+   body 就是 APK 字节）。手搓 `multipart/form-data` 会被 GitHub 原样存成资产（开头是边界串 `----wb…`
+   而不是 `PK`），下载下来根本装不上。上传完**必须下载回来比一次 SHA**。

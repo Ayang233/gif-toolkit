@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
@@ -57,6 +59,16 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
  * 单点下发 —— 高度公式一变（比如以后调胶囊高度），也只改一处。
  */
 val LocalBottomBarClearance = compositionLocalOf { 0.dp }
+
+/**
+ * 当前页面的列表状态，交给页面内的控件主动滚动用（目前只有"输入框获得焦点"这一处）。
+ *
+ * 为什么需要：页面挂了 `Modifier.imePadding()`，键盘弹出时整页会缩上去，但
+ * `LazyColumn` 不会自己把获得焦点的输入框滚进可视区 —— 输入框在列表末尾时就被键盘顶出去了。
+ * 页内控件拿不到 `rememberLazyListState()`（它在骨架里），所以用 CompositionLocal 下发；
+ * 不需要滚动的页面不用理会它。
+ */
+val LocalPageListState = androidx.compose.runtime.compositionLocalOf<androidx.compose.foundation.lazy.LazyListState?> { null }
 
 /**
  * 底栏占位高度。
@@ -302,53 +314,56 @@ fun Os4ListPage(
         }
 
         ContentBackdropBox(glass) {
-            Box(Modifier.fillMaxSize()) {
-                if (largeHeader != null) {
-                    // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = padding.calculateLeftPadding(layoutDirection),
-                                end = padding.calculateRightPadding(layoutDirection),
-                                top = headerPadTop,
-                            )
-                            .onSizeChanged { headerHeightPx = it.height },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        largeHeader(headerProgress)
-                    }
-                }
-                val contentPadding = pageContentPadding(
-                    innerPadding = padding,
-                    extraBottom = extraBottom,
-                    horizontal = horizontalPadding,
-                    reserveNavBar = reserveNavBar,
-                )
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pageScrollModifiers(scrollBehavior),
-                    // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
-                    contentPadding = contentPadding,
-                ) {
+            // 页面内控件（输入框）需要主动滚动时，从 CompositionLocal 取这份状态。
+            CompositionLocalProvider(LocalPageListState provides listState) {
+                Box(Modifier.fillMaxSize()) {
                     if (largeHeader != null) {
-                        item(key = "logoSpacer") {
-                            // 头部内容高度 + 头部比列表多出来的顶部留白（40dp 相对 2dp）+ 呼吸
-                            Spacer(Modifier.height(headerHeight + (headerPadTop - listTop) + 20.dp))
+                        // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = padding.calculateLeftPadding(layoutDirection),
+                                    end = padding.calculateRightPadding(layoutDirection),
+                                    top = headerPadTop,
+                                )
+                                .onSizeChanged { headerHeightPx = it.height },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            largeHeader(headerProgress)
                         }
                     }
-                    content()
+                    val contentPadding = pageContentPadding(
+                        innerPadding = padding,
+                        extraBottom = extraBottom,
+                        horizontal = horizontalPadding,
+                        reserveNavBar = reserveNavBar,
+                    )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pageScrollModifiers(scrollBehavior),
+                        // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
+                        contentPadding = contentPadding,
+                    ) {
+                        if (largeHeader != null) {
+                            item(key = "logoSpacer") {
+                                // 头部内容高度 + 头部比列表多出来的顶部留白（40dp 相对 2dp）+ 呼吸
+                                Spacer(Modifier.height(headerHeight + (headerPadTop - listTop) + 20.dp))
+                            }
+                        }
+                        content()
+                    }
+                    // 官方 example 的每个列表页都挂 `VerticalScrollBar`（`MainPage.kt:341-346` 等）：
+                    // 轨道 padding 用同一份 `contentPadding`，顶栏折叠交给 `topAppBarScrollBehavior`。
+                    VerticalScrollBar(
+                        adapter = rememberScrollBarAdapter(listState),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                        trackPadding = contentPadding,
+                        topAppBarScrollBehavior = scrollBehavior,
+                    )
                 }
-                // 官方 example 的每个列表页都挂 `VerticalScrollBar`（`MainPage.kt:341-346` 等）：
-                // 轨道 padding 用同一份 `contentPadding`，顶栏折叠交给 `topAppBarScrollBehavior`。
-                VerticalScrollBar(
-                    adapter = rememberScrollBarAdapter(listState),
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                    trackPadding = contentPadding,
-                    topAppBarScrollBehavior = scrollBehavior,
-                )
             }
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
@@ -366,6 +381,10 @@ fun Os4ListPage(
         Box(Modifier.fillMaxSize()) {
             background(headerProgress)
             Scaffold(
+                // 键盘弹出时整页（含底部主操作条）一起抬起来。edge-to-edge 下
+                // `windowSoftInputMode="adjustResize"` 不会真的缩窗口，IME insets 必须自己消费，
+                // 官方示例也是给 Scaffold 挂 `Modifier.imePadding()`（`ComponentPage.kt:148`）。
+                modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
                 topBar = topBar,
                 bottomBar = bottomBar,
@@ -374,6 +393,8 @@ fun Os4ListPage(
         }
     } else {
         Scaffold(
+            // 同上：键盘弹出时整页抬起，输入框跟着输入法上移。
+            modifier = Modifier.imePadding(),
             // 页面底色显式写出来，不依赖 Scaffold 的默认值（默认是 `surface`，现在与它同值）。
             // 必须与 `rememberPageBackdrop` 垫的那一层、底部主操作条的遮挡色是**同一个**
             // `pageBaseColor()`：三处只要有一处走偏，玻璃/操作条就会在页面上留一块色差方块。

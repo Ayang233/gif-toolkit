@@ -31,6 +31,11 @@
 - 说明段落上下留白 10dp → 8dp，与分组标题的 28/8 同一节奏；结果卡并排按钮间距 10dp → 12dp。
 
 **修复**
+- 「字幕内容」输入框弹出键盘时不跟随上移：edge-to-edge 下 IME insets 没人消费
+  （页面骨架补 `Modifier.imePadding()`），且 LazyColumn 不会把焦点项滚进可视区
+  （获得焦点 / IME insets 变化时滚到列表末尾）。同一处还把 `TextFieldState` 提到页面级，
+  避免列表项回收时把刚输入的文字丢掉。
+
 
 - 「AMOLED 纯黑 + 动态取色 + 深色」下，关掉玻璃材质后顶栏是一条比页面亮 19/255 的实色带：
   非玻璃档的顶栏底色写的是 `colorScheme.surface`（#131316），而 AMOLED 会把页面压成纯黑。

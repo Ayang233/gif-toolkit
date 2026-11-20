@@ -7,6 +7,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -31,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +58,7 @@ import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.IconSizes
+import com.ayang.giftoolkit.ui.LocalPageListState
 import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.PreviewStage
@@ -98,6 +105,18 @@ fun ToolScreen(
             form.uris = uris
             form.result = null
             form.message = ""
+        }
+    }
+
+    // 字幕输入的 TextFieldState 放在**页面级**，不能放在 LazyColumn 的 item 里：
+    // item 滚出可视区会被回收，`remember` 跟着丢，重新组合时又要从 `form.text` 重建 ——
+    // 刚敲进去还没同步回 `form.text` 的那几个字就没了（实测能复现"输入后关键盘变空"）。
+    val subtitleState = remember(tool.id) {
+        if (tool == Tool.GIF_EDIT) androidx.compose.foundation.text.input.TextFieldState(form.text) else null
+    }
+    if (subtitleState != null) {
+        LaunchedEffect(subtitleState) {
+            snapshotFlow { subtitleState.text.toString() }.collect { form.text = it }
         }
     }
 
@@ -206,8 +225,8 @@ fun ToolScreen(
         // 套进 Card 就成了两层圆角贴在一起、还紧贴卡片边缘 —— 这是"比例不像 OS4"的来源。
         // 官方示例 `component/TextFieldSection.kt` 就是独立摆放：
         // `Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)`。
-        if (tool == Tool.GIF_EDIT) {
-            item(key = "subtitle") { SubtitleField(form) }
+        if (subtitleState != null && tool == Tool.GIF_EDIT) {
+            item(key = "subtitle") { SubtitleField(state = subtitleState) }
         }
 
         if (form.message.isNotBlank()) {
@@ -423,16 +442,35 @@ private fun ColorSwatches(form: ToolForm) {
  * 和卡片里行标题的 28dp（12 外边距 + 16 内边距）本来就对齐。
  */
 @Composable
-private fun SubtitleField(form: ToolForm) {
-    val state = remember { androidx.compose.foundation.text.input.TextFieldState(form.text) }
-    LaunchedEffect(state) {
-        snapshotFlow { state.text.toString() }.collect { form.text = it }
+private fun SubtitleField(state: androidx.compose.foundation.text.input.TextFieldState) {
+    // 键盘弹出时把输入框滚进可视区。
+    //
+    // 页面挂了 `Modifier.imePadding()`（`Os4ListPage`），键盘一弹整页会缩上去；
+    // 但 `LazyColumn` 不会自己把获得焦点的输入框滚进来 —— 这个输入框在列表末尾，
+    // 缩完之后正好落到键盘下面。
+    //
+    // 所以：拿到焦点的瞬间 + IME 每一帧 insets 变化时，都把列表滚到末尾（输入框是最后一项）。
+    // 不能只用 `bringIntoViewRequester`：输入框被顶出可视区后列表项会被回收，
+    // requester 随之失效；而且 IME 是动画变高的，只请求一次会停在动画中途的位置。
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val listState = LocalPageListState.current
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(focused, imeBottom, listState) {
+        if (!focused || listState == null) return@LaunchedEffect
+        val last = listState.layoutInfo.totalItemsCount - 1
+        if (last < 0) return@LaunchedEffect
+        withFrameNanos { }
+        // 用 scrollToItem（瞬时）而不是 animateScrollToItem：IME 动画期间这个 effect 会被重启多次，
+        // 每次重启都重开一段动画会和键盘动画互相打架。
+        listState.scrollToItem(last)
     }
     TextField(
         state = state,
         label = "字幕内容",
         useLabelAsPlaceholder = true,
         modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+        interactionSource = interactionSource,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     )
 }
