@@ -4,7 +4,7 @@ plugins {
     id("com.android.application") version "9.5.1"
     id("org.jetbrains.kotlin.multiplatform") version "2.4.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
-    id("org.jetbrains.compose") version "1.12.2"
+    id("org.jetbrains.compose") version "1.13.0-rc01"
 }
 
 kotlin {
@@ -16,9 +16,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("org.jetbrains.compose.runtime:runtime:1.12.2")
-            implementation("org.jetbrains.compose.foundation:foundation:1.12.2")
-            implementation("org.jetbrains.compose.ui:ui:1.12.2")
+            implementation("org.jetbrains.compose.runtime:runtime:1.13.0-rc01")
+            implementation("org.jetbrains.compose.foundation:foundation:1.13.0-rc01")
+            implementation("org.jetbrains.compose.ui:ui:1.13.0-rc01")
             implementation("androidx.navigationevent:navigationevent-compose:1.2.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.13.0")
 
@@ -52,7 +52,7 @@ android {
     namespace = "com.ayang.giftoolkit"
     // Miuix 0.9.5-beta01 起把自身编译目标提到 SDK 37.2，
     // 下游必须同档编译，否则 AGP 在配置期直接拒绝（"requires compile against 37.2 or later"）。
-    // 基线提交跟进到 5ff41ba9 后这条要求未变。
+    // 基线提交跟进到 f3829d3d（v0.9.5-beta02 + 3 个 main 提交）后这条要求未变。
     // 这里只影响编译期可用 API，targetSdk 仍是 36，不改运行时行为。
     compileSdk {
         version = release(37) {
@@ -65,8 +65,8 @@ android {
         // 33：miuix-blur 的下限，也是 OS4 玻璃（RuntimeShader）能正常工作且不降级的起点
         minSdk = 33
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.11"
+        versionCode = 14
+        versionName = "1.12"
     }
 
     buildTypes {

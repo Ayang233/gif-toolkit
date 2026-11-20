@@ -245,8 +245,9 @@ fun PageTopBar(
     if (glass.enabled) {
         // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
         //
-        // `GlassTopAppBar` 内部（GlassTopAppBar.kt:392-458）是二选一：
-        //   progressiveBlur && backdrop != null → 走 progressiveTextureBlur（AGSL 运行时着色器）
+        // `GlassTopAppBar` 内部（`GlassTopAppBar.kt:404-480`，f3829d3d）是二选一：
+        //   progressiveBlur && backdrop != null → 走 progressiveTextureBlur（AGSL 运行时着色器，
+        //                                          由 maskProgress 驱动，0.9.5-beta02 起带 2x bridge）
         //   否则                                → 走 bandBrush 渐变（零 AGSL）
         // 而 `bandBrush` 的类型决定了走哪条绘制路径：传 `TopAppBarBandBrush`（bandBrush() 的返回值）
         // 时库会用 `TopAppBarFadeBrush`，渐变高度 = bandOverhang + 12dp，尾部是 17 段平滑衰减，
@@ -255,6 +256,8 @@ fun PageTopBar(
         // 所以哪怕当前走了 progressive 分支，也要把 bandBrush / bandOverhang 备好：
         // AGSL 在个别 GPU 上编译失败是**静默**的（图层不产出内容，不抛异常），
         // 那时库会落回这条分支，参数不对就会露出生硬的矩形边。
+        // 官方 `AdaptiveTopAppBar`（`PageUtils.kt:249-273`）也是这么传的：bandBrush 用 remember
+        // 保持身份、bandOverhang 显式取默认常量 —— 这两行不是我们的自定义，是和官方同一个写法。
         val surfaceColor = MiuixTheme.colorScheme.surface
         val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
         GlassTopAppBar(
@@ -264,6 +267,9 @@ fun PageTopBar(
             // 渐进模糊（AGSL）走库自己的能力判断：`GlassTopAppBar` 内部用
             // `isRuntimeShaderSupported()` 决定要不要用 progressiveTextureBlur，
             // 不支持时自动落回 bandBrush 渐变带（两条都是同一个组件的官方绘制路径）。
+            // 默认开启，与官方 example 的 `appState.enableBlur = true` 同义 ——
+            // 0.9.5-beta02 的性能优化就是冲着这条管线来的（2x bridge / 着色器特化 /
+            // cascade[0] 复用 / NoiseDither 折进最终 pass）。
             // 这里**不再**自己判断渲染器 —— 之前用 `Build.HARDWARE` 里的 ranchu/goldfish
             // 当"软件渲染"判据，结果 `-gpu host` 的硬件加速模拟器也被误判，
             // 连真机级的模糊都被关掉了。

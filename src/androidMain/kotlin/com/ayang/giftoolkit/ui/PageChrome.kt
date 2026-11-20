@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,7 +21,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -75,10 +76,20 @@ val LocalBottomBarClearance = compositionLocalOf { 0.dp }
  */
 @Composable
 fun rememberBottomBarClearance(): Dp {
-    val navInset = WindowInsets.navigationBars
-        .only(WindowInsetsSides.Bottom)
-        .asPaddingValues()
-        .calculateBottomPadding()
+    // 与上游 `GlassNavigationBar.kt:309-324`（f3829d3d）逐字一致的取值顺序：
+    // 底部安全区 = max(navigationBars, captionBar)，再套那三档。
+    // 手机上没有 captionBar（恒 0），但自由窗口 / 桌面模式下它非 0，
+    // 只取 navigationBars 会少让一截，内容末尾会被底栏压住。
+    val navInset = maxOf(
+        WindowInsets.navigationBars
+            .only(WindowInsetsSides.Bottom)
+            .asPaddingValues()
+            .calculateBottomPadding(),
+        WindowInsets.captionBar
+            .only(WindowInsetsSides.Bottom)
+            .asPaddingValues()
+            .calculateBottomPadding(),
+    )
     val floatingMargin = when {
         navInset <= 16.dp -> 20.dp
         navInset >= 28.dp -> navInset
@@ -233,7 +244,11 @@ fun Os4ListPage(
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
-    val isScrolled by remember { derivedStateOf { listState.canScrollBackward } }
+    // `computedStateOf`（Compose 1.13 新 API，MIUIX 0.9.5-beta02 全面改用）：
+    // 每次读重新计算、不缓存结果，但仍然只在结果变化时让组合失效 —— 正好适合这种廉价判据，
+    // 省掉派生状态的缓存簿记与失效写回。官方 `MainPage.kt:104` / `AboutPage.kt:93` /
+    // `ComponentPage.kt:144` 的 `isScrolled` 就是这一行。
+    val isScrolled by remember { computedStateOf { listState.canScrollBackward } }
 
     // 头部高度：首帧用 300dp 兜底（与官方 `AboutPage.kt` 的 logoHeightDp 初值一致）。
     // 用 0 会让透明占位高度为 0 —— 首帧卡片压住图标/标题，且滚动进度恒为 0（判据 > 0 不成立）。
@@ -247,7 +262,7 @@ fun Os4ListPage(
             else -> 0f
         }
     }
-    val collapsed by remember { derivedStateOf { headerProgress() == 1f } }
+    val collapsed by remember { computedStateOf { headerProgress() == 1f } }
 
     val topBar: @Composable () -> Unit = {
         PageTopBar(

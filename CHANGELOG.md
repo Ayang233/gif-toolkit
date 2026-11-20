@@ -2,6 +2,32 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.12 — 2026-11-20
+
+**升级**
+
+- Miuix 基线从 `5ff41ba9` 升到 `f3829d3d`：`5ff41ba9` → `66248bac`（`v0.9.5-beta02`，已发布 Maven Central）
+  为 11 个提交，再加其后 3 个 main 提交。差异与结论见 `docs/os4-round12-audit.md`。
+- Compose Multiplatform 1.12.2 → 1.13.0-rc01（0.9.5-beta02 的硬性要求），Gradle wrapper 9.9.1 → 9.9.2。
+- 渐进模糊按官方新版管线默认开启（顶栏与底栏都是）：库内部换成 2x bridge / 着色器特化 /
+  `cascade[0]` 复用 / `NoiseDither` 折进最终 pass，调用方不需要改参数。
+
+**调整**
+
+- 玻璃能力判断只留库的 `isRuntimeShaderSupported()`：原先叠的 `isRenderEffectSupported()`
+  在 `minSdk 33` 下恒为 true，属于多余的兼容代码。
+- `derivedStateOf` → Compose 1.13 的 `computedStateOf`（滚动判据与关于页头部收起判据），
+  与官方 `MainPage.kt` / `AboutPage.kt` 的写法一致。
+- 主操作按钮的容器换成官方 `Button` 的那一套（`squircleSurface` + `clickable`），
+  四角与其它 Miuix 按钮同为连续曲率，不再用 `Surface + RoundedCornerShape`。
+- 底栏占位高度补上 `captionBar`：与上游 `GlassNavigationBar` 的取值顺序一致（手机恒 0，自由窗口下才生效）。
+
+**已知**
+
+- Compose 1.13.0-rc01 在本机 GPU 模拟器上把绘制侧帧耗时抬高约 1ms：janky 帧 4% → 9%，
+  分位数（p50 / p99）不变。对照构建已确认与 Miuix 基线和本项目代码无关，属上游 RC 现象，
+  见 `docs/os4-round12-audit.md` §5。
+
 ## 1.11 — 2026-11-20
 
 **升级**

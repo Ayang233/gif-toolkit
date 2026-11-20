@@ -15,11 +15,15 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 5ff41ba9 = 当前基线（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）。
-# 升级记录见 docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md。
+# 上游 f3829d3d = 当前基线（2026-11-20，`perf: improve sidebar performance (#489)`）。
+# 对应发布版 v0.9.5-beta02（66248bac，已推送 Maven Central），源码基线取其后 3 个 main 提交：
+#   b31c60f2 显式 isContentScrolled 下的过滚驱动修复（我们正走这条路径）
+#   c16dfa12 仅 example
+#   f3829d3d NavDisplay 布局尺寸延迟读取 / TabRow 量测期测量 / Rail 密度变化居中
+# 本轮升级记录见 docs/os4-round12-audit.md。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="5ff41ba9"
+PINNED_REF="f3829d3d"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

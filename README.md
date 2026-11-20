@@ -6,7 +6,7 @@
 界面基于 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）重写，
 支持静态配色与 Monet 动态取色两套主题、明暗双模式，以及 OS4 玻璃质感的浮动底栏。
 
-**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上，当前 1.11）
+**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上，当前 1.12）
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
@@ -44,7 +44,7 @@
 
 ## 技术栈
 
-- Kotlin Multiplatform（单模块，`androidMain` 承载全部实现）+ Compose Multiplatform 1.12.2
+- Kotlin Multiplatform（单模块，`androidMain` 承载全部实现）+ Compose Multiplatform 1.13.0-rc01
 - [Miuix](https://github.com/compose-miuix-ui/miuix) 提供全部 UI 组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`）
 - AGP 9.5.1 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
 - GIF 编解码为纯 Kotlin 实现，视频取帧与 MP4 编码使用系统 `MediaMetadataRetriever` / `MediaCodec`

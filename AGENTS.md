@@ -25,7 +25,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
 │   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例，Apache-2.0）
 │   │                      + BgEffectBackground 的 bgModifier：给关于页的 textureBlur 挂录制层
-│   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0）
+│   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0；容器形状走官方 Button 的 squircleSurface + clickable）
 │   └── LicenseCatalog.kt 许可清单：本项目 / 第三方组件 / NOTICE
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
 ├── task/TaskRunner.kt    任务分发 + 进度 + 预览取帧
@@ -87,10 +87,13 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    旧结论「Monet 会把 `surface`/`surfaceContainer` 压成同一个值」在 `3177a684` 上**已不成立**
    （第十轮四套配色实测都不同值），所以页面直接用 `surface` 不会和卡片糊在一起。
 3. **玻璃只有一个决策点：`ui/GlassSupport.kt` 的 `LocalGlassEnabled`。**
-   页面里不许再出现 `isRenderEffectSupported()` 之类的判断 —— 一度 `App.kt`、`GlassScope`、
-   `Widgets.kt` 各判各的，就出过「顶栏玻璃、底栏实心」的割裂。
-   **另外：Miuix 的 `isRenderEffectSupported()` 只是 `SDK_INT >= 31`**，
-   它查不出某台 GPU 上模糊会不会翻车（真机上出现过「内容不糊开、只被压暗」），
+   页面里不许再出现 `isRenderEffectSupported()` / `isRuntimeShaderSupported()` 之类的判断 ——
+   一度 `App.kt`、`GlassScope`、`Widgets.kt` 各判各的，就出过「顶栏玻璃、底栏实心」的割裂。
+   **`isGlassSupported()` 现在只调库的 `isRuntimeShaderSupported()`**（`SDK_INT >= 33`）——
+   这正是官方 example 的判断点（`LicensePage.kt:53`、`PageUtils.kt` 的 `rememberBlurBackdrop()`）。
+   以前还叠了一个 `isRenderEffectSupported()`（`SDK_INT >= 31`），在 `minSdk 33` 下恒为 true，
+   0.9.5-beta02 那轮已删掉。
+   **注意它查不出某台 GPU 上模糊会不会翻车**（真机上出现过「内容不糊开、只被压暗」），
    所以"关掉玻璃"这个开关必须一直留给用户。
 4. **弹层的 `backdrop` 用 `pageOverlay` 传进来的那个（= `LocalRootBackdrop ?: 页面正文录制层`），
    不要用卡片局部层，也不要用 `null` 一躲了事。**
@@ -177,6 +180,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     顶栏也要让位：玻璃档传 `contentModifier`（只挪前景，背景带仍满宽），非玻璃档挂 `modifier`。
     **录制层不许跟着收窄** —— 收窄会让 Rail 左半段没有像素可采，玻璃只剩一块平色。
     官方 `AppContent.kt:300-350` 也是"满宽录制 + 页面内边距让位"。
+   **`derivedStateOf` 换成 `computedStateOf`（Compose 1.13 新增）。**
+   官方 0.9.5-beta02 已把 `GlassTopAppBar`、`AboutPage`、`MainPage` 等处的
+   `derivedStateOf` 全部换掉，本项目跟随（`ui/PageChrome.kt` 两处）。
+   两者语义差别只有一条：`computedStateOf` **每次读都重新计算、不缓存**，
+   但**仍然只在计算结果变化时才让组合失效**；`derivedStateOf` 会缓存结果，
+   适合"计算本身很贵、同一趟组合里被读很多次"的场景。
+   所以像 `canScrollBackward`、`progress == 1f` 这种廉价判据用 `computedStateOf`，
+   省掉缓存簿记与失效写回；昂贵的多重读取仍用 `derivedStateOf`。
+   无论哪个，**逐帧变化的值（`railState.progress`）都不能在组合期解包** ——
+   这条和下面的让位规则是同一个原因。
+
 14. **页面级弹层（Dialog / BottomSheet）走 `Os4ListPage` 的 `pageOverlay` 槽位，不要挂在页面外面。**
     槽位在页面 Scaffold **内部**、`ContentBackdropBox` **外部**：拿得到宿主，又不会被录进页面录制层。
     槽位参数是**弹层采样源**，`Os4ListPage` 已经按 `LocalRootBackdrop ?: 页面录制层` 选好了（第 1 条），
@@ -220,8 +234,8 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       此时 `textureBlur` / AGSL 渐进模糊与真机一致，图标、标题会真的跟随背景渐变。
       早先用 `-gpu swiftshader_indirect` 时 `textureBlur` 不产出像素，一度在代码里加了
       "软件渲染器就跳过模糊"的判据 —— 那条判据把 `-gpu host` 也误判掉，导致图标/标题退化成纯色、
-      顶栏关掉渐进模糊，**已删除**。能力判断一律交给库（`isRenderEffectSupported()` /
-      `isRuntimeShaderSupported()`），不要在业务代码里猜渲染器。
+      顶栏关掉渐进模糊，**已删除**。能力判断一律交给库（`isRuntimeShaderSupported()`），
+      不要在业务代码里猜渲染器。
     - 图标**不带白底/底板**，只有单色剪影。第九轮那块 `cardColor(alpha = 0.72f)` 底板已删除。
     - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
@@ -275,14 +289,19 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`5ff41ba9`**（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）。
-   上一次基线是 `3177a684`；34 个提交的逐项差异见
-   `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`，升级前定制面清单见
+1. 基线是 Miuix **`f3829d3d`**（2026-11-20，`perf: improve sidebar performance (#489)`），
+   对应发布版 **`v0.9.5-beta02`**（tag `66248bac`，已推 Maven Central）+ 其后 3 个 main 提交；
+   源码基线取后者，理由见 `docs/os4-round12-audit.md` §0.1。
+   **`v0.9.5-beta02` 强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
+   上上次基线是 `3177a684`（逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），
+   上一轮基线 `5ff41ba9`（见 `docs/os4-round11-audit.md`），升级前定制面清单见
    `docs/upgrade-prep-customization-inventory.md`。
    升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
    这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
    已经踩过的一次：`GlassNavigationBar` 的 `floatingMargin` 在 ≤16dp 档从 28dp 变成 20dp，
    `ui/PageChrome.kt` 的 `rememberBottomBarClearance()` 复刻了这条公式（必须同步，见该函数注释）。
+   这条公式的输入是 `maxOf(navigationBars, captionBar)`（上游 `GlassNavigationBar.kt:309-324`），
+   只取 `navigationBars` 会在自由窗口 / 桌面模式下少让一截。
    **从 0.9.5-beta01 起上游把 `compileSdk` 提到 37.2**，下游必须同步：
    `compileSdk { version = release(37) { minorApiLevel = 2 } }`，否则 AGP 配置期直接拒绝
    （`requires ... compile against version 37.2 or later`）。`targetSdk` 可以继续停在 36。
