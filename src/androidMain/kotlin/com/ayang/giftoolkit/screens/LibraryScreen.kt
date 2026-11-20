@@ -5,12 +5,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +44,7 @@ import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.icon.glass.FolderOutline
 import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Download
@@ -46,6 +57,7 @@ import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassIconButton
 import java.io.File
 
 @Composable
@@ -217,18 +229,22 @@ private fun FileRow(
 }
 
 /**
- * 文件操作面板。
+ * 文件操作面板（只按 MIUIX 官方写法组装，不参考任何第三方 App 的自定义组合）。
  *
- * 用官方的 [GlassBottomSheet]，采样页面正文录制层（[LocalPageBackdrop]），
- * 与官方示例 `component/GlassBottomSheetDemo.kt` 同一套：半透明磨砂面板 + 拖拽把手 + 标题。
+ * 依据（全部来自 MIUIX 源码 `5ff41ba9`）：
+ * - 面板：官方 [GlassBottomSheet]（`docs/demo/GlassBottomSheetDemo.kt` 的玻璃弹层示例），
+ *   标题居中、采样页面录制层、行直接落在面板上 —— 官方玻璃示例不套 `Card` 分组，
+ *   只有非玻璃的 `OverlayBottomSheet` 示例（`component/BottomSheetSection.kt`）才用
+ *   `SmallTitle + Card(secondaryContainer)`；
+ * - 行：官方 [BasicComponent]，最小行高 56dp / 行内边距 16dp / 图文间距 8dp 全吃默认值，
+ *   不在调用点手写 `Row + clickable + padding`；
+ * - 行图标：官方 example 的 Glass 图标统一 `Modifier.size(28.dp)`
+ *   （`GlassPage.kt:325/359/372`、`IconPage.kt:266`、`PullToRefreshPage.kt:121`）；
+ * - 收尾：官方 `component/BottomSheetSection.kt:258-266` 的「导航条 + captionBar」留白。
  *
- * 之前这里是 `WindowBottomSheet`（系统窗口版）：它的参数表里没有 `backdrop`，
- * 所以拿不到任何玻璃效果，实拍是一块不透明的白色面板。
- * 当时退成系统窗口的原因是 `GlassBottomSheet` 依赖 `LocalDialogStates` —— 由 Scaffold 提供并绘制，
- * 而面板挂在 `Os4ListPage` 外面（兄弟节点），拿不到那个 local，静默不显示。
- *
- * 现在改由 `Os4ListPage` 的 `pageOverlay` 槽位承载：槽位在 Scaffold **内部**、录制层**外部**，
- * 宿主与"不要采样自己"两个条件同时满足。业务回调与菜单项保持原样。
+ * 头部 `startAction` / `endAction` 在官方组件里是可选参数（`OverlayBottomSheet` 文档的
+ * Action Sheet 示例用了 Cancel / Confirm 两个 TextButton；本项目是三个行内动作，
+ * 由拖拽 / 外部点击 / 返回键关闭，因此不额外放头部按钮）。
  */
 @Composable
 private fun FileActionSheet(
@@ -248,37 +264,50 @@ private fun FileActionSheet(
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished,
     ) {
-        // 行内边距去掉左右：面板本身已经有 24dp 内边距（`BottomSheetDefaults.insideMargin`），
-        // 行再叠 16dp 会让标题距面板边 40dp、和面板标题的 24dp 对不齐。
-        // 官方示例（`component/GlassBottomSheetDemo.kt`）也是"面板给横向、行只给纵向"。
-        val rowMargin = PaddingValues(horizontal = 0.dp, vertical = 16.dp)
-        BasicComponent(
-            title = "保存到相册",
-            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Download) },
-            insideMargin = rowMargin,
-            onClick = onSave,
-        )
-        BasicComponent(
-            title = "分享",
-            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Share) },
-            insideMargin = rowMargin,
-            onClick = onShare,
-        )
-        BasicComponent(
-            title = "删除",
-            titleColor = BasicComponentDefaults.titleColor(
-                color = MiuixTheme.colorScheme.error,
-            ),
-            startAction = { LeadingIcon(MiuixIcons.Glass.Light.Delete, MiuixTheme.colorScheme.error) },
-            insideMargin = rowMargin,
-            onClick = onDelete,
-        )
-        // 手势导航条留白：面板的 `defaultWindowInsetsPadding` 只处理 IME，
-        // 底部导航条要内容自己让（官方 `GlassBottomSheet` KDoc 原文：
-        // "Apply navigation-bar padding inside scrollable content"）。
-        // 少了这一行，"删除"会贴着导航条（真机手势导航下最明显）。
-        Spacer(Modifier.navigationBarsPadding().height(8.dp))
+        Column(Modifier.fillMaxWidth()) {
+            SheetActionRow(MiuixIcons.Glass.Download, "保存到相册", onClick = onSave)
+            SheetActionRow(MiuixIcons.Glass.Share, "分享", onClick = onShare)
+            SheetActionRow(MiuixIcons.Glass.Delete, "删除", destructive = true, onClick = onDelete)
+            // 官方 `component/BottomSheetSection.kt:258-266` 的收尾：导航条 + captionBar 留白。
+            Spacer(
+                Modifier.padding(
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                        WindowInsets.captionBar.asPaddingValues().calculateBottomPadding(),
+                ),
+            )
+        }
     }
+}
+
+/**
+ * 弹层里的一行：官方 [BasicComponent]（56dp 最小高、16dp 行内边距、8dp 图文间距全吃默认值）。
+ *
+ * 图标 28dp 是 MIUIX 官方 example 里 Glass 图标的统一尺寸
+ * （`GlassPage.kt:325/359/372`、`IconPage.kt:266`、`MainPage.kt:224/254`、`PullToRefreshPage.kt:121`）；
+ * 颜色取 `BasicComponentDefaults.titleColor` 的默认值（`onBackground`），破坏性操作用 `error`。
+ * 不要在调用点再写 `Row + clickable`，也不要自己塞 `IconButton`。
+ */
+@Composable
+private fun SheetActionRow(
+    icon: ImageVector,
+    label: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val color = if (destructive) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onBackground
+    BasicComponent(
+        title = label,
+        titleColor = BasicComponentDefaults.titleColor(color = color),
+        startAction = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(IconSizes.Row),
+                tint = color,
+            )
+        },
+        onClick = onClick,
+    )
 }
 
 private fun mimeOf(file: File): String = when (file.extension.lowercase()) {

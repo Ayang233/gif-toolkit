@@ -6,7 +6,7 @@
 界面基于 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）重写，
 支持静态配色与 Monet 动态取色两套主题、明暗双模式，以及 OS4 玻璃质感的浮动底栏。
 
-**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上，当前 1.10）
+**下载**：[Releases](https://github.com/Ayang233/gif-toolkit/releases)（Android 13 及以上，当前 1.11）
 
 文档：[开发须知 AGENTS.md](AGENTS.md) · [路线图 ROADMAP.md](ROADMAP.md) · [变更记录 CHANGELOG.md](CHANGELOG.md)
 
@@ -17,8 +17,8 @@
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
 
-> 截图取自 1.8。「关于」页这一张是**关闭玻璃材质**时的样子 —— 开启玻璃时图标与软件名称由
-> `textureBlur` 采样背景绘制，而截图所用的模拟器是软件渲染，该路径不产出像素（原因见文末「已知限制」）。
+> 截图取自 1.8。「关于」页这一张是**关闭玻璃材质**时的样子 —— 开启玻璃时图标、软件名称与卡片
+> 由 `textureBlur` 采样背景渐变绘制（需要硬件 GPU；模拟器请用 `-gpu host` 启动）。
 
 <details>
 <summary>深色模式</summary>
@@ -140,9 +140,9 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 - 没有目标体积压缩（不会为了压到某个大小自动二分色数/帧率）
 - 进程被杀后返回栈能由系统恢复到原页面，但页面里的选择（已选素材、参数、生成进度）会丢
 - 玻璃在低端机上的性能未充分验证，设置里可关闭
-- 关于页的图标与软件名称用原生 `textureBlur` 采样背景绘制，需要硬件 GPU；
-  模拟器（SwiftShader 软件渲染）上该路径不产出像素，图标与标题会整块不显示，真机正常。
-  想在这个环境里看到它们，把「设置 → 主题 → 玻璃材质」关掉即可。
+- 关于页的图标与软件名称用原生 `textureBlur` 采样背景绘制，需要硬件 GPU。
+  模拟器请用 `-gpu host` 启动（与真机一致）；`-gpu swiftshader_indirect` 这类软件光栅化环境
+  不产出模糊像素，不是可信的观感环境，看到异常属渲染器问题。
 
 ## 许可证
 

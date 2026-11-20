@@ -1,7 +1,5 @@
 package com.ayang.giftoolkit.ui
 
-import android.os.Build
-import android.view.RoundedCorner
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -12,10 +10,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
@@ -27,6 +22,9 @@ import kotlin.math.sqrt
  * 横屏时挖孔落在起始边（本机 128px = 64dp）。Scaffold 的 `innerPadding` 已经带了这段，
  * 但**不在 Scaffold 内容槽位里**的控件（底部主操作条、页面根部自绘列表）拿不到 `innerPadding`，
  * 只能自己取一次。抽出来是为了让全项目对"横向安全区"只有一个定义。
+ *
+ * 屏幕圆角不要在这里再算一遍 —— 直接用库的 `rememberNavSystemCornerRadius()`
+ * （`top.yukonga.miuix.kmp.nav.core`，官方 example `AppContent.kt:267` 同款）。
  */
 @Composable
 fun rememberHorizontalSafeInsets(): PaddingValues =
@@ -34,35 +32,6 @@ fun rememberHorizontalSafeInsets(): PaddingValues =
         .union(WindowInsets.displayCutout)
         .only(WindowInsetsSides.Horizontal)
         .asPaddingValues()
-
-/**
- * 设备屏幕底部圆角半径。
- *
- * 优先用公开的 [RoundedCorner] 窗口内嵌 API（API 31+），否则退回 framework 的
- * `rounded_corner_radius_bottom` dimen，最后给 0（直屏）。不要写死数值：
- * 同一套布局在直屏机和大圆角机型上的安全边距差一倍以上。
- */
-@Composable
-fun rememberDeviceCornerRadius(): Dp {
-    val context = LocalContext.current
-    val view = LocalView.current
-    val density = LocalDensity.current
-    return remember(context, view, density) {
-        val fromInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            view.rootWindowInsets
-                ?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)
-                ?.radius
-                ?.takeIf { it > 0 }
-        } else {
-            null
-        }
-        val px = fromInsets ?: run {
-            val id = context.resources.getIdentifier("rounded_corner_radius_bottom", "dimen", "android")
-            if (id > 0) context.resources.getDimensionPixelSize(id) else 0
-        }
-        with(density) { px.toDp() }
-    }
-}
 
 /**
  * 通栏按钮贴底时需要的底部留白。

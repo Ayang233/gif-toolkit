@@ -15,10 +15,11 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 d45ca181 = 侧栏折叠形态重写 + 顶栏/Scaffold 结构调整 + 模糊管线优化（MaxBlurRadius 100f）。
+# 上游 5ff41ba9 = 当前基线（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）。
+# 升级记录见 docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="d45ca181"
+PINNED_REF="5ff41ba9"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

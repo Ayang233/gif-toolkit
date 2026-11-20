@@ -135,8 +135,8 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
     `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
     Glass 族是 **28dp 画布**（`buildHyperOSIcon` 里 `defaultWidth = 28.dp`），
-    塞进 24dp 槽位会明显偏小；列表统一 26dp（`IconSizes.Row`）。
-    尺寸只有 `IconSizes` 一个出处：`Row` 26 / `Action` 28 / `Inline` 19（行内小动作）/ `Empty` 44 / `Media` 28（媒体区占位）。
+    塞进 24dp 槽位会明显偏小；列表统一 **28dp**（`IconSizes.Row`，与官方 example 的行首图标同值）。
+    尺寸只有 `IconSizes` 一个出处：`Row` 28 / `Action` 28 / `Inline` 19（行内小动作）/ `Empty` 44 / `Media` 28（媒体区占位）。
     注意新版权重/命名变化：`Glass.Folder` / `Glass.Settings` 已改名成 `*Outline` / `*Fill`。
     顶栏返回键玻璃档用 `Glass.ChevronBackward`（28dp），非玻璃档才用 extended 的 `Back`（24dp），
     官方 `component/BackNavigationIcon.kt` 就是这么分的。
@@ -216,10 +216,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       图标容器 100dp（`clip = true`）、主体 `requiredSize(132dp)`、`ColorFilter.tint(onBackground)`；
       标题 35sp Bold、同 backdrop 同混合色。
       **不要**改成 `gradientFilled` / `SrcIn` / ShaderBrush / 任何自制渐变（第九轮做过，第十轮已删除）。
-    - 本机模拟器（`swiftshader_indirect`）上 `textureBlur` 不产出像素，
-      于是图标与标题**整块不可见**（`DstIn` 用空结果替换了内容）；关掉玻璃开关时二者正常显示。
-      这是 GPU 能力问题，不是接线问题 —— 保留原生实现，标注真机待验证，
-      **不要**为了在模拟器上看出来而换一套视觉。详见 `docs/os4-round10-audit.md` §2.5。
+    - 本机模拟器**必须用 `-gpu host` 启动**（`emulator -avd android16 -gpu host`）：
+      此时 `textureBlur` / AGSL 渐进模糊与真机一致，图标、标题会真的跟随背景渐变。
+      早先用 `-gpu swiftshader_indirect` 时 `textureBlur` 不产出像素，一度在代码里加了
+      "软件渲染器就跳过模糊"的判据 —— 那条判据把 `-gpu host` 也误判掉，导致图标/标题退化成纯色、
+      顶栏关掉渐进模糊，**已删除**。能力判断一律交给库（`isRenderEffectSupported()` /
+      `isRuntimeShaderSupported()`），不要在业务代码里猜渲染器。
     - 图标**不带白底/底板**，只有单色剪影。第九轮那块 `cardColor(alpha = 0.72f)` 底板已删除。
     - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
@@ -254,6 +256,16 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    技术细节进 `docs/`，对外内容一句话能说清就一句话。
 6. **README 里的数字与清单要跟代码同步**（硬约束条数、依赖列表、已删功能）。过期的介绍比没有更糟。
 
+## 判定基准（IMPORTANT）
+
+**"像不像 OS4 / 是不是 MIUIX 原生写法"只有一个基准：MIUIX 官方源码 + 官方 example 的编译产物。**
+
+- 需要视觉真值时，直接编译官方 example：`./gradlew :example:android:assembleDebug`（在 `../miuix` 里），
+  装机对照；源码依据用 `miuix/example/shared` 与 `miuix/docs/demo`。
+- **不要拿第三方 App 当标准**（包括上一轮参考过的 Glacier 等下游项目）：它们只是"别人怎么组合"，
+  可能本身就是错的。之前从 Glacier 抄来的脚注行、24dp 行图标都已按 MIUIX 改回/删除。
+- 组件默认值、尺寸、动画一律从 MIUIX 源码取；库里没有明确证据的，按官方 example 的调用点取。
+
 ## 产物与版本约定
 
 - 版本号在 `build.gradle.kts` 的 `versionCode` / `versionName`
@@ -263,9 +275,14 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`3177a684`**（2026-11-18，`library: Refine glass floating action button`）。
+1. 基线是 Miuix **`5ff41ba9`**（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）。
+   上一次基线是 `3177a684`；34 个提交的逐项差异见
+   `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`，升级前定制面清单见
+   `docs/upgrade-prep-customization-inventory.md`。
    升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
    这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
+   已经踩过的一次：`GlassNavigationBar` 的 `floatingMargin` 在 ≤16dp 档从 28dp 变成 20dp，
+   `ui/PageChrome.kt` 的 `rememberBottomBarClearance()` 复刻了这条公式（必须同步，见该函数注释）。
    **从 0.9.5-beta01 起上游把 `compileSdk` 提到 37.2**，下游必须同步：
    `compileSdk { version = release(37) { minorApiLevel = 2 } }`，否则 AGP 配置期直接拒绝
    （`requires ... compile against version 37.2 or later`）。`targetSdk` 可以继续停在 36。

@@ -4,7 +4,11 @@
 > 而是让一个**完全没有 MIUIX 的项目**能照着走到完整的 OS4 + Glass 适配。
 
 - 参考工程：GifHelper 1.10（`versionCode = 12`），Kotlin Multiplatform 单模块，全部实现在 `androidMain`
-- MIUIX 基线：`compose-miuix-ui/miuix` @ `3177a684`（2026-11-18，version `0.9.5` 开发线）
+- MIUIX **证据基线**：`compose-miuix-ui/miuix` @ `3177a684`（2026-11-18，version `0.9.5` 开发线）。
+  本知识库的组件行号、默认值、实测截图都取自这个提交，属于**历史证据**，不要当成"当前版本"。
+  GifHelper 的**当前 pin** 已跟进到 `5ff41ba9`（2026-11-20），升级过程与差异见
+  [`docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`](../miuix-baseline-3177a684-to-5ff41ba9-diff.md)；
+  长期维护流程见 [`docs/miuix-baseline-maintenance.md`](../miuix-baseline-maintenance.md)。
 - 本文档集**只描述方法与已验证事实**；GIF 助手的具体业务代码一律标注为「本项目实现」，不作为通用规范
 
 ---

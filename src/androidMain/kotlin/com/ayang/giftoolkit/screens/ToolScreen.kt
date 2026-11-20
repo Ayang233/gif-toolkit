@@ -71,6 +71,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Clear
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
 
@@ -349,59 +350,54 @@ private fun ColorSwatches(form: ToolForm) {
         0xFF000000 to "黑色",
         0xFFFF3B30 to "红色",
     )
-    // 触觉反馈：这是本项目唯一自绘的"选择"控件，官方对应物是 RadioButtonPreference /
-    // RadioButton —— 它们在选中项变化时调用 `HapticFeedbackType.ToggleOn`
-    // （miuix-preference `RadioButtonPreference.kt:131`、miuix-ui `RadioButton.kt:101`）。
+    // 触觉反馈：官方 `RadioButtonPreference` / `RadioButton` 在选中项变化时调用
+    // `HapticFeedbackType.ToggleOn`（`RadioButtonPreference.kt:131`、`RadioButton.kt:101`）。
     // 点已经选中的颜色不发生状态变化，按迁移指南"无状态变化不加反馈"的规矩直接跳过。
     val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // 12 + 28 + 12 = 52dp：补到官方 56dp 最小行高（`Component.kt` 的 BasicComponent）。
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // 标题与同卡其它行同一档（`BasicComponent` 的 title 用 headline1，`Component.kt:92`）。
-        Text("抠图颜色", style = MiuixTheme.textStyles.headline1, modifier = Modifier.weight(1f))
-        presets.forEach { (value, name) ->
-            val selected = form.keyColor == value.toInt()
-            // **固定 28dp 槽位**：之前选中时 24→28dp，整行会跟着变宽、右侧色块一起位移。
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .selectable(
-                        selected = selected,
-                        role = Role.RadioButton,
-                        onClick = {
-                            if (!selected) {
-                                hapticFeedback.performHapticFeedback(
-                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
-                                )
-                                form.keyColor = value.toInt()
-                            }
-                        },
-                    )
-                    .semantics { contentDescription = name },
-                contentAlignment = Alignment.Center,
-            ) {
+    // 行本身走官方 `BasicComponent`（56dp 最小高、16dp 内边距、headline1 标题都是库的规格），
+    // 色块放 `endActions`。之前这里手写了同一套行规格，属于重复造轮子。
+    BasicComponent(
+        title = "抠图颜色",
+        endActions = {
+            presets.forEach { (value, name) ->
+                val selected = form.keyColor == value.toInt()
+                // **固定 28dp 槽位**：之前选中时 24→28dp，整行会跟着变宽、右侧色块一起位移。
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .padding(start = 12.dp)
+                        .size(28.dp)
                         .clip(CircleShape)
-                        .background(Color(value))
-                        .border(
-                            width = if (selected) 2.dp else 1.dp,
-                            color = if (selected) MiuixTheme.colorScheme.primary
-                            else MiuixTheme.colorScheme.outline,
-                            shape = CircleShape,
-                        ),
-                )
+                        .selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = {
+                                if (!selected) {
+                                    hapticFeedback.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
+                                    )
+                                    form.keyColor = value.toInt()
+                                }
+                            },
+                        )
+                        .semantics { contentDescription = name },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(value))
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) MiuixTheme.colorScheme.primary
+                                else MiuixTheme.colorScheme.outline,
+                                shape = CircleShape,
+                            ),
+                    )
+                }
             }
-        }
-    }
+        },
+    )
 }
 
 /** 字幕输入：Miuix TextField + TextFieldState，失焦不丢内容。 */
@@ -438,8 +434,8 @@ private fun AnimatedPreview(frames: List<GifFrame>, speed: Float) {
         Modifier
             .fillMaxWidth()
             .aspectRatio(frame.bitmap.width.toFloat() / frame.bitmap.height.coerceAtLeast(1))
-            .clip(RoundedCornerShape(12.dp))
-            .background(pageColor()),
+            // 与预览舞台同源：连续曲率圆角走库的 squircleSurface，不自造 clip(RoundedCornerShape)。
+            .squircleSurface(color = pageColor(), cornerRadius = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Image(

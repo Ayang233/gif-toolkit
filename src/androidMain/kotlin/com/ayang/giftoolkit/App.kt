@@ -44,6 +44,7 @@ import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.LocalRailInset
+import com.ayang.giftoolkit.ui.LocalTopAppBarCenterObstructionStart
 import com.ayang.giftoolkit.ui.LocalTopBarTitleAlpha
 import com.ayang.giftoolkit.ui.LocalRootBackdrop
 import com.ayang.giftoolkit.ui.LocalWideLayout
@@ -52,7 +53,6 @@ import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.pageBaseColor
 import com.ayang.giftoolkit.ui.rememberBottomBarClearance
-import com.ayang.giftoolkit.ui.rememberDeviceCornerRadius
 import com.ayang.giftoolkit.ui.rememberIsDebuggable
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
@@ -73,6 +73,7 @@ import top.yukonga.miuix.kmp.nav.core.NavBackStack
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.navBackStackOf
+import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -140,6 +141,16 @@ fun GifApp() {
         }
     }
 
+    // 折叠态侧栏是顶部居中胶囊，会盖住顶栏中间那条位置：把它的起始偏移下发，
+    // 顶栏用官方 `centerObstructionStart` 让标题绕开（官方 `AppContent.kt:226-232` 同款）。
+    val centerObstructionStart = if (
+        railVisible && !railState.expanded && railState.collapsedWidth > 0.dp
+    ) {
+        railState.collapsedStart
+    } else {
+        Dp.Unspecified
+    }
+
     CompositionLocalProvider(
         LocalGlassEnabled provides glassEnabled,
         LocalAmoled provides app.amoledEnabled,
@@ -148,6 +159,7 @@ fun GifApp() {
         // 折叠态（顶部居中胶囊）与居中标题抢同一条位置：标题透明度跟着折叠进度走，
         // 官方 `AppContent.kt:208-214` 就是这么接的。二级页没有 Rail，标题恒为 1。
         LocalTopBarTitleAlpha provides { if (railVisible) railState.progress else 1f },
+        LocalTopAppBarCenterObstructionStart provides centerObstructionStart,
         LocalBottomBarClearance provides if (wide) 0.dp else bottomClearance,
     ) {
         AnimatedMiuixTheme(controller) {
@@ -218,17 +230,17 @@ fun GifApp() {
             ) {
                 Box(Modifier.fillMaxSize().background(pageBaseColor())) {
                     // 转场档位来自主题设置；圆角裁剪半径取设备真实屏幕圆角 ——
-                    // 之前没传 effects，默认 cornerClipRadius = 0.dp，等于把圆角裁剪关掉了。
+                    // 用库的 `rememberNavSystemCornerRadius()`（官方 example `AppContent.kt:267` 同款），
+                    // 不再自己读 RoundedCorner / framework dimen。
                     val pageBackground = pageBaseColor()
                     val pageTransition = remember(app.backAnimation, app.backExitDirection) {
                         backTransition(app.backAnimation, app.backExitDirection)
                     }
-                    val cornerRadius = rememberDeviceCornerRadius()
+                    val cornerRadius = rememberNavSystemCornerRadius()
                     val navEffects = remember(cornerRadius, pageBackground) {
+                        // enableCornerClip / dimAmount 都吃 `NavDisplayEffects` 的默认值，不重复声明。
                         NavDisplayEffects(
-                            enableCornerClip = true,
                             cornerClipRadius = cornerRadius,
-                            dimAmount = 0.5f,
                             backdropColor = pageBackground,
                         )
                     }

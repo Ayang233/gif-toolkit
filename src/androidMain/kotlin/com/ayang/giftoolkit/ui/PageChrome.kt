@@ -37,7 +37,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import androidx.compose.foundation.layout.fillMaxHeight
+import top.yukonga.miuix.kmp.basic.VerticalScrollBar
+import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
@@ -60,9 +64,14 @@ val LocalBottomBarClearance = compositionLocalOf { 0.dp }
  * 胶囊高度直接取库的 `GlassNavigationBarDefaults.Height`（54dp），不再本地留一份 54.dp ——
  * 之前硬编码过，上游一改这个值，顶栏高度和内容末尾留白就对不上了。
  *
- * 外边距规则仍要镜像 `GlassNavigationBar` 内部那套（导航栏 ≤16dp → 28dp；≥28dp → 跟随；
+ * 外边距规则仍要镜像 `GlassNavigationBar` 内部那套（导航栏 ≤16dp → **20dp**；≥28dp → 跟随；
  * 中间 → 12dp + 导航栏），因为库**没有把这个 margin 暴露出来**（`floatingMargin` 是函数内
  * 局部变量）。这是全项目唯一"复刻库内部公式"的地方，上游若改规则这里要跟着改。
+ *
+ * 基线迁移记录：Miuix `5ff41ba9`（提交 `9413f690`）把 ≤16dp 档从 28dp 改成 20dp，
+ * 底栏胶囊因此整体下沉 8dp。镜像公式要跟着改，否则内容末尾会多预留 8dp 空带。
+ * 本机（420dpi、手势导航，导航栏 24dp）走的是「12dp + 导航栏」档，不受这次改动影响 ——
+ * 也就是说这个 bug 在模拟器上看不出来，只有导航栏 ≤16dp 的真机（部分全屏手势机型）才会暴露。
  */
 @Composable
 fun rememberBottomBarClearance(): Dp {
@@ -71,7 +80,7 @@ fun rememberBottomBarClearance(): Dp {
         .asPaddingValues()
         .calculateBottomPadding()
     val floatingMargin = when {
-        navInset <= 16.dp -> 28.dp
+        navInset <= 16.dp -> 20.dp
         navInset >= 28.dp -> navInset
         else -> 12.dp + navInset
     }
@@ -169,6 +178,7 @@ fun pageContentPadding(
  * 玻璃顶栏必须是录制层的兄弟节点，这个顺序一旦写错就会采样到自己、libhwui 原生栈溢出闪退
  * （AGENTS.md 第 1 条，历史真崩过）。集中到一处以后，页面里就不再有出错的机会。
  */
+@OptIn(ExperimentalScrollBarApi::class)
 @Composable
 fun Os4ListPage(
     title: String,
@@ -276,42 +286,53 @@ fun Os4ListPage(
         }
 
         ContentBackdropBox(glass) {
-            if (largeHeader != null) {
-                // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = padding.calculateLeftPadding(layoutDirection),
-                            end = padding.calculateRightPadding(layoutDirection),
-                            top = headerPadTop,
-                        )
-                        .onSizeChanged { headerHeightPx = it.height },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    largeHeader(headerProgress)
+            Box(Modifier.fillMaxSize()) {
+                if (largeHeader != null) {
+                    // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = padding.calculateLeftPadding(layoutDirection),
+                                end = padding.calculateRightPadding(layoutDirection),
+                                top = headerPadTop,
+                            )
+                            .onSizeChanged { headerHeightPx = it.height },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        largeHeader(headerProgress)
+                    }
                 }
-            }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pageScrollModifiers(scrollBehavior),
-                // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
-                contentPadding = pageContentPadding(
+                val contentPadding = pageContentPadding(
                     innerPadding = padding,
                     extraBottom = extraBottom,
                     horizontal = horizontalPadding,
                     reserveNavBar = reserveNavBar,
-                ),
-            ) {
-                if (largeHeader != null) {
-                    item(key = "logoSpacer") {
-                        // 头部内容高度 + 头部比列表多出来的顶部留白（40dp 相对 2dp）+ 呼吸
-                        Spacer(Modifier.height(headerHeight + (headerPadTop - listTop) + 20.dp))
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pageScrollModifiers(scrollBehavior),
+                    // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
+                    contentPadding = contentPadding,
+                ) {
+                    if (largeHeader != null) {
+                        item(key = "logoSpacer") {
+                            // 头部内容高度 + 头部比列表多出来的顶部留白（40dp 相对 2dp）+ 呼吸
+                            Spacer(Modifier.height(headerHeight + (headerPadTop - listTop) + 20.dp))
+                        }
                     }
+                    content()
                 }
-                content()
+                // 官方 example 的每个列表页都挂 `VerticalScrollBar`（`MainPage.kt:341-346` 等）：
+                // 轨道 padding 用同一份 `contentPadding`，顶栏折叠交给 `topAppBarScrollBehavior`。
+                VerticalScrollBar(
+                    adapter = rememberScrollBarAdapter(listState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    trackPadding = contentPadding,
+                    topAppBarScrollBehavior = scrollBehavior,
+                )
             }
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。

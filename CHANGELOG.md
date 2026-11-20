@@ -2,6 +2,21 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.11 — 2026-11-20
+
+**升级**
+
+- Miuix 基线从 `3177a684` 升到 `5ff41ba9`（34 个提交），差异与结论见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`。
+- 作品操作面板按 MIUIX 官方弹层写法重做：`GlassBottomSheet` + 官方 `BasicComponent` 行（行高、内边距、图文间距全吃默认值）+ 官方底部留白；去掉自造的头部按钮与脚注。
+- 各列表页补上官方 `VerticalScrollBar` 滚动条。
+- 行首图标统一 28dp（与官方示例的 Glass 图标同尺寸）。
+- 改用官方 `rememberNavSystemCornerRadius()`、`squircleSurface`、`NavDisplayEffects` 默认值、`ButtonDefaults` / `ProgressIndicatorDefaults` 常量。
+- 接入官方 `centerObstructionStart`：横屏折叠态侧栏不再压住顶栏标题。
+
+**修复**
+
+- 关于页图标与软件名称不跟随背景渐变：删掉自造的"软件渲染器"降级判断（它把硬件加速模拟器也误判了），能力判断交给库。
+- 动态取色下玻璃材质缺少着色：主题装配补上 `MiuixTheme(controller)`，让 `dynamicGlassMaterial` 生效。
 ## 1.10 — 2026-11-19
 
 **调整**

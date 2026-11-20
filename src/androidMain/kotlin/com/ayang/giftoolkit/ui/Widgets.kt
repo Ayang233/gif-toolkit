@@ -40,11 +40,14 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -248,7 +251,7 @@ fun LeadingIcon(
 /** 图标尺寸的唯一出处，避免每个页面各写一个 `size(...)`。 */
 object IconSizes {
     /** 列表行首。 */
-    val Row: Dp = 26.dp
+    val Row: Dp = 28.dp
 
     /** 顶栏动作按钮（`GlassIconButton` 内部 44dp 胶囊）。 */
     val Action: Dp = 28.dp
@@ -414,10 +417,9 @@ fun PreviewStage(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(stageHeight)
-                .clip(RoundedCornerShape(12.dp))
-                // 卡片是 surfaceContainer（白），舞台用 surface（#F7F7F7）才看得出"一块画布"；
-                // 用 surfaceContainer 会和卡片糊成一片，透明度高的素材完全没边界。
-                .background(pageColor()),
+                // 连续曲率圆角用库的 `squircleSurface`（官方 Card/Button 本体也是 squircle），
+                // 不要自己 clip(RoundedCornerShape(...)) + background()：四角会是正圆弧。
+                .squircleSurface(color = pageColor(), cornerRadius = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (bitmap != null) {
@@ -491,7 +493,7 @@ fun PrimaryActionBar(
     val safeStart = safeInsets.calculateLeftPadding(layoutDirection)
     val safeEnd = safeInsets.calculateRightPadding(layoutDirection)
     val bottomGap = maxOf(
-        safeBottomGap(corner = rememberDeviceCornerRadius(), sideGap = sideGap + safeStart + 4.dp),
+        safeBottomGap(corner = rememberNavSystemCornerRadius(), sideGap = sideGap + safeStart + 4.dp),
         24.dp,
     )
     Column(
@@ -590,11 +592,12 @@ private fun ActionButton(
         modifier = Modifier.fillMaxWidth(),
     ) {
         if (busy) {
+            // 尺寸走库的默认值（20dp / 2dp / 2dp），不自己另给一套数字。
             InfiniteProgressIndicator(
                 color = colors.contentColor,
-                size = 16.dp,
-                strokeWidth = 2.dp,
-                orbitingDotSize = 1.5.dp,
+                size = ProgressIndicatorDefaults.DefaultInfiniteProgressIndicatorSize,
+                strokeWidth = ProgressIndicatorDefaults.DefaultInfiniteProgressIndicatorStrokeWidth,
+                orbitingDotSize = ProgressIndicatorDefaults.DefaultInfiniteProgressIndicatorOrbitingDotSize,
             )
             Spacer(Modifier.width(10.dp))
         }

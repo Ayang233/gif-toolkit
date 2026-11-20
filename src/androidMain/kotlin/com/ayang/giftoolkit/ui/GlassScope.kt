@@ -261,12 +261,13 @@ fun PageTopBar(
             title = title,
             isContentScrolled = isScrolled,
             expandable = expandable,
-            // 渐进模糊（AGSL）只在硬件渲染器上开。软件光栅化（模拟器 SwiftShader）上
-            // 它不产出模糊像素、只留一层错位副本：顶栏看起来"内容直接顶到标题上"，
-            // 横屏行距密的时候最明显（本轮 §1 的实测）。此时走库默认的 bandBrush 渐变带，
-            // 也就是 `progressiveBlur = false`（`GlassTopAppBar` 自己的默认值）。
-            // 注意：这不是自造的替代视觉 —— 两条都是同一个组件的官方绘制路径。
-            progressiveBlur = !isSoftwareRenderer,
+            // 渐进模糊（AGSL）走库自己的能力判断：`GlassTopAppBar` 内部用
+            // `isRuntimeShaderSupported()` 决定要不要用 progressiveTextureBlur，
+            // 不支持时自动落回 bandBrush 渐变带（两条都是同一个组件的官方绘制路径）。
+            // 这里**不再**自己判断渲染器 —— 之前用 `Build.HARDWARE` 里的 ranchu/goldfish
+            // 当"软件渲染"判据，结果 `-gpu host` 的硬件加速模拟器也被误判，
+            // 连真机级的模糊都被关掉了。
+            progressiveBlur = true,
             backdrop = backdrop ?: glass.contentBackdrop,
             contentModifier = contentInset,
             largeTitle = largeTitle,
@@ -285,6 +286,7 @@ fun PageTopBar(
             actions = actions,
             // 绘制期读取，折叠动画期间不重组。
             titleAlpha = effectiveTitleAlpha,
+            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current,
         )
     } else {
         TopAppBar(
@@ -299,6 +301,8 @@ fun PageTopBar(
             scrollBehavior = scrollBehavior,
             navigationIcon = backIcon,
             actions = actions,
+            // 两档顶栏都吃同一个绕行偏移：折叠态顶部胶囊不该压住居中标题（官方同款参数）。
+            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current,
         )
     }
 }

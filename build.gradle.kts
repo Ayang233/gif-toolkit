@@ -50,8 +50,9 @@ kotlin {
 
 android {
     namespace = "com.ayang.giftoolkit"
-    // Miuix 0.9.5-beta01（3177a684）起把自身编译目标提到 SDK 37.2，
+    // Miuix 0.9.5-beta01 起把自身编译目标提到 SDK 37.2，
     // 下游必须同档编译，否则 AGP 在配置期直接拒绝（"requires compile against 37.2 or later"）。
+    // 基线提交跟进到 5ff41ba9 后这条要求未变。
     // 这里只影响编译期可用 API，targetSdk 仍是 36，不改运行时行为。
     compileSdk {
         version = release(37) {
@@ -64,8 +65,8 @@ android {
         // 33：miuix-blur 的下限，也是 OS4 玻璃（RuntimeShader）能正常工作且不降级的起点
         minSdk = 33
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.10"
+        versionCode = 13
+        versionName = "1.11"
     }
 
     buildTypes {

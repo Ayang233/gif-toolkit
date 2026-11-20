@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +30,6 @@ import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.bg.BgEffectBackground
-import com.ayang.giftoolkit.ui.isSoftwareRenderer
 import com.ayang.giftoolkit.ui.rememberAppVersion
 import com.ayang.giftoolkit.ui.rememberCombinedBackdrop
 import com.ayang.giftoolkit.ui.rememberGlassScope
@@ -91,9 +90,10 @@ private val MarkBoxSize = 100.dp
  *
  * **不要改成 `gradientFilled` / `SrcIn` / ShaderBrush 之类的自制渐变**（第九轮做过，已删除）。
  *
- * 本机模拟器（`swiftshader_indirect`）上 `textureBlur` 不产出像素，图标与标题整块不可见；
- * 关掉玻璃开关（走参考项目的"不模糊就正常画"分支）时二者立刻正常。
- * 这是 GPU 能力问题，不是接线错误，真机验证前保持原生实现不动。
+ * 玻璃能力只看库的 `isRenderEffectSupported()`（见 `ui/GlassSupport.kt`）：之前这里还叠了一条
+ * "软件渲染器就跳过 textureBlur"的判据，把 `-gpu host` 的硬件加速模拟器也一起判掉了，
+ * 结果图标/标题退化成纯色剪影、不跟随渐变。现在不做渲染器猜判，能力交给库；
+ * 观感验证请用 `-gpu host` 启动的模拟器或真机。
  */
 @Composable
 fun AboutScreen(
@@ -104,11 +104,8 @@ fun AboutScreen(
     // 正文录制层不垫页面底色：这一页的背景是整块渐变，垫了就把渐变盖住了（见 rememberPageBackdrop）。
     val glass = rememberGlassScope(opaqueBase = false)
     val glassEnabled = LocalGlassEnabled.current
-    // 软件光栅化（模拟器 SwiftShader）上不启用 textureBlur：那条路径在这个渲染器上
-    // **不产出像素**，图标与标题会整块消失（前面几轮反复确认过）。跳过它，让这一页在
-    // 模拟器上退化成"单色剪影 + 实字"，既能看到版式，也省掉一层没人消费的采样。
-    // 真机（硬件 GLES）上照旧走 textureBlur + DstIn 的完整液态玻璃。
-    val blurEnabled = glassEnabled && !isSoftwareRenderer
+    // 玻璃开关 && 库的能力判断（`isGlassSupported`），不再按"模拟器"降级。
+    val blurEnabled = glassEnabled
     val version = rememberAppVersion()
 
     // 背景录制层：只录渐变那一层，给图标/标题的 textureBlur 当采样源。
@@ -243,10 +240,12 @@ private fun AboutHeader(
                     if (blurEnabled) {
                         Modifier.textureBlur(
                             backdrop = bgBackdrop,
-                            // 形状只裁"采样区域"；可见结果由 DstIn 的 alpha 决定。
-                            shape = RectangleShape,
-                            // 150f 与 KSU 图标同值（库内部按 BlurDefaults.MaxBlurRadius 夹紧）。
-                            blurRadius = 150f,
+                            // 采样区形状与图标容器的圆角观感一致（官方图标容器是 RoundedCornerShape(24.dp)）。
+                            shape = RoundedCornerShape(24.dp),
+                            // 100f 就是 `BlurDefaults.MaxBlurRadius`，与官方 AboutPage 同值
+                            // （写 150f 也会被库夹紧到这个上限）。
+                            blurRadius = BlurDefaults.MaxBlurRadius,
+                            noiseCoefficient = BlurDefaults.NoiseCoefficient,
                             colors = logoColors,
                             contentBlendMode = ComposeBlendMode.DstIn,
                             enabled = true,
@@ -271,8 +270,10 @@ private fun AboutHeader(
                 if (blurEnabled) {
                     Modifier.textureBlur(
                         backdrop = bgBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 150f,
+                        // 与官方 `AboutPage.kt:273-282` 逐参一致：shape 16dp / 半径 100f。
+                        shape = RoundedCornerShape(16.dp),
+                        blurRadius = BlurDefaults.MaxBlurRadius,
+                        noiseCoefficient = BlurDefaults.NoiseCoefficient,
                         colors = logoColors,
                         contentBlendMode = ComposeBlendMode.DstIn,
                         enabled = true,

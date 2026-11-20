@@ -261,7 +261,7 @@ fun rememberBottomBarClearance(): Dp {
     val navInset = WindowInsets.navigationBars
         .only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
     val floatingMargin = when {
-        navInset <= 16.dp -> 28.dp
+        navInset <= 16.dp -> 20.dp
         navInset >= 28.dp -> navInset
         else -> 12.dp + navInset
     }
@@ -269,7 +269,11 @@ fun rememberBottomBarClearance(): Dp {
 }
 ```
 
-🏠 `GifHelper/.../ui/PageChrome.kt:67-81`。
+🏠 `GifHelper/.../ui/PageChrome.kt:67-86`。
+
+> ⚠️ 版本差异：`navInset <= 16.dp` 这一档在 MIUIX `3177a684` 上是 `28.dp`，
+> 从 `5ff41ba9`（提交 `9413f690`）起改成 `20.dp`。照抄旧知识库会多预留 8dp，
+> 列表末尾出现空带（只有导航栏 ≤16dp 的机型才会暴露，420dpi 手势导航模拟器走不到这一档）。
 
 📌 这个 `when` 是**镜像库内部公式**：`GlassNavigationBar.kt:304-323` 里
 `floatingMargin` 是函数内局部变量，**没有暴露成参数**。这是全项目唯一"复刻库内部公式"的地方；

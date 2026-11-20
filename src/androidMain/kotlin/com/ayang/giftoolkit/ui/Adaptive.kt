@@ -90,6 +90,18 @@ fun Modifier.railStartInset(base: Dp = 0.dp): Modifier {
 val LocalTopBarTitleAlpha = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
 
 /**
+ * 折叠态玻璃侧栏（顶部居中胶囊）的起始偏移，用来避免它压住顶栏的居中标题。
+ *
+ * 官方 `AppContent.kt:226-232` 算好后下发给两档顶栏的 `centerObstructionStart`
+ * （`GlassTopAppBar` / `TopAppBar` 同名参数）：横屏折叠态下标题会绕开这块宽度居中。
+ * 未在宽屏 / 侧栏展开 / 还没量到胶囊宽度时给 [Dp.Unspecified]（= 不绕开）。
+ */
+val LocalTopAppBarCenterObstructionStart =
+    androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.ui.unit.Dp> {
+        androidx.compose.ui.unit.Dp.Unspecified
+    }
+
+/**
  * 侧栏是否展开，阈值与官方 `utils/AdaptiveUtils.kt` 的 `shouldExpandNavigationRail()` 一致：
  * **宽度 ≥ 1200dp** 才展开。
  *
