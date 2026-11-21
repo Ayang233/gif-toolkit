@@ -388,7 +388,8 @@ Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度�
 | 关于页图标下方标题 / 版本 | 12 / 5 dp | `AboutPage.kt:261-300` 同 | 一致 |
 | 预览舞台圆角 | 12 dp | 官方媒体缩略图 `squircleClip(12.dp)` | 一致 |
 | 弹层双按钮间距 | 12 dp | `GlassPage.kt:435` 12dp | 一致 |
-| 主操作条左右留白 | 12 dp（与卡片对齐） | 官方 demo 用 24 dp | **保留差异**：对齐卡片边缘，与系统设置页一致；官方 demo 是演示页留白 |
+| 主操作条左右留白 | ~~12 dp~~ → **24 dp** | 官方底部条 `GlassPage.kt:289` 用 24 dp | **已改**：内容卡片 12dp、贴底那一条 24dp，是官方并存的两种网格 |
+| 主操作按钮高度 | ~~写死 50 dp~~ → `ButtonDefaults.MinHeight` + `InsideMargin` 16×13 | 同 | **已改**：示例实测按钮 45.7dp（英文），我们中文行高撑到 50.3dp —— 参数一致，行高差异来自字形 |
 | 关于页图标容器 / 主体 | 100 dp / 132 dp（裁切到 100） | 88 dp / 74 dp | **保留差异**：图标满容器是参考 KSU 的观感，属于产品选择，不在本轮改 |
 | 页面内容 `extraTop` | 2 dp | 0 | 保留：与「固定大标题」占位换算绑定，2dp 是可视呼吸量 |
 
@@ -405,51 +406,34 @@ Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度�
 
 ### 10.1 输入框不跟随键盘（真 bug）
 
-**现场**：点「字幕内容」→ 键盘弹出，但列表纹丝不动，输入框被键盘整个盖住。
+**先看官方怎么做的**：把 MIUIX 示例 APK（`miuix/example/.../Miuix-v1.1.0(85)-debug.apk`）装到同一台模拟器上看 ——
+Glass Component → 搜索，输入框在**页面顶部**，点一下整页随键盘抬起、键盘占满下半屏
+（`Scaffold(modifier = Modifier.imePadding())`，`ComponentPage.kt:148`）。
+示例里**没有"底部操作条"这种东西**：页面底部只有悬浮玻璃导航栏（左右 24dp、`GlassNavigationBarDefaults.Height`）。
 
-**根因一：IME insets 没人消费。**
-清单是 `windowSoftInputMode="adjustResize"`，但 Activity 开了 `enableEdgeToEdge()` ——
-edge-to-edge 下窗口不再真的缩小，IME 高度只以 `WindowInsets.ime` 报给应用，必须自己 `imePadding()`。
-全项目 grep 零命中，所以键盘浮在内容上、页面不动。
-**修**：`Os4ListPage` 的两个 Scaffold 分支都挂 `Modifier.imePadding()`（官方 `ComponentPage.kt:148`、
-`AppContent.kt:655/703` 同款）。整页（含底部主操作条）随键盘抬起。
+**我们的问题**：输入框在**列表最后一项**，底下还压着一条覆盖式底栏。所以：
 
-**根因二：列表不会把获得焦点的输入框滚进可视区，而且"可视区"本身算错了。**
-输入框在列表最后一项，可视区一变矮就落到键盘下面。更麻烦的是：`Scaffold` 的 `bottomBar`
-只是把高度写进 `innerPadding`，**内容区仍然铺满整个 Scaffold**，所以 LazyColumn 的"视口底边"
-其实是底栏背后那条线。框架自带的 bringIntoView 把输入框滚到"键盘顶边"时，正好落在底栏背后 ——
-实测被裁掉下半截（`_archive/round12/shots/z-ime.png`）。
+1. edge-to-edge 下 `adjustResize` 不缩窗口，`WindowInsets.ime` 必须自己消费 —— 项目里一处都没有，键盘直接盖住页面；
+2. 补了 `imePadding()` 之后整页会抬起，但 `Scaffold` 的正文是**按整屏测量**的（`ScaffoldLayout` 里
+   `bodyContentPlaceable.place(0, 0)`，`contentWindowInsets` 只以 `PaddingValues` 形式给出），
+   底栏是"盖在上面"，于是列表视口底边 = 底栏背后那条线；
+3. Compose 自带的 bringIntoView 又只请求**文本行**（实测 `size=52px`，不是整个框），
+   落点正好在底栏背后 —— 表现就是"输入框被切掉下半截"。
 
-**修法**（最终版，试错过程见下）：在 `Scaffold` 的 body 里（能拿到 `innerPadding`，也就知道底栏多高）
-逐帧补齐差量：
+**最终实现（全部官方 API，没有自写滚动）**：
 
-```kotlin
-val visibleBottom = info.viewportEndOffset - barPx - gapPx   // 扣掉底栏高度 + 8dp 呼吸位
-val deficit = (last.offset + last.size) - visibleBottom
-if (deficit > 0) listState.scroll { scrollBy(deficit) }
-```
-
-**为什么这样才"不硬"**：位移由 `WindowInsets.ime` 的逐帧值驱动 —— 那正是系统键盘动画本身，
-所以**速度、时长、曲线和键盘完全同步**，没有任何自己定的 `tween` 参数；差量收敛到 0 就自然停下。
-反过来说，凡是自己给一个时长/曲线，就一定会和键盘对不齐，看起来就是"硬"。
-
-**试错记录**（都实测过，都不是最终解）：
-
-| 尝试 | 结果 |
+| 环节 | 用的东西 |
 |---|---|
-| `bringIntoViewRequester` + 焦点回调 | 无效：项被回收后 requester 失效；且 IME 是渐变的，只请求一次停在动画中途 |
-| `scrollToItem(最后一项)` | 位置对，但**瞬时跳变**，就是用户说的"生硬" |
-| 把滚动逻辑放进那个 lazy item | 列表一滚该项就被回收，协程被取消 → "滚到一半停住" |
-| 把 `imePadding()` 挂在内容层 | 视口底边对上了，但底栏被键盘盖住（"开始生成"消失了） |
-| `animateScrollToItem` / 按帧重启动画 | 与键盘动画互相打架，抖动 |
+| 键盘抬起 | `Scaffold(modifier = Modifier.imePadding())`，与官方示例同一行 |
+| 视口停在底栏上方 | `LazyColumn(modifier = Modifier.padding(bottom = barHeight))`，`barHeight` 取自 `innerPadding.bottom`；`pageContentPadding` 相应扣掉（`barReserved`），不重复计算 |
+| 告诉框架"被底栏遮了多少" | `LocalBringIntoViewSpec`，只改一句"可视下边界 = 容器高 − 8dp 呼吸位"；滚动量与动画仍由框架给 |
+| 让请求落在整个输入框上 | `Modifier.bringIntoViewRequester` 包在 `PaddingValues` 外层，焦点或 IME 高度变化时 `bringIntoView()` |
 
-**顺带修掉一个丢字问题**：`TextFieldState` 原来建在 LazyColumn 的 item 里，
-`remember { TextFieldState(form.text) }` 会在 item 被回收后重建 —— 刚敲进去、还没同步回
-`form.text` 的那几个字就没了（实测能复现"输入后关键盘变空"）。现在状态提到 `ToolScreen` 页面级，
-`remember(tool.id)`，同步 `form.text` 的 `snapshotFlow` 也一并提到页面级。
+**已验证**：点输入框 → 输入框完整可见（含下边框）、停在"开始生成"上方、按钮在键盘上方；
+输入正常；返回收键盘后页面恢复、文字保留（`TextFieldState` 建在页面级，列表项回收也不丢）。
 
-**验证**：点输入框 → 整页随键盘抬起（连续帧实测无跳变）、输入框停在按钮上方 8dp 处、可输入 →
-返回收起键盘 → 页面恢复、文字保留 → 滚走再滚回来 → 文字仍在。
+**之前那套自写的 `scrollBy(deficit)` 逐帧补偿已删除** —— 那是重复实现框架已有的能力，
+上游一升级就容易失真。
 
 ### 10.2 Release APK 装不上（上传方式错了，不是构建问题）
 

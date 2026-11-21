@@ -6,7 +6,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +18,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -37,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -129,8 +136,6 @@ fun ToolScreen(
         reserveNavBar = false,
         // 底部主操作条自带渐变遮罩，再给结果卡留一点呼吸，别贴着按钮
         extraBottom = 20.dp,
-        // 字幕输入框在列表末尾：键盘弹出时保证它完整露在键盘上方
-        imeEndAnchor = subtitleState != null,
         // 主操作放在 Scaffold 的 bottomBar 里：内容区自动让出高度，
         // 不会再出现"参数滑块贴着按钮"或者滚动到头还要被压住的情况。
         bottomBar = {
@@ -438,20 +443,38 @@ private fun ColorSwatches(form: ToolForm) {
  */
 @Composable
 private fun SubtitleField(state: androidx.compose.foundation.text.input.TextFieldState) {
-    // 键盘跟随由页面骨架统一处理（内容区吃 IME 内边距，Compsoe 会把获得焦点的输入框
-    // bringIntoView 到自己算出的位置，动画由框架给）。这里不要再自己滚 ——
-    // 这个可组合项在列表项里，项被回收时协程会被取消，表现就是"滚到一半停住"（踩过）。
-    //
-    // 摆法照官方 `component/TextFieldSection.kt`：TextField 自己就是一张卡
-    // （16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），独立占一条、外边距 12dp，
-    // 不要塞进 `GroupCard`（两层圆角会套在一起、底部会被卡片圆角截掉）。
-    TextField(
-        state = state,
-        label = "字幕内容",
-        useLabelAsPlaceholder = true,
-        modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-    )
+    // 位置交给官方机制：
+    // 1) `Modifier.bringIntoViewRequester` 把这个**整个输入框**（含内边距）作为滚动目标 ——
+    //    `TextField` 自己只请求"文本行"可见，行底到框底还差 16dp 内边距，看起来就是被切掉一截；
+    // 2) 滚动量由 `LocalBringIntoViewSpec` 算（见 `Os4ListPage`），那里扣掉了底栏高度；
+    // 3) 位移由键盘动画驱动（`imePadding`），这里不写任何动画时长/曲线。
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val requester = remember { BringIntoViewRequester() }
+    // 键盘高度每帧都在变：每次变化都重新请求一次「把整个输入框bringIntoView」，
+    // 滚动量与动画仍由框架给（`LocalBringIntoViewSpec` 只负责扣掉底栏）。
+    val imePx = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(focused, imePx) {
+        if (focused) requester.bringIntoView()
+    }
+    Box(
+        Modifier
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp)
+            .bringIntoViewRequester(requester),
+    ) {
+        // 摆法照官方 `component/TextFieldSection.kt`：TextField 自己就是一张卡
+        // （16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），独立占一条、外边距 12dp，
+        // 不要塞进 `GroupCard`（两层圆角会套在一起、底部会被卡片圆角截掉）。
+        TextField(
+            state = state,
+            label = "字幕内容",
+            useLabelAsPlaceholder = true,
+            modifier = Modifier.fillMaxWidth(),
+            interactionSource = interactionSource,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+        )
+    }
 }
 
 @Composable

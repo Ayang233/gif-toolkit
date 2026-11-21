@@ -32,9 +32,11 @@
 
 **修复**
 - 「字幕内容」输入框弹出键盘时不跟随上移：edge-to-edge 下 IME insets 没人消费，页面骨架补
-  `Modifier.imePadding()`；同时列表不会把焦点项滚进可视区（视口还延伸到按钮背后），
-  改为逐帧按"差多少补多少"跟随键盘滚动，位移由键盘动画驱动、不做二次动画。
-  同一处把 `TextFieldState` 提到页面级，避免列表项回收时把刚输入的文字丢掉。
+  `Modifier.imePadding()`（与 MIUIX 示例同一行）；再用官方的 `LocalBringIntoViewSpec` 把"底栏遮挡"
+  告诉框架、`bringIntoViewRequester` 把请求落在整个输入框上（TextField 自己只请求文本行）。
+  `TextFieldState` 提到页面级，避免列表项回收时把刚输入的文字丢掉。
+- 底部主操作条按官方尺寸对齐：左右留白 12dp → 24dp（官方底部条同值），按钮高度不再写死 50dp，
+  改用 `ButtonDefaults.MinHeight` + `InsideMargin`。
 
 
 - 「AMOLED 纯黑 + 动态取色 + 深色」下，关掉玻璃材质后顶栏是一条比页面亮 19/255 的实色带：

@@ -312,11 +312,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    `scripts/setup-miuix.sh` 会把这两件事都做掉。
 3. **带输入框的页面不要再自己加 `imePadding()`**：`Os4ListPage` 的 Scaffold 已经挂了
    （官方 `ComponentPage.kt:148` 同款），edge-to-edge 下 `adjustResize` 不会缩窗口。
-   末尾有输入框的页面传 `imeEndAnchor = true`：骨架会在 body 里逐帧比对"输入框底边 vs
-   （视口底边 − 底栏高度 − 8dp）"，差多少 `scrollBy` 多少 —— **位移由 `WindowInsets.ime` 驱动，
-   不要自己给时长/曲线**，否则一定和键盘动画对不齐（"生硬"的根源）。
-   踩过的坑：`scrollToItem` 是瞬时跳变；把滚动放进 lazy item 会因回收而取消协程（滚一半停住）；
-   `bringIntoViewRequester` 在项被回收后失效。
+   有底栏的页面，底栏高度要做成**真实布局内边距**（`LazyColumn(modifier = Modifier.padding(bottom = barHeight))`
+   + `pageContentPadding(barReserved = barHeight)`），否则列表视口一直延伸到屏幕底，
+   输入框获得焦点时框架会把它滚到**底栏背后**。
+   再叠加两件官方能力：`LocalBringIntoViewSpec` 告诉框架"可视下边界要扣掉底栏"、
+   `Modifier.bringIntoViewRequester` 把请求打在**整个输入框外层**（`TextField` 自己只请求文本行）。
+   **不要自己写 `scrollBy` 循环补差量**（写过，已删除）：那是重复实现框架已有的能力，上游一升级就失真。
    `TextFieldState` 必须建在**页面级**，不要建在 LazyColumn 的 item 里：item 被回收后
    `remember` 会重建，刚输入还没同步回表单的内容会丢。
 4. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed` / `Empty reply from server`，

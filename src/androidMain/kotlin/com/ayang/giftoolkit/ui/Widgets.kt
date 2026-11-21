@@ -476,7 +476,10 @@ fun PrimaryActionBar(
     onClick: () -> Unit,
     onCancel: () -> Unit = {},
 ) {
-    val sideGap = 12.dp
+    // 左右留白 24dp：MIUIX 示例里页面底部那条 `bottomBar`（GlassPage.kt:289）就是
+    // `padding(start = 24.dp, end = 24.dp, top = 20.dp)`。内容卡片是 12dp，两者并存；
+    // 「贴着屏幕底部的那一条」用 24dp 是官方约定，之前写 12dp 是拿卡片网格去套底栏。
+    val sideGap = 24.dp
     // 展开态玻璃侧栏叠在内容之上，底部主操作条也要跟着让位，否则按钮左端会被面板压住。
     // 折叠态（手机横屏 / 竖屏）让位为 0，与之前完全一致。
     // 让位宽度逐帧变化 → 走 railStartInset()（量测期读取），不在组合期解包。

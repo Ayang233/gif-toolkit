@@ -1,5 +1,7 @@
 package com.ayang.giftoolkit.ui
 
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.computedStateOf
@@ -140,6 +143,8 @@ fun pageContentPadding(
     extraBottom: Dp = 12.dp,
     horizontal: Dp = 0.dp,
     reserveNavBar: Boolean = true,
+    /** 底栏高度：已作为真实 padding 施加在列表上（见 `Os4ListPage`），这里不再重复计入。 */
+    barReserved: Dp = 0.dp,
 ): PaddingValues {
     // 二级页没有底栏（进入子页面时它已淡出），此时不该为它预留高度，
     // 否则列表末尾会多出一块 100dp 左右的空白。
@@ -165,7 +170,8 @@ fun pageContentPadding(
     val safeStart = innerPadding.calculateLeftPadding(layoutDirection)
     val safeEnd = innerPadding.calculateRightPadding(layoutDirection)
     val top = innerPadding.calculateTopPadding() + extraTop
-    val bottom = maxOf(innerPadding.calculateBottomPadding(), clearance) + extraBottom
+    val bottom = (maxOf(innerPadding.calculateBottomPadding(), clearance) - barReserved)
+        .coerceAtLeast(0.dp) + extraBottom
     return remember(top, bottom, horizontal, safeStart, safeEnd, railInset) {
         object : PaddingValues {
             override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp {
@@ -200,7 +206,8 @@ fun Os4ListPage(
     subtitle: String = "",
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
-    bottomBar: @Composable () -> Unit = {},
+    /** 底部固定操作条。为 `null` 表示这一页没有底栏（内容不受底栏遮挡）。 */
+    bottomBar: (@Composable () -> Unit)? = null,
     extraBottom: Dp = 12.dp,
     horizontalPadding: Dp = 0.dp,
     reserveNavBar: Boolean = true,
@@ -243,14 +250,6 @@ fun Os4ListPage(
      * - 顶栏的 `isScrolled` 改为"进度到 1"（与参考项目一致：内容完全收起后顶栏才浮起）。
      */
     largeHeader: (@Composable (progress: () -> Float) -> Unit)? = null,
-    /**
-     * 键盘弹出时需要保证列表末尾（输入框）可见。
-     *
-     * 只给「输入框在列表最后一项」的页面用（工具页的字幕输入框）。
-     * 逻辑放在骨架里而不是那个列表项里：`LaunchedEffect` 挂在 lazy item 上时，
-     * 列表一开始滚动该项就可能被回收，协程随之取消，表现是"滚到一半停住"。
-     */
-    imeEndAnchor: Boolean = false,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -305,31 +304,6 @@ fun Os4ListPage(
     }
 
     val body: @Composable (PaddingValues) -> Unit = { padding ->
-        // 键盘弹出时补齐"末尾还没露出来"的那一点高度（只给末尾有输入框的页面）。
-        //
-        // 不能只在 `Scaffold` 上挂 `imePadding()` 就完事：列表的测量区一直延伸到屏幕底
-        // （`bottomBar` 只是把 `innerPadding` 告诉你，内容仍然铺满整个 Scaffold），
-        // 所以「视口底边」其实是底栏背后那条线。这里按 `innerPadding` 把底栏高度扣掉，
-        // 算出的可见下边界才对得上用户真正看到的那条边。
-        //
-        // 也不用 `scrollToItem(末尾)`：那是瞬时跳变（生硬）且不跟键盘动画同步。
-        // IME 高度逐帧上报，这里就逐帧算一次差量、`scrollBy` 补上 —— 位移由键盘动画驱动，
-        // 速度/时长/曲线天然一致；差量收敛到 0 就自然停下。
-        if (imeEndAnchor) {
-            val imePx = WindowInsets.ime.getBottom(LocalDensity.current)
-            val barPx = with(LocalDensity.current) {
-                padding.calculateBottomPadding().roundToPx()
-            }
-            val gapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
-            LaunchedEffect(imePx, barPx, listState) {
-                if (imePx <= 0) return@LaunchedEffect
-                val info = listState.layoutInfo
-                val last = info.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
-                val visibleBottom = info.viewportEndOffset - barPx - gapPx
-                val deficit = (last.offset + last.size) - visibleBottom
-                if (deficit > 0) listState.scroll { scrollBy(deficit.toFloat()) }
-            }
-        }
         val layoutDirection = LocalLayoutDirection.current
         val density = LocalDensity.current
         val headerPadTop = padding.calculateTopPadding() + 40.dp
@@ -356,16 +330,54 @@ fun Os4ListPage(
                             largeHeader(headerProgress)
                         }
                     }
+                    // 有底栏时，把底栏高度做成**真实布局内边距**，让列表视口停在底栏上方。
+                    //
+                    // 这是官方 Scaffold 的固有模型：正文按整屏测量（`ScaffoldLayout` 里
+                    // `bodyContentPlaceable.place(0, 0)`，`contentWindowInsets` 只以 `PaddingValues`
+                    // 形式告诉你），底栏是**盖在上面**的。于是"视口底边"实际上在底栏背后，
+                    // 输入框获得焦点时 Compose 自带的 bringIntoView 会把它滚到那个位置 ——
+                    // 正好被底栏挡住。把底栏高度从视口里扣掉，框架自己算出来的落点就是对的，
+                    // 我们不需要任何自定义滚动（动画也由框架给）。
+                    val barHeight = if (bottomBar != null) padding.calculateBottomPadding() else 0.dp
+                    val barPx = with(density) { barHeight.roundToPx().toFloat() }
+                    val gapPx = with(density) { 8.dp.roundToPx().toFloat() }
                     val contentPadding = pageContentPadding(
                         innerPadding = padding,
                         extraBottom = extraBottom,
                         horizontal = horizontalPadding,
                         reserveNavBar = reserveNavBar,
+                        barReserved = barHeight,
                     )
+                    // 用官方 `LocalBringIntoViewSpec` 把"底栏遮挡"告诉框架：
+                    // 框架自己算滚动量、自己给动画，我们只改一句"可视下边界在哪儿"。
+                    // （不去自己写滚动循环 —— 那样既重复实现，又会在基线上游变化时失真。）
+                    val bringIntoViewSpec = remember(gapPx) {
+                        object : BringIntoViewSpec {
+                            override fun calculateScrollDistance(
+                                offset: Float,
+                                size: Float,
+                                containerSize: Float,
+                            ): Float {
+                                // containerSize 是滚动容器的整块高度（底栏盖在它上面），
+                                // 扣掉底栏与 8dp 呼吸位才是用户真正看得见的下边界。
+                                // 容器高度已经由 `padding(bottom = barHeight)` 扣掉了底栏，
+                                // 这里只再留一个呼吸位。
+                                val visible = containerSize - gapPx
+                                val overflow = (offset + size) - visible
+                                return when {
+                                    overflow > 0f -> overflow
+                                    offset < 0f -> offset
+                                    else -> 0f
+                                }
+                            }
+                        }
+                    }
+                    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(bottom = barHeight)
                             .pageScrollModifiers(scrollBehavior),
                         // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
                         contentPadding = contentPadding,
@@ -386,6 +398,7 @@ fun Os4ListPage(
                         trackPadding = contentPadding,
                         topAppBarScrollBehavior = scrollBehavior,
                     )
+                    }
                 }
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
@@ -409,7 +422,7 @@ fun Os4ListPage(
                 modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
                 topBar = topBar,
-                bottomBar = bottomBar,
+                bottomBar = { bottomBar?.invoke() },
                 content = body,
             )
         }
@@ -422,7 +435,7 @@ fun Os4ListPage(
             // `pageBaseColor()`：三处只要有一处走偏，玻璃/操作条就会在页面上留一块色差方块。
             containerColor = pageBaseColor(),
             topBar = topBar,
-            bottomBar = bottomBar,
+            bottomBar = { bottomBar?.invoke() },
             content = body,
         )
     }

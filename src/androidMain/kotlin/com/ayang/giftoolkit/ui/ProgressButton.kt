@@ -64,9 +64,11 @@ fun ProgressButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     cornerRadius: Dp = ButtonDefaults.CornerRadius,
-    minHeight: Dp = 50.dp,
+    // 尺寸全部取官方 `ButtonDefaults`：MIUIX 里没有"进度按钮"，但容器与尺寸本来就该跟
+    // 普通按钮一致（MinHeight 40dp / InsideMargin 16×13），否则一页里两种高度的按钮并排出现。
+    minHeight: Dp = ButtonDefaults.MinHeight,
     colors: ProgressButtonColors = ProgressButtonDefaults.progressButtonColors(),
-    insideMargin: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+    insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
     interactionSource: MutableInteractionSource? = null,
     indication: Indication? = LocalIndication.current,
     content: @Composable RowScope.() -> Unit,
