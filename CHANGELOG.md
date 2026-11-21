@@ -35,6 +35,8 @@
   `Modifier.imePadding()`（与 MIUIX 示例同一行）；再用官方的 `LocalBringIntoViewSpec` 把"底栏遮挡"
   告诉框架、`bringIntoViewRequester` 把请求落在整个输入框上（TextField 自己只请求文本行）。
   `TextFieldState` 提到页面级，避免列表项回收时把刚输入的文字丢掉。
+- 关于页图标容器 100dp → **88dp**（官方 `AboutPage.kt:249` 同值）；主体 132dp → 88dp
+  （资源自带 26% 透明留白，取 88 后可见主体约 65dp，与官方 74dp 图的可见主体同档）。
 - 底部主操作条按官方尺寸对齐：左右留白 12dp → 24dp（官方底部条同值），按钮高度不再写死 50dp，
   改用 `ButtonDefaults.MinHeight` + `InsideMargin`。
 

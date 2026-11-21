@@ -48,18 +48,18 @@ import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 private const val SOURCE_URL = "https://github.com/Ayang233/gif-toolkit"
 
 /**
- * 图标主体在 backdrop 里的采样尺寸。
+ * 图标容器与主体尺寸，**严格取官方** `AboutPage.kt:249-262`：容器 `88.dp`、圆角
+ * `RoundedCornerShape(24.dp)`、`clip = true`，主体 `Image`。
  *
- * 不是随手给的数：`ic_app_mark` 是 108×108 画布，实际图形只占 x=14..94（80 单位宽，
- * 占画布 74.1%）。要让**看得见的胶片条**正好落在 100dp 的容器里（KSU 是
- * `245dp` 图形 / `100dp` 容器、InstallerX 是 `160dp` / `88dp`，两者都靠图形自带的透明
- * 留白把主体收进容器），需要的采样尺寸 = 100dp × 108/80 ≈ 135dp，这里取 132dp
- * （左右各留 1dp 余量，避免圆角被裁）。可见主体约 97.8 × 48.9dp。
+ * 主体尺寸这里取 88dp 而不是官方的 74dp，原因只在资源：官方那张是 launcher 图，画面几乎铺满；
+ * 本项目的 `ic_app_mark` 是 108 画布、可见图形只占 x=14..94（74.1%），
+ * 取 88dp 后可见主体约 65dp，和官方 74dp 图的可见主体（约 66–70dp）同一档。
+ * 换成不留白的图之后，把这里改回 74dp 即是逐数字对齐。
  */
-private val MarkSampleSize = 132.dp
+private val MarkSampleSize = 88.dp
 
-/** 图标外层容器。与 KSU 的 `Modifier.size(100.dp)` 同档，比第九轮的 88dp 底板大一圈。 */
-private val MarkBoxSize = 100.dp
+/** 图标外层容器：官方 `88.dp`（`AboutPage.kt:249`）。 */
+private val MarkBoxSize = 88.dp
 
 /**
  * 关于页。

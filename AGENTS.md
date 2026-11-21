@@ -227,7 +227,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
       `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。
       三档混合色与 KSU `AboutMiuix.kt:189-203` / InstallerX `MiuixAboutPage.kt:420-431` 逐字相同。
-      图标容器 100dp（`clip = true`）、主体 `requiredSize(132dp)`、`ColorFilter.tint(onBackground)`；
+      图标容器 **88dp**（官方 `AboutPage.kt:249`，`clip = true`）、主体 `requiredSize(88dp)`、`ColorFilter.tint(onBackground)`；
       标题 35sp Bold、同 backdrop 同混合色。
       **不要**改成 `gradientFilled` / `SrcIn` / ShaderBrush / 任何自制渐变（第九轮做过，第十轮已删除）。
     - 本机模拟器**必须用 `-gpu host` 启动**（`emulator -avd android16 -gpu host`）：
