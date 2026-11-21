@@ -7,8 +7,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,8 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -35,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,7 +52,6 @@ import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.IconSizes
-import com.ayang.giftoolkit.ui.LocalPageListState
 import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.PreviewStage
@@ -136,6 +129,8 @@ fun ToolScreen(
         reserveNavBar = false,
         // 底部主操作条自带渐变遮罩，再给结果卡留一点呼吸，别贴着按钮
         extraBottom = 20.dp,
+        // 字幕输入框在列表末尾：键盘弹出时保证它完整露在键盘上方
+        imeEndAnchor = subtitleState != null,
         // 主操作放在 Scaffold 的 bottomBar 里：内容区自动让出高度，
         // 不会再出现"参数滑块贴着按钮"或者滚动到头还要被压住的情况。
         bottomBar = {
@@ -443,34 +438,18 @@ private fun ColorSwatches(form: ToolForm) {
  */
 @Composable
 private fun SubtitleField(state: androidx.compose.foundation.text.input.TextFieldState) {
-    // 键盘弹出时把输入框滚进可视区。
+    // 键盘跟随由页面骨架统一处理（内容区吃 IME 内边距，Compsoe 会把获得焦点的输入框
+    // bringIntoView 到自己算出的位置，动画由框架给）。这里不要再自己滚 ——
+    // 这个可组合项在列表项里，项被回收时协程会被取消，表现就是"滚到一半停住"（踩过）。
     //
-    // 页面挂了 `Modifier.imePadding()`（`Os4ListPage`），键盘一弹整页会缩上去；
-    // 但 `LazyColumn` 不会自己把获得焦点的输入框滚进来 —— 这个输入框在列表末尾，
-    // 缩完之后正好落到键盘下面。
-    //
-    // 所以：拿到焦点的瞬间 + IME 每一帧 insets 变化时，都把列表滚到末尾（输入框是最后一项）。
-    // 不能只用 `bringIntoViewRequester`：输入框被顶出可视区后列表项会被回收，
-    // requester 随之失效；而且 IME 是动画变高的，只请求一次会停在动画中途的位置。
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
-    val listState = LocalPageListState.current
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    LaunchedEffect(focused, imeBottom, listState) {
-        if (!focused || listState == null) return@LaunchedEffect
-        val last = listState.layoutInfo.totalItemsCount - 1
-        if (last < 0) return@LaunchedEffect
-        withFrameNanos { }
-        // 用 scrollToItem（瞬时）而不是 animateScrollToItem：IME 动画期间这个 effect 会被重启多次，
-        // 每次重启都重开一段动画会和键盘动画互相打架。
-        listState.scrollToItem(last)
-    }
+    // 摆法照官方 `component/TextFieldSection.kt`：TextField 自己就是一张卡
+    // （16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），独立占一条、外边距 12dp，
+    // 不要塞进 `GroupCard`（两层圆角会套在一起、底部会被卡片圆角截掉）。
     TextField(
         state = state,
         label = "字幕内容",
         useLabelAsPlaceholder = true,
         modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
-        interactionSource = interactionSource,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     )
 }

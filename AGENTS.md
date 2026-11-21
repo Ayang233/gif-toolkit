@@ -312,8 +312,11 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    `scripts/setup-miuix.sh` 会把这两件事都做掉。
 3. **带输入框的页面不要再自己加 `imePadding()`**：`Os4ListPage` 的 Scaffold 已经挂了
    （官方 `ComponentPage.kt:148` 同款），edge-to-edge 下 `adjustResize` 不会缩窗口。
-   页面内的输入框若在列表末尾，还要保证获得焦点后能把列表滚到底 —— 见 `ToolScreen.SubtitleField`
-   （从 `LocalPageListState` 取列表状态，焦点 + IME insets 变化时 `scrollToItem(最后一项)`）。
+   末尾有输入框的页面传 `imeEndAnchor = true`：骨架会在 body 里逐帧比对"输入框底边 vs
+   （视口底边 − 底栏高度 − 8dp）"，差多少 `scrollBy` 多少 —— **位移由 `WindowInsets.ime` 驱动，
+   不要自己给时长/曲线**，否则一定和键盘动画对不齐（"生硬"的根源）。
+   踩过的坑：`scrollToItem` 是瞬时跳变；把滚动放进 lazy item 会因回收而取消协程（滚一半停住）；
+   `bringIntoViewRequester` 在项被回收后失效。
    `TextFieldState` 必须建在**页面级**，不要建在 LazyColumn 的 item 里：item 被回收后
    `remember` 会重建，刚输入还没同步回表单的内容会丢。
 4. 在受限网络下 `git push` 可能报 `CONNECT tunnel failed` / `Empty reply from server`，

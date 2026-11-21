@@ -138,7 +138,7 @@ AGSL 可用。滚动后顶栏确实出现渐进模糊带，内容被糊开、边
 | Release `:assembleRelease` | 通过（R8 + shrinkResources） |
 | 依赖树 | `releaseRuntimeClasspath` 全部 Compose 构件收敛到 `1.13.0rc01`，无 `FAILED` / 冲突；`top.yukonga.miuix.kmp:*` 全部被 composite build 的 project 替换（预期） |
 | 升级后 Debug | 47,865,117 B，`1.12 / 14`，SHA-256 `b4265be9…58cd8` |
-| 升级后 Release | 3,409,711 B，`1.12 / 14`，SHA-256 `e5c861b1…43741` |
+| 升级后 Release | 3,409,711 B，`1.12 / 14`，SHA-256 `fa708253…6032a7`（最终构建） |
 | 升级前 Debug（对照） | 45,327,506 B（由 `b74a0e0` 重建），SHA-256 `e4d5ed04…e334ff` |
 | 升级前 Release（对照） | 3,360,963 B，SHA-256 `71cbec0a…e4839` |
 
@@ -407,33 +407,49 @@ Monet 深色 y=45 处 (9,9,9) → (9,9,9)）—— 因为这条带子的亮度�
 
 **现场**：点「字幕内容」→ 键盘弹出，但列表纹丝不动，输入框被键盘整个盖住。
 
-**根因**（两层）：
+**根因一：IME insets 没人消费。**
+清单是 `windowSoftInputMode="adjustResize"`，但 Activity 开了 `enableEdgeToEdge()` ——
+edge-to-edge 下窗口不再真的缩小，IME 高度只以 `WindowInsets.ime` 报给应用，必须自己 `imePadding()`。
+全项目 grep 零命中，所以键盘浮在内容上、页面不动。
+**修**：`Os4ListPage` 的两个 Scaffold 分支都挂 `Modifier.imePadding()`（官方 `ComponentPage.kt:148`、
+`AppContent.kt:655/703` 同款）。整页（含底部主操作条）随键盘抬起。
 
-1. **IME insets 没人消费。** 清单是 `windowSoftInputMode="adjustResize"`，但 Activity 开了
-   `enableEdgeToEdge()` —— edge-to-edge 下窗口不再真的缩小，IME 高度只以 `WindowInsets.ime`
-   的形式报给应用，必须自己 `imePadding()`。全项目 grep `imePadding` / `WindowInsets.ime` **零命中**，
-   所以键盘浮在内容上面，页面一点没动。
-   官方示例是给 Scaffold 挂 `Modifier.imePadding()`（`ComponentPage.kt:148`、`AppContent.kt:655/703`），
-   现在 `Os4ListPage` 的两个 Scaffold 分支都照这个挂上了。
+**根因二：列表不会把获得焦点的输入框滚进可视区，而且"可视区"本身算错了。**
+输入框在列表最后一项，可视区一变矮就落到键盘下面。更麻烦的是：`Scaffold` 的 `bottomBar`
+只是把高度写进 `innerPadding`，**内容区仍然铺满整个 Scaffold**，所以 LazyColumn 的"视口底边"
+其实是底栏背后那条线。框架自带的 bringIntoView 把输入框滚到"键盘顶边"时，正好落在底栏背后 ——
+实测被裁掉下半截（`_archive/round12/shots/z-ime.png`）。
 
-2. **`LazyColumn` 不会把获得焦点的输入框滚进可视区。** 挂上 `imePadding()` 之后整页确实缩上去了
-   （底部主操作条也一起抬起），但输入框在列表**最后一项**，可视区变矮之后正好落到键盘下面，
-   列表自己不滚。试过的两条路：
-   - `bringIntoViewRequester` + `onFocusChanged`：**不管用**。输入框被顶出可视区后列表项会被回收，
-     requester 随节点失效；而且 IME 是动画变高的，只在获得焦点的那一帧请求一次，
-     滚到的是"旧可视区"算出来的位置。
-   - 现在：`Os4ListPage` 通过 `LocalPageListState` 把列表状态下发，`SubtitleField` 在
-     「获得焦点」和「IME 每一帧 insets 变化」时都 `scrollToItem(最后一项)`。
-     用瞬时的 `scrollToItem` 而不是 `animateScrollToItem`：IME 动画期间 effect 会被重启多次，
-     每帧重开一段滚动动画会和键盘动画互相打架。
+**修法**（最终版，试错过程见下）：在 `Scaffold` 的 body 里（能拿到 `innerPadding`，也就知道底栏多高）
+逐帧补齐差量：
+
+```kotlin
+val visibleBottom = info.viewportEndOffset - barPx - gapPx   // 扣掉底栏高度 + 8dp 呼吸位
+val deficit = (last.offset + last.size) - visibleBottom
+if (deficit > 0) listState.scroll { scrollBy(deficit) }
+```
+
+**为什么这样才"不硬"**：位移由 `WindowInsets.ime` 的逐帧值驱动 —— 那正是系统键盘动画本身，
+所以**速度、时长、曲线和键盘完全同步**，没有任何自己定的 `tween` 参数；差量收敛到 0 就自然停下。
+反过来说，凡是自己给一个时长/曲线，就一定会和键盘对不齐，看起来就是"硬"。
+
+**试错记录**（都实测过，都不是最终解）：
+
+| 尝试 | 结果 |
+|---|---|
+| `bringIntoViewRequester` + 焦点回调 | 无效：项被回收后 requester 失效；且 IME 是渐变的，只请求一次停在动画中途 |
+| `scrollToItem(最后一项)` | 位置对，但**瞬时跳变**，就是用户说的"生硬" |
+| 把滚动逻辑放进那个 lazy item | 列表一滚该项就被回收，协程被取消 → "滚到一半停住" |
+| 把 `imePadding()` 挂在内容层 | 视口底边对上了，但底栏被键盘盖住（"开始生成"消失了） |
+| `animateScrollToItem` / 按帧重启动画 | 与键盘动画互相打架，抖动 |
 
 **顺带修掉一个丢字问题**：`TextFieldState` 原来建在 LazyColumn 的 item 里，
 `remember { TextFieldState(form.text) }` 会在 item 被回收后重建 —— 刚敲进去、还没同步回
 `form.text` 的那几个字就没了（实测能复现"输入后关键盘变空"）。现在状态提到 `ToolScreen` 页面级，
 `remember(tool.id)`，同步 `form.text` 的 `snapshotFlow` 也一并提到页面级。
 
-**验证**：点输入框 → 整页抬起、列表滚到末尾、输入框带焦点框停在键盘正上方 → 输入 `xyz` 正常 →
-按返回收起键盘 → 页面恢复、文字保留 → 滚走再滚回来 → 文字仍在。
+**验证**：点输入框 → 整页随键盘抬起（连续帧实测无跳变）、输入框停在按钮上方 8dp 处、可输入 →
+返回收起键盘 → 页面恢复、文字保留 → 滚走再滚回来 → 文字仍在。
 
 ### 10.2 Release APK 装不上（上传方式错了，不是构建问题）
 

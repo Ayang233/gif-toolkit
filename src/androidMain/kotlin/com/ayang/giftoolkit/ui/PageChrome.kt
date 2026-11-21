@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -21,7 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
@@ -60,15 +61,6 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
  */
 val LocalBottomBarClearance = compositionLocalOf { 0.dp }
 
-/**
- * 当前页面的列表状态，交给页面内的控件主动滚动用（目前只有"输入框获得焦点"这一处）。
- *
- * 为什么需要：页面挂了 `Modifier.imePadding()`，键盘弹出时整页会缩上去，但
- * `LazyColumn` 不会自己把获得焦点的输入框滚进可视区 —— 输入框在列表末尾时就被键盘顶出去了。
- * 页内控件拿不到 `rememberLazyListState()`（它在骨架里），所以用 CompositionLocal 下发；
- * 不需要滚动的页面不用理会它。
- */
-val LocalPageListState = androidx.compose.runtime.compositionLocalOf<androidx.compose.foundation.lazy.LazyListState?> { null }
 
 /**
  * 底栏占位高度。
@@ -251,6 +243,14 @@ fun Os4ListPage(
      * - 顶栏的 `isScrolled` 改为"进度到 1"（与参考项目一致：内容完全收起后顶栏才浮起）。
      */
     largeHeader: (@Composable (progress: () -> Float) -> Unit)? = null,
+    /**
+     * 键盘弹出时需要保证列表末尾（输入框）可见。
+     *
+     * 只给「输入框在列表最后一项」的页面用（工具页的字幕输入框）。
+     * 逻辑放在骨架里而不是那个列表项里：`LaunchedEffect` 挂在 lazy item 上时，
+     * 列表一开始滚动该项就可能被回收，协程随之取消，表现是"滚到一半停住"。
+     */
+    imeEndAnchor: Boolean = false,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -305,6 +305,31 @@ fun Os4ListPage(
     }
 
     val body: @Composable (PaddingValues) -> Unit = { padding ->
+        // 键盘弹出时补齐"末尾还没露出来"的那一点高度（只给末尾有输入框的页面）。
+        //
+        // 不能只在 `Scaffold` 上挂 `imePadding()` 就完事：列表的测量区一直延伸到屏幕底
+        // （`bottomBar` 只是把 `innerPadding` 告诉你，内容仍然铺满整个 Scaffold），
+        // 所以「视口底边」其实是底栏背后那条线。这里按 `innerPadding` 把底栏高度扣掉，
+        // 算出的可见下边界才对得上用户真正看到的那条边。
+        //
+        // 也不用 `scrollToItem(末尾)`：那是瞬时跳变（生硬）且不跟键盘动画同步。
+        // IME 高度逐帧上报，这里就逐帧算一次差量、`scrollBy` 补上 —— 位移由键盘动画驱动，
+        // 速度/时长/曲线天然一致；差量收敛到 0 就自然停下。
+        if (imeEndAnchor) {
+            val imePx = WindowInsets.ime.getBottom(LocalDensity.current)
+            val barPx = with(LocalDensity.current) {
+                padding.calculateBottomPadding().roundToPx()
+            }
+            val gapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
+            LaunchedEffect(imePx, barPx, listState) {
+                if (imePx <= 0) return@LaunchedEffect
+                val info = listState.layoutInfo
+                val last = info.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
+                val visibleBottom = info.viewportEndOffset - barPx - gapPx
+                val deficit = (last.offset + last.size) - visibleBottom
+                if (deficit > 0) listState.scroll { scrollBy(deficit.toFloat()) }
+            }
+        }
         val layoutDirection = LocalLayoutDirection.current
         val density = LocalDensity.current
         val headerPadTop = padding.calculateTopPadding() + 40.dp
@@ -314,8 +339,6 @@ fun Os4ListPage(
         }
 
         ContentBackdropBox(glass) {
-            // 页面内控件（输入框）需要主动滚动时，从 CompositionLocal 取这份状态。
-            CompositionLocalProvider(LocalPageListState provides listState) {
                 Box(Modifier.fillMaxSize()) {
                     if (largeHeader != null) {
                         // 头部画在列表**下面**：先画的是底层，后画的列表盖在上面。
@@ -364,7 +387,6 @@ fun Os4ListPage(
                         topAppBarScrollBehavior = scrollBehavior,
                     )
                 }
-            }
         }
         // 与录制层同级：能拿 Scaffold 的弹层宿主，又不会被录进 backdrop。
         //
@@ -381,9 +403,9 @@ fun Os4ListPage(
         Box(Modifier.fillMaxSize()) {
             background(headerProgress)
             Scaffold(
-                // 键盘弹出时整页（含底部主操作条）一起抬起来。edge-to-edge 下
-                // `windowSoftInputMode="adjustResize"` 不会真的缩窗口，IME insets 必须自己消费，
-                // 官方示例也是给 Scaffold 挂 `Modifier.imePadding()`（`ComponentPage.kt:148`）。
+                // 键盘弹出时整页（含底部主操作条）一起抬起来。edge-to-edge 下 `adjustResize`
+                // 不会真的缩窗口，IME insets 必须自己消费 —— 官方示例也是给 Scaffold 挂这个
+                // （`ComponentPage.kt:148`、`AppContent.kt:655/703`）。
                 modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
                 topBar = topBar,
@@ -393,7 +415,7 @@ fun Os4ListPage(
         }
     } else {
         Scaffold(
-            // 同上：键盘弹出时整页抬起，输入框跟着输入法上移。
+            // 同上：键盘弹出时整页抬起。
             modifier = Modifier.imePadding(),
             // 页面底色显式写出来，不依赖 Scaffold 的默认值（默认是 `surface`，现在与它同值）。
             // 必须与 `rememberPageBackdrop` 垫的那一层、底部主操作条的遮挡色是**同一个**
