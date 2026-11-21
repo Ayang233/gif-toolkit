@@ -77,7 +77,7 @@ data class ProgressButtonColors(
 )
 ```
 
-🏠 `GifHelper/.../ui/ProgressButton.kt:48-120`（Apache-2.0，移植自 MIUIX 生态）。
+🏠 `.../ui/ProgressButton.kt:48-120`（Apache-2.0，移植自 MIUIX 生态）。
 
 ### 2.3 实现要点（三处值得抄）
 
@@ -133,7 +133,7 @@ ProgressButtonDefaults.progressButtonColors(
 )
 ```
 
-🏠 `GifHelper/.../ui/Widgets.kt:551-576`。
+🏠 `.../ui/Widgets.kt:551-576`。
 
 ### 2.4 已知风险
 
@@ -175,7 +175,7 @@ Column(
 ) { ActionButton(…) }
 ```
 
-🏠 `GifHelper/.../ui/Widgets.kt:497-518`。
+🏠 `.../ui/Widgets.kt:497-518`。
 
 | 决定 | 为什么 |
 |---|---|
@@ -218,7 +218,7 @@ BoxWithConstraints(modifier.fillMaxWidth()) {
 }
 ```
 
-🏠 `GifHelper/.../ui/Widgets.kt:390-450`。
+🏠 `.../ui/Widgets.kt:390-450`。
 
 三个要点：
 
@@ -243,7 +243,7 @@ GIF 助手的"抠图颜色"是五个色点 + 标题，自绘了 `Box.selectable`
 | 无选中语义 | `selectable(role = Role.RadioButton, selected = …)` + `stateDescription` |
 | 选中时尺寸 24→28dp 让整行跳动 | 固定 28dp 槽位（圆点仍 24dp），行高补到 56dp |
 
-🏠 `GifHelper/.../screens/ToolScreen.kt:353-402`。
+🏠 `.../screens/ToolScreen.kt:353-402`。
 
 触觉：只在**选中项真的变化**时发 `HapticFeedbackType.ToggleOn`（依据官方
 `RadioButtonPreference.kt:131` / `RadioButton.kt:101` 的触发条件）。详见 [09](09-interaction-and-haptics.md)。
@@ -276,7 +276,7 @@ fun GlassCard(backdrop: Backdrop?, modifier: Modifier = Modifier, content: @Comp
 }
 ```
 
-🏠 `GifHelper/.../ui/Widgets.kt:187-219`（写法来自 InstallerX `MiuixAboutPage.kt:612-638` 的转引）。
+🏠 `.../ui/Widgets.kt:187-219`（写法来自 InstallerX `MiuixAboutPage.kt:612-638` 的转引）。
 
 要点：
 

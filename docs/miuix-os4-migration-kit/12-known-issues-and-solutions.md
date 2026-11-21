@@ -1,6 +1,6 @@
 # 12 · 真实问题案例库（GIF 助手 1.10）
 
-> 45 个真实案例。来源：`GifHelper/AGENTS.md`、`docs/os4-round5~11-audit.md`、
+> 45 个真实案例。来源：`AGENTS.md`、`docs/os4-round5~11-audit.md`、
 > `docs/os4-deep-audit.md`、`docs/os4-reuse-audit.md`、`docs/OS4-Glass-UI-Plan.md`、`docs/ui-audit.md`。
 > **每条都标注"可迁移性"**：是 MIUIX 通用约束，还是 GIF 助手的结构选择。
 >

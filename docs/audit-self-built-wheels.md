@@ -2,7 +2,7 @@
 
 - **性质**：只读审计。除本文件外未改动任何文件。
 - **审计对象**：`src/androidMain/kotlin/com/ayang/giftoolkit` 下全部 **36 个 `.kt`**，逐文件过一遍（清单见 §10）。
-- **上游**：`C:\Users\10487\WorkBuddy\gif\miuix`，detached HEAD `5ff41ba9`（含本地补丁 `build-logic/.../BuildConfig.kt`，未触碰）。
+- **上游**：`../miuix`，detached HEAD `5ff41ba9`（含本地补丁 `build-logic/.../BuildConfig.kt`，未触碰）。
 - **本仓库状态**：HEAD `060c804` + 未提交的基线升级改动（`AGENTS.md`、`build.gradle.kts`、`ui/GlassSupport.kt`、`ui/GlassScope.kt`、`screens/AboutScreen.kt`、`ui/PageChrome.kt`、`docs/`、`scripts/`）。
   **行号以审计时工作区快照为准**；其中 `GlassSupport.kt` / `GlassScope.kt` / `AboutScreen.kt` / `PageChrome.kt` 正被并行修改，引用时请以**符号名**为主、行号为辅。
 

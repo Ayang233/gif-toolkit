@@ -5,7 +5,7 @@
 > `docs/miuix-baseline-<旧sha>-to-<新sha>-diff.md`，定制面清单见 `docs/upgrade-prep-customization-inventory.md`。
 >
 > 适用基线：Miuix `5ff41ba9`（2026-11-20）。本文所有命令都在
-> `GifHelper/`（Git Bash / zsh / bash）与 `GifHelper/../miuix/` 两个目录下执行，路径以实际工作区为准。
+> **仓库根目录**（Git Bash / zsh / bash）与 `../miuix/` 两个目录下执行，路径以实际工作区为准。
 
 ---
 
@@ -29,8 +29,8 @@
 
 | 角色 | 实际位置 | 地址 | 说明 |
 | --- | --- | --- | --- |
-| **upstream**（上游基线） | `GifHelper/../miuix` 独立 git 仓库 | `https://github.com/compose-miuix-ui/miuix.git` | 只读消费；**我们从不向它提交** |
-| **origin**（自己的主仓库） | `GifHelper/` git 仓库 | `https://github.com/Ayang233/gif-toolkit.git` | 唯一需要备份、发布、长期保存的仓库 |
+| **upstream**（上游基线） | `../miuix` 独立 git 仓库 | `https://github.com/compose-miuix-ui/miuix.git` | 只读消费；**我们从不向它提交** |
+| **origin**（自己的主仓库） | 仓库根目录（clone 后是 `gif-toolkit/`） | `https://github.com/Ayang233/gif-toolkit.git` | 唯一需要备份、发布、长期保存的仓库 |
 | **local**（开发环境） | 上面两个目录 + JDK 21 + Android SDK 37.2 | — | 可销毁、可重建 |
 
 工作区里还存在 `KernelSU-AVD`、`_archive` 等目录：前者是无关参考项目，后者是本机的升级前 APK / 截图 / 脚本归档，
@@ -86,7 +86,7 @@ includeBuild(miuixDir)
 ### Step 1 — 建保护点（5 分钟）
 
 ```bash
-# 在 GifHelper/ 下
+# 在仓库根目录下
 git status --porcelain            # 必须为空，或先提交
 git fetch origin --prune --tags
 git rev-list --left-right --count origin/main...HEAD   # 期望 "0 0"
@@ -138,8 +138,11 @@ bash scripts/setup-miuix.sh                              # 幂等：确认 pin�
 ./gradlew :assembleRelease --console=plain               # R8 + lintVital 也要过
 ```
 
-判定：**debug 与 release 都 `BUILD SUCCESSFUL`**。
-编译错误通常只有两类：图标/常量改名、公开签名变化。按报错修，不要为了"过编译"改设计。
+判定：**debug 与 release 都 `BUILD SUCCESSFUL`**。构建前先看脚本最后三行校验：
+基线是否真的切到目标提交（`exit 2/3` 就是没切到，别硬编）、补丁是否在、宿主 AGP 与上游是否同版本。
+编译错误通常只有三类：图标/常量改名、公开签名变化，以及**工具链版本不再对齐**
+（上游 `gradle/libs.versions.toml` 的 `agp` / CMP 一变，宿主的 `build.gradle.kts` 必须同版本；
+AGP 不同版本在 composite build 里是硬错误，不是警告）。按报错修，不要为了"过编译"改设计。
 
 ### Step 5 — 适配耦合点（本轮实际工作量：1 处）
 
@@ -257,13 +260,13 @@ git -C ../miuix diff > /dev/null                 # 确认补丁仍在
 
 | 东西 | 位置 | 是否在 GitHub | 备注 |
 | --- | --- | --- | --- |
-| 源代码 + 文档 + 全部历史 | `GifHelper/` | ✅ 全部（`origin/main`） | 114 个跟踪文件，.git 约 2.7MB |
+| 源代码 + 文档 + 全部历史 | 仓库根目录 | ✅ 全部（`origin/main`） | 114 个跟踪文件，.git 约 2.7MB |
 | 基线 pin | `scripts/setup-miuix.sh` | ✅ | 恢复时自动重建 `../miuix` |
 | 签名 keystore | **不在仓库** | ❌ | 目前 release 用 debug 签名；正式分发前必须生成并**在仓库外**备份 |
 | `local.properties`（SDK 路径） | 本机 | ❌（被 .gitignore） | 重建时手写一行，或设 `ANDROID_HOME` |
 | `../miuix` 源码 | 本机 | 不需要 | 由脚本 clone + checkout pin |
 | 旧 APK / 截图 / 审计归档 | `_archive/` | ❌（本机归档） | 想留就复制到 GitHub Release 或网盘 |
-| 版本 tag | 仓库内 | ✅（`v1.0`…`v1.10`） | `git tag` 查看；**注意有的 tag 只在本地**，要 `git push --tags` 才上云 |
+| 版本 tag | 仓库内 | ✅（`v1.0`…`v1.12`） | `git tag` 查看；**注意有的 tag 只在本地**，要 `git push --tags` 才上云 |
 
 ### 5.2 新电脑从零恢复（约 15 分钟）
 
@@ -306,7 +309,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 ### 6.1 版本号约定
 
 - `versionName`：`1.<n>`，**每吸收一次上游基线或有一组对外可见改动就 +1**；纯内部重构/文档不动版本。
-- `versionCode`：严格递增整数（当前 12 → 下一个 13）。
+- `versionCode`：严格递增整数（1.12 是 14，下一个 15）。
 - 版本号写在 `build.gradle.kts` 的 `defaultConfig`，关于页/设置页从 `AppInfo` 读，不要在 UI 里硬写。
 
 ### 6.2 分支与 tag

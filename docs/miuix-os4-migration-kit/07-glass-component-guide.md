@@ -51,7 +51,7 @@
 - **局部 / 全局**：页面框架型（局部 Glass）。
 - **与普通组件关系**：非玻璃档用 `TopAppBar`（`miuix-ui/basic`），两者参数高度对齐，
   可以做成"同一个封装里二选一"（GIF 助手 `PageTopBar` 就是这么做的 🏠）。
-- **GIF 助手用法** 🏠：`GifHelper/.../ui/GlassScope.kt:260-288`。关键点：
+- **GIF 助手用法** 🏠：`.../ui/GlassScope.kt:260-288`。关键点：
   - `progressiveBlur = !isSoftwareRenderer`（软件渲染走库的 band 渐变，不自绘）
   - `backdrop = backdrop ?: glass.contentBackdrop`
   - `contentModifier = Modifier.railStartInset()`（侧栏让位只挪前景）
@@ -190,7 +190,7 @@
   `summary`、`startAction`、`bottomAction`、`insideMargin`、`visuals`、`onExpandedChange`。
 - **backdrop**：必须传（可空）。
 - **局部 / 全局**：**全局弹层**（默认渲染在根 Scaffold）。
-- **GIF 助手用法** 🏠：`DropdownRow`（`GifHelper/.../ui/Widgets.kt:301-323`）：
+- **GIF 助手用法** 🏠：`DropdownRow`（`.../ui/Widgets.kt:301-323`）：
   `backdrop = (LocalRootBackdrop.current ?: LocalPageBackdrop.current).takeIf { glassEnabled }`。
 - **坑**：
   - 不要传 `visuals = GlassPopupDefaults.visuals(style = GlassDefaults.style(isDark))`：

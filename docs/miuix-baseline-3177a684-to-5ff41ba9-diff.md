@@ -1,10 +1,10 @@
 # Miuix 基线 3177a684 → 5ff41ba9 差异分析（面向 GifHelper）
 
-- 分析对象：`C:\Users\10487\WorkBuddy\gif\miuix`（git 仓库），区间 `3177a684..5ff41ba9`，共 **34 个提交**，198 个文件、+18435/−4307。
+- 分析对象：`../miuix`（git 仓库），区间 `3177a684..5ff41ba9`，共 **34 个提交**，198 个文件、+18435/−4307。
 - 取证方式：`git log/log -S/-G`、`git diff --stat/-U0/-U3`、`git show <rev>:<file>`，均只读；未改动 miuix 仓库任何状态。
-- 分析实现：`C:\Users\10487\WorkBuddy\gif\GifHelper`（36 个 `.kt`，composite build 通过 `settings.gradle.kts` 的 `includeBuild(../miuix)` 引入）。
+- 分析实现：`.`（36 个 `.kt`，composite build 通过 `settings.gradle.kts` 的 `includeBuild(../miuix)` 引入）。
 - 环境备注（重要）：分析期间该 miuix 仓库实际处于 **detached HEAD = 5ff41ba9**，工作区仅一处本地补丁 `build-logic/src/main/kotlin/BuildConfig.kt`（composite build 必需，与本次差异无关）。任务描述里的"当前 HEAD 3177a684"与现场不符，本报告不依赖 HEAD，全部结论用两个 commit 号对取。
-- 版本 pin 现状不一致：`GifHelper/scripts/setup-miuix.sh:21` 的 `PINNED_REF="d45ca181"`、`GifHelper/build.gradle.kts:53` 注释写的是 `0.9.5-beta01（3177a684）`。**两处都应在升级后同步改为 5ff41ba9**，否则重跑 `setup-miuix.sh` 会把源码切回别的提交。
+- 版本 pin 现状不一致：`scripts/setup-miuix.sh:21` 的 `PINNED_REF="d45ca181"`、`build.gradle.kts:53` 注释写的是 `0.9.5-beta01（3177a684）`。**两处都应在升级后同步改为 5ff41ba9**，否则重跑 `setup-miuix.sh` 会把源码切回别的提交。
 
 ---
 
@@ -224,7 +224,7 @@
 ## 附录 A：本次取证的关键命令
 
 ```powershell
-cd C:\Users\10487\WorkBuddy\gif\miuix
+cd ../miuix
 git log --oneline --no-decorate 3177a684..5ff41ba9          # 34 提交
 git diff --stat 3177a684..5ff41ba9                          # 198 文件
 git diff --diff-filter=D --name-only 3177a684..5ff41ba9     # 删除清单
@@ -246,7 +246,7 @@ git show e875daf8   # 下拉锚点 / interactionSource / NonRestartable
 GifHelper 侧使用的 grep：
 
 ```powershell
-cd C:\Users\10487\WorkBuddy\gif\GifHelper
+cd .
 Select-String -Path (Get-ChildItem -Recurse -Filter *.kt src | % FullName) -Pattern '^import top\.yukonga' | Sort-Object -Unique
 Select-String -Path (Get-ChildItem -Recurse -Filter *.kt src | % FullName) -Pattern 'GlassNavigationBarDefaults\.|GlassTopAppBarDefaults\.|isDynamicColor'
 ```

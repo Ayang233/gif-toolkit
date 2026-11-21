@@ -54,8 +54,14 @@
 ### 前置
 
 - JDK 21
-- Android SDK Platform 37、Build-Tools 37.0.0
+- Android SDK Platform **37.2**（SDK 目录名 `platforms/android-37.2`；只装 37.0 会在配置期报
+  `requires compile against version 37.2 or later`）、Build-Tools 37.0.0
 - 一把能跑 `gradlew` 的 shell（Git Bash / zsh / bash 均可）
+
+`build.gradle.kts` 的 AGP 版本必须与 `../miuix/gradle/libs.versions.toml` 的 `agp` **完全一致**。
+composite build 里两个构建用不同 AGP 会直接失败：
+`Using multiple versions of the Android Gradle plugin (9.5.2, 9.5.1) in the same build is not allowed`。
+升级 Miuix 基线后先对一眼这个值（0.9.5-beta03 起上游是 9.5.2）。
 
 SDK 路径可以写进 `local.properties`（`sdk.dir=/path/to/Android/Sdk`），也可以只设 `ANDROID_HOME` 环境变量——
 两种方式都验证过。
@@ -77,6 +83,17 @@ cd gif-toolkit
 并打上 composite build 必需的一处上游补丁——Miuix 的 `build-logic` 在配置阶段调用 git 取版本号，
 而子构建的工作目录是宿主工程（不是 git 仓库），不打补丁会直接 exit 128。
 脚本可重复执行，已打过会跳过。
+
+脚本结束时会做三件事的校验，**任一不通过就别急着构建**：
+
+| 检查 | 不通过时的行为 |
+|---|---|
+| 源码是否真的停在钉住的提交 | `exit 2`（解析不到该 ref）/ `exit 3`（停在了别的提交）。受限网络下确实要用当前提交时，设 `MIUIX_OFFLINE=1` 显式跳过 |
+| `workingDir = rootDir` 补丁 | `exit 1`，打印要手工加的两行 |
+| 宿主 AGP vs 上游 `gradle/libs.versions.toml` 的 `agp` | 只告警（升级途中你要自己改），但会把两个版本号和该改哪一行摆出来 |
+
+> 以前这些情况脚本是"打个警告继续跑"的：拿不到目标 ref 就用旧基线，
+> 最后出一个标着新版本号的包，没人发现。现在默认硬失败。
 
 没准备 Miuix 时，Gradle 同步会直接给出带克隆命令的报错，不会只丢一句「找不到项目」。
 

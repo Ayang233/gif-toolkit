@@ -51,7 +51,7 @@ interface Backdrop {
 |---|---|---|---|
 | **库 API** | `rememberLayerBackdrop`、`Modifier.layerBackdrop`、`Modifier.drawBackdrop`、`Modifier.textureBlur`、`Modifier.glassPanel`、`glassSurface`、`GlassDefaults`、`GlassStyle`… | `miuix-blur` / `miuix-material` / `miuix-glass` | ✅ 直接用 |
 | **example-only** | `rememberBlurBackdrop`、`rememberCombinedBackdrop`、`LocalTopAppBarBackdrop`、`LocalTopLayer`/`TopLayerHost`、`GlassPageHost` | `miuix/example/shared/...` | ⚠️ 逻辑可参考，代码要自己写 |
-| **GIF 助手自建** 🏠 | `GlassScope`、`LocalPageBackdrop`、`LocalRootBackdrop`、`rememberPageBackdrop`、`ContentBackdropBox`、`Os4ListPage`、`LocalRailInset`、`CombinedBackdrop` | `GifHelper/.../ui/*.kt` | ❌ 不存在的库 API，必须重新设计 |
+| **GIF 助手自建** 🏠 | `GlassScope`、`LocalPageBackdrop`、`LocalRootBackdrop`、`rememberPageBackdrop`、`ContentBackdropBox`、`Os4ListPage`、`LocalRailInset`、`CombinedBackdrop` | `.../ui/*.kt` | ❌ 不存在的库 API，必须重新设计 |
 
 > 本条是纪律：**库里没有 `rememberBlurBackdrop`，也没有 `rememberCombinedBackdrop`。**
 > 它们分别是 `miuix/example/shared/src/commonMain/kotlin/utils/PageUtils.kt:294` 与
@@ -379,7 +379,7 @@ fun Modifier.railStartInset(base: Dp = 0.dp): Modifier = layout { measurable, co
 
 > `GlassNavigationRailState.progress` 是逐帧变化的动画值（`miuix-glass/.../GlassNavigationRail.kt`），
 > 官方迁移指南把它列为红线之一。
-> 🏠 GIF 助手实现：`GifHelper/.../ui/Adaptive.kt:51`、`:67-78`。
+> 🏠 GIF 助手实现：`.../ui/Adaptive.kt:51`、`:67-78`。
 
 ---
 
@@ -422,7 +422,7 @@ fun Modifier.railStartInset(base: Dp = 0.dp): Modifier = layout { measurable, co
 📌 原理：`Backdrop` 是接口，`drawBackdrop` 可以转发。example 里有一份（`rememberCombinedBackdrop`，
 `miuix/example/.../CombinedBackdrop.kt:46`），**不在库里**。
 
-🏠 GIF 助手的实现（`GifHelper/.../ui/CombinedBackdrop.kt`，Apache-2.0，移植自 example）：
+🏠 GIF 助手的实现（`.../ui/CombinedBackdrop.kt`，Apache-2.0，移植自 example）：
 
 ```kotlin
 @Stable
@@ -485,7 +485,7 @@ val glassEnabled = prefs.glassEnabled && isGlassSupported()
 **查不出某台 GPU 上模糊会不会翻车**；`isRuntimeShaderSupported()` 只是 `SDK_INT >= 33`。
 真机上确实出现过"内容不糊开、只被压暗"的情况 🔴，所以用户必须能关。
 
-GIF 助手做法 🏠：`LocalGlassEnabled` 是**唯一**决策点（`GifHelper/.../ui/GlassSupport.kt:63`），
+GIF 助手做法 🏠：`LocalGlassEnabled` 是**唯一**决策点（`.../ui/GlassSupport.kt:63`），
 页面里禁止再出现 `isRenderEffectSupported()` 判断 —— 否则会出现"顶栏玻璃、底栏实心"的割裂。
 
 ### 7.2 每个组件都要能用 `backdrop = null` 工作
@@ -517,7 +517,7 @@ else Card(colors = CardDefaults.defaultColors(color = cardColor())) { Content() 
 
 ### 7.3 软件渲染 / 未知 GPU 的降级
 
-GIF 助手加了一个**渲染器探测** 🏠（`GifHelper/.../ui/GlassSupport.kt:45-60`）：
+GIF 助手加了一个**渲染器探测** 🏠（`.../ui/GlassSupport.kt:45-60`）：
 用 `GL_RENDERER` / `GL_VENDOR` + `Build.HARDWARE` 判断 `swiftshader` / `llvmpipe` / `ranchu` / `goldfish`，
 只用于一处决策：顶栏要不要走 `progressiveBlur`（AGSL 路径）。
 
@@ -630,4 +630,4 @@ fun Screen() {
 - 库源码：`miuix-blur/.../{Backdrop,LayerBackdrop,LayerBackdropModifier,DrawBackdropModifier,TextureEffect}.kt`
 - 官方 example：`miuix/example/shared/src/commonMain/kotlin/{AppContent.kt,GlassPage.kt,utils/PageUtils.kt}`
 - 真实案例：`12-known-issues-and-solutions.md` C10~C19
-- 本项目实现：`GifHelper/.../ui/{GlassScope,CombinedBackdrop,GlassSupport}.kt`
+- 本项目实现：`.../ui/{GlassScope,CombinedBackdrop,GlassSupport}.kt`

@@ -22,7 +22,7 @@
 
 ### 1.1 GIF 助手的实现方式：把"骨架"参数化
 
-🏠 `Os4ListPage` 用三个参数表达这三种特殊需求（`GifHelper/.../ui/PageChrome.kt:172-223`）：
+🏠 `Os4ListPage` 用三个参数表达这三种特殊需求（`.../ui/PageChrome.kt:172-223`）：
 
 > 下文的 `progress` / `collapsed` / `headerHeight` / `pageContentPadding(...)` 都是"骨架里已有的变量"，
 > 不是库 API；自己实现时按 §4 的公式算。
@@ -66,7 +66,7 @@ Box(Modifier.fillMaxSize()) {
 MIUIX 生态里的"OS3 背景"：4 段颜色在超大范围内缓慢流动 + 模糊，用 **AGSL 运行时着色器**
 （`RuntimeShader`）在 GPU 上逐帧计算。
 
-🏠 GIF 助手移植版：`GifHelper/.../ui/bg/BgEffect.kt`（17KB）+ `BgEffectShader.kt`（片段源码）。
+🏠 GIF 助手移植版：`.../ui/bg/BgEffect.kt`（17KB）+ `BgEffectShader.kt`（片段源码）。
 
 ```kotlin
 @Composable
@@ -166,7 +166,7 @@ Text(
 )
 ```
 
-🏠 `GifHelper/.../screens/AboutScreen.kt:240-289`。
+🏠 `.../screens/AboutScreen.kt:240-289`。
 
 ### 3.3 `DstIn` 到底做了什么
 
@@ -227,7 +227,7 @@ val headerProgress: () -> Float = {
 }
 ```
 
-🏠 `GifHelper/.../ui/PageChrome.kt:231-239`。
+🏠 `.../ui/PageChrome.kt:231-239`。
 
 要点：
 
@@ -254,7 +254,7 @@ Modifier.graphicsLayer {
 }
 ```
 
-🏠 `GifHelper/.../screens/AboutScreen.kt:221-303`；阈值与 InstallerX `MiuixAboutPage.kt:482/517/546` 一致（转引）。
+🏠 `.../screens/AboutScreen.kt:221-303`；阈值与 InstallerX `MiuixAboutPage.kt:482/517/546` 一致（转引）。
 
 ### 4.3 顶栏的两种状态
 
@@ -311,7 +311,7 @@ val blurEnabled = LocalGlassEnabled.current && !isSoftwareRenderer
 // 所有 textureBlur 都挂在 if (blurEnabled) 之后
 ```
 
-🏠 `GifHelper/.../screens/AboutScreen.kt:111`、`GifHelper/.../ui/GlassSupport.kt:45-60`。
+🏠 `.../screens/AboutScreen.kt:111`、`.../ui/GlassSupport.kt:45-60`。
 
 > `isSoftwareRenderer` 的判据：`GL_RENDERER`/`GL_VENDOR` 里出现
 > `swiftshader`/`llvmpipe`/`softpipe`/`software`/`emulator opengl`，或 `Build.HARDWARE` 含
@@ -348,7 +348,7 @@ val topBarBackdrop = when {
 }
 ```
 
-🏠 `GifHelper/.../screens/AboutScreen.kt:147-151`；`CombinedBackdrop` 实现见 [06](06-glass-architecture.md) §6.3。
+🏠 `.../screens/AboutScreen.kt:147-151`；`CombinedBackdrop` 实现见 [06](06-glass-architecture.md) §6.3。
 
 **不要**为了"让顶栏采到渐变"在页面根部再套一层 `layerBackdrop` —— 那样顶栏就成了录制层的子节点，
 采样到自己 → `libhwui` 栈溢出（[06](06-glass-architecture.md) R1/R2）。
@@ -384,7 +384,7 @@ GlassCard(backdrop = if (blurEnabled) bgBackdrop else null) {
 | 排版 | 等宽字体不必，但必须可选中复制；长文本用 `LazyColumn` |
 | 入口 | About 页一个「开源许可」行，本项目 GPL / 第三方 Apache / NOTICE 在同一页分组 |
 
-🏠 参考：`GifHelper/.../ui/LicenseCatalog.kt`、`screens/LicensesScreen.kt`。
+🏠 参考：`.../ui/LicenseCatalog.kt`、`screens/LicensesScreen.kt`。
 
 ---
 

@@ -1,10 +1,10 @@
 # GifHelper OS4 / Glass 定制面与基线耦合点清点（升级准备）
 
 > 性质：**只读审计**。本报告不改任何源码、文档或 git 状态，唯一产物是本文件。
-> 审计对象：`C:\Users\10487\WorkBuddy\gif\GifHelper`（HEAD `060c804`，`versionName 1.10` / `versionCode 12`，工作区干净）。
+> 审计对象：`.`（HEAD `060c804`，`versionName 1.10` / `versionCode 12`，工作区干净）。
 > 审计时间：2026-11-20。
 > 证据方式：逐文件精读 + 全项目 grep + 与本地 `../miuix` 源码交叉核对。**未执行构建**，所有「编译级」判断都来自签名/默认值比对，§9 会区分「编译失败」与「不报错但观感变化」。
-> 行号约定：`GifHelper/...` 的行号来自本工作区源码；`miuix@…` 的行号来自本地 `../miuix` 源码，**默认按 HEAD `5ff41ba9` 标注**（见 §1，本地 miuix 已不是 GifHelper 文档写的基线）。
+> 行号约定：仓库内相对路径的行号来自本仓库源码；`miuix@…` 的行号来自本地 `../miuix` 源码，**默认按 HEAD `5ff41ba9` 标注**（见 §1，本地 miuix 已不是 GifHelper 文档写的基线）。
 
 ---
 

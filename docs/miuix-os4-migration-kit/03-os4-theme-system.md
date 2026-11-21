@@ -24,7 +24,7 @@
 - `LocalColorSchemeMode` 丢了 → `MiuixTheme.isDynamicColor` 恒 false → 依赖它做默认色的组件
   （底栏/侧栏选中色、Switch 未选中拇指色）会走错分支。**而且它是 `internal`，调用方补不了。**
 
-🏠 GIF 助手的处置（`GifHelper/.../ui/AnimatedTheme.kt:63-68`）：
+🏠 GIF 助手的处置（`.../ui/AnimatedTheme.kt:63-68`）：
 
 ```kotlin
 MiuixTheme(colors = animated) {
@@ -176,7 +176,7 @@ GIF 助手的逐色插值把 53 个角色全部列了一遍（`AnimatedTheme.kt:
 }
 ```
 
-📌 来源：`GifHelper/.../ui/Widgets.kt:84-138`。
+📌 来源：`.../ui/Widgets.kt:84-138`。
 
 ### 3.4 会不会"页面和卡片糊成一片"？
 
@@ -386,6 +386,6 @@ grep -rn "compose.material3\|material3" --include=*.kts .
 - 官方主题文档：`miuix/docs/guide/theme.md`、`miuix/docs/guide/colors.md`、`miuix/docs/guide/textstyles.md`
 - `Colors` 字段清单：`miuix-ui/.../theme/Colors.kt`（GIF 助手逐色插值列全了 53 个，见 `AnimatedTheme.kt:72-129`）
 - `ThemeController`：`miuix-ui/.../theme/ThemeController.kt:246-274`
-- 三层配色：`GifHelper/.../ui/Widgets.kt:84-138`
-- 逐色插值：`GifHelper/.../ui/AnimatedTheme.kt`
+- 三层配色：`.../ui/Widgets.kt:84-138`
+- 逐色插值：`.../ui/AnimatedTheme.kt`
 - 配色事故：`12-known-issues-and-solutions.md` C14、C32、C37

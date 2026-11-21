@@ -1,7 +1,7 @@
 # 17 · 官方文档、源码、提交与参考项目索引
 
 > 用途：任何一条结论都要能追到"哪一行"。本篇是索引，不重复结论。
-> 路径约定：`miuix/...` 指 MIUIX 上游源码；`GifHelper/...` 指本参考工程。
+> 路径约定：`miuix/...` 指 MIUIX 上游源码；其余相对路径都相对**本仓库根目录**（clone 后目录名是 `gif-toolkit/`）。
 
 ---
 
@@ -221,7 +221,7 @@ commit body 自述（原文摘要）：
 
 ## 5. 参考项目与二次来源
 
-> ⚠️ 本节前三条是 **GIF 助手审计文档记录的引用**（`GifHelper/docs/os4-*-audit.md`），
+> ⚠️ 本节前三条是 **GIF 助手审计文档记录的引用**（`docs/os4-*-audit.md`），
 > 本库**未**独立核对其源码。引用时请注明"经 GIF 助手审计转引"，不要当作一手事实。
 
 | 参考 | 用到的部分 | 出处 |
@@ -237,16 +237,16 @@ commit body 自述（原文摘要）：
 
 | 文件 | 作用 | 本库引用 |
 |---|---|---|
-| `GifHelper/.../ui/GlassScope.kt` | `GlassScope`、`LocalPageBackdrop`、`LocalRootBackdrop`、`rememberPageBackdrop`、`PageTopBar`、`ContentBackdropBox` | [06](06-glass-architecture.md) §4、[07](07-glass-component-guide.md) |
-| `GifHelper/.../ui/PageChrome.kt` | `Os4ListPage`、`pageContentPadding`、`pageScrollModifiers`、`LocalBottomBarClearance` | [05](05-navigation-and-adaptive.md) §5 |
-| `GifHelper/.../ui/Adaptive.kt` | `rememberWideLayout`、`LocalRailInset`、`railStartInset`、`LocalTopBarTitleAlpha` | [05](05-navigation-and-adaptive.md) §3–§4 |
-| `GifHelper/.../ui/GlassSupport.kt` | `LocalGlassEnabled`、`isGlassSupported`、`isSoftwareRenderer` | [06](06-glass-architecture.md) §5 |
-| `GifHelper/.../ui/CombinedBackdrop.kt` | 两层 backdrop 叠加 | [06](06-glass-architecture.md) §6.3 |
-| `GifHelper/.../ui/Widgets.kt` | 三层配色、`GlassCard`、`DropdownRow`、`PrimaryActionBar`、`IconSizes` | [03](03-os4-theme-system.md)、[08](08-custom-component-migration.md) |
-| `GifHelper/.../ui/AnimatedTheme.kt` | 逐色插值主题 | [03](03-os4-theme-system.md) §5 |
-| `GifHelper/.../App.kt` | 装配顺序、弹层宿主、Pager、Rail | [18](18-gif-helper-baseline-audit.md) |
-| `GifHelper/AGENTS.md` | 15 条硬约束（本库 [12](12-known-issues-and-solutions.md) 的主要来源） | [12](12-known-issues-and-solutions.md) |
-| `GifHelper/docs/os4-round5~11-audit.md` | 逐轮真实审计（含实测数字） | [12](12-known-issues-and-solutions.md) |
+| `.../ui/GlassScope.kt` | `GlassScope`、`LocalPageBackdrop`、`LocalRootBackdrop`、`rememberPageBackdrop`、`PageTopBar`、`ContentBackdropBox` | [06](06-glass-architecture.md) §4、[07](07-glass-component-guide.md) |
+| `.../ui/PageChrome.kt` | `Os4ListPage`、`pageContentPadding`、`pageScrollModifiers`、`LocalBottomBarClearance` | [05](05-navigation-and-adaptive.md) §5 |
+| `.../ui/Adaptive.kt` | `rememberWideLayout`、`LocalRailInset`、`railStartInset`、`LocalTopBarTitleAlpha` | [05](05-navigation-and-adaptive.md) §3–§4 |
+| `.../ui/GlassSupport.kt` | `LocalGlassEnabled`、`isGlassSupported`、`isSoftwareRenderer` | [06](06-glass-architecture.md) §5 |
+| `.../ui/CombinedBackdrop.kt` | 两层 backdrop 叠加 | [06](06-glass-architecture.md) §6.3 |
+| `.../ui/Widgets.kt` | 三层配色、`GlassCard`、`DropdownRow`、`PrimaryActionBar`、`IconSizes` | [03](03-os4-theme-system.md)、[08](08-custom-component-migration.md) |
+| `.../ui/AnimatedTheme.kt` | 逐色插值主题 | [03](03-os4-theme-system.md) §5 |
+| `.../App.kt` | 装配顺序、弹层宿主、Pager、Rail | [18](18-gif-helper-baseline-audit.md) |
+| `AGENTS.md` | 15 条硬约束（本库 [12](12-known-issues-and-solutions.md) 的主要来源） | [12](12-known-issues-and-solutions.md) |
+| `docs/os4-round5~11-audit.md` | 逐轮真实审计（含实测数字） | [12](12-known-issues-and-solutions.md) |
 
 GIF 助手的实测环境（引用数字时必须一起写）：
 

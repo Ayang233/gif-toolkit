@@ -23,15 +23,18 @@
 | JDK | `21` | `BuildConfig.kt:16` |
 | 版本号生成 | 无参数 → `0.9.5-<hash>-SNAPSHOT`；`-Prelease` → `0.9.5`；`-Pbeta` → `0.9.5-betaN` | `miuix/build-logic/src/main/kotlin/module.publication.gradle.kts:12-33` |
 
-参考工程 GIF 助手（1.10）的实际组合 📌：
+上表是 `3177a684`（2026-11-18）的历史快照，**当前基线不是这一版**——
+现用基线见 `AGENTS.md` 的「构建环境的两个坑」第 1 条。
+
+参考工程 GIF 助手（1.12）的实际组合 📌：
 
 | 项 | 值 | 来源 |
 |---|---|---|
-| AGP / Kotlin / CMP | `9.5.1` / `2.4.21` / `1.12.2` | `GifHelper/build.gradle.kts:4-7` |
+| AGP / Kotlin / CMP | `9.5.1` / `2.4.21` / `1.13.0-rc01` | `build.gradle.kts:4-7` |
 | compileSdk | `release(37) { minorApiLevel = 2 }` | `:56-60` |
 | minSdk / targetSdk | `33` / `36` | `:65-66` |
 | JDK | 21（`JvmTarget.JVM_21`） | `:14` |
-| 导航 | `miuix-nav` 的 `NavDisplay`（**不用 androidx.navigation**） | `GifHelper/.../App.kt:72-75` |
+| 导航 | `miuix-nav` 的 `NavDisplay`（**不用 androidx.navigation**） | `.../App.kt:72-75` |
 
 > 为什么 GIF 助手 minSdk 是 33 而不是 24：`miuix-blur` 的 minSdk 就是 33，
 > 而 OS4 玻璃（`drawBackdrop` / texture blur）依赖 API 33 的 `RuntimeShader`。
@@ -63,7 +66,7 @@ miuix-window （仅 desktop，无 Android target）
 可直接读出的重要事实：
 
 - `miuix-ui` 已经 `api(miuix-squircle)`，所以**再单独声明 `miuix-squircle` 是冗余的**。
-  GIF 助手就多写了一条（`GifHelper/build.gradle.kts:35`），而且源码里没有一处 `squircle*` 调用
+  GIF 助手就多写了一条（`build.gradle.kts:35`），而且源码里没有一处 `squircle*` 调用
   （全项目 grep 零命中），属于"注释说有、代码没有"的文档漂移 🏠。
 - `miuix-glass` 已经 `api(miuix-blur)`、`api(miuix-material)`、`api(miuix-ui)`，
   所以**只引 `miuix-glass` 就能拿到 `GlassDefaults`、`Backdrop`、`MiuixTheme`**。
@@ -143,7 +146,7 @@ curl -s  https://repo1.maven.org/maven2/top/yukonga/miuix/kmp/miuix-glass/maven-
 
 ### 4.3 composite build（源码引入）
 
-GIF 助手就是这么做的（`GifHelper/settings.gradle.kts:56-63` 的 `includeBuild(miuixDir)`），
+GIF 助手就是这么做的（`settings.gradle.kts:56-63` 的 `includeBuild(miuixDir)`），
 原因是当时 `miuix-glass` / `miuix-glass-icons` 没有发布到 Central。
 源码引入的好处是能读实现、能临时打补丁；代价是构建慢、要维护一份补丁。
 
@@ -237,7 +240,7 @@ MIUIX version: <BuildConfig.LIBRARY_VERSION>
 
 ## 8. GIF 助手的完整依赖清单（作为参考，不是模板）
 
-📌 来源 `GifHelper/build.gradle.kts:17-48`。
+📌 来源 `build.gradle.kts:17-48`。
 
 ```kotlin
 commonMain.dependencies {
@@ -266,7 +269,7 @@ androidMain.dependencies {
 ```
 
 其中 `hiddenapibypass` 只为反射 `ApplicationInfo.setEnableOnBackInvokedCallback`
-（预测性返回开关，见 `GifHelper/.../GifApplication.kt:27-48`）——
+（预测性返回开关，见 `.../GifApplication.kt:27-48`）——
 **新项目如果没有"让用户切换返回动画"这种设置，就不需要它**。
 正确做法是 `AndroidManifest.xml` 里 `android:enableOnBackInvokedCallback="true"` 即可。
 

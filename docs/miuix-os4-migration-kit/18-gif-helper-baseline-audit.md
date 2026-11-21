@@ -10,7 +10,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 范围 | `GifHelper/src/**`（全部 Kotlin + XML + Manifest）、`build.gradle.kts`、`settings.gradle.kts`、`gradle.properties`、`AGENTS.md`、`docs/os4-*.md` |
+| 范围 | `src/**`（全部 Kotlin + XML + Manifest）、`build.gradle.kts`、`settings.gradle.kts`、`gradle.properties`、`AGENTS.md`、`docs/os4-*.md` |
 | 方法 | 逐文件精读 + 全项目 grep + 与 `../miuix` 源码交叉核对 |
 | 未做 | 未构建、未跑模拟器、未真机（本轮只做源码审计）；未修改任何文件 |
 | 对照基线 | MIUIX `3177a684`（`miuix/`，2026-11-18） |

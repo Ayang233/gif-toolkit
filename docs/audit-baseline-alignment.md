@@ -1,7 +1,7 @@
 # GifHelper × MIUIX `5ff41ba9` 样式 / 默认值对齐审计
 
 > 性质：**只读审计**。除本文件外没有改动任何源码。
-> 工作区基线：`C:\Users\10487\WorkBuddy\gif\miuix` @ `5ff41ba9`（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）；
+> 工作区基线：`../miuix` @ `5ff41ba9`（2026-11-20，`fix: Align GlassTopAppBar progressive blur insets with systemBars`）；
 > GifHelper 工作区（HEAD `060c804` + 未提交的 5ff41ba9 升级改动）。
 > 所有结论都带两侧 `文件:行号`；行号取自审计时的实际文件内容。
 

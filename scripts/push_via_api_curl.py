@@ -5,8 +5,11 @@ import subprocess
 import tempfile
 import time
 
+# 仅用于「git push 走不通、但 api.github.com 可达」的受限网络（见 AGENTS.md 构建环境的两个坑 4）。
+# 前置：本机 git 凭据管理器里已有一把能写这个仓库的 token（脚本从 credential.helper 取，不读环境变量）。
+# 仓库根目录按脚本位置推导，不写死本机路径。
 REPO = "Ayang233/gif-toolkit"
-CWD = r"C:\Users\10487\WorkBuddy\gif\GifHelper"
+CWD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 cred = subprocess.run(
     ["git", "-c", "credential.https://github.com.helper=", "-c", "credential.helper=manager",

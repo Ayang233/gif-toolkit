@@ -32,6 +32,12 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 └── core/                 GifCodec / GifTasks / MediaTools / Stabilizer / ColorKey / MotionPhoto
 ```
 
+仓库根目录还有：`docs/`（审计与基线维护）、`scripts/`（`setup-miuix.sh` 准备源码、`push_via_api_curl.py` 受限网络下推提交）、
+`README.md` / `AGENTS.md` / `CHANGELOG.md`。
+
+> **`_archive/` 不在仓库里。** 文档里引用的截图、diff、perf 数据都在本机归档目录，只做线索用；
+> 只拿到仓库（例如从 GitHub clone）时看不到这些文件，别把它当成"仓库缺文件"。
+
 ## 常用命令
 
 ```bash
@@ -306,6 +312,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    **从 0.9.5-beta01 起上游把 `compileSdk` 提到 37.2**，下游必须同步：
    `compileSdk { version = release(37) { minorApiLevel = 2 } }`，否则 AGP 配置期直接拒绝
    （`requires ... compile against version 37.2 or later`）。`targetSdk` 可以继续停在 36。
+   **还要同步 AGP 版本。** composite build 里宿主与 `../miuix` 是两个独立构建，
+   但 AGP 只允许全构建一个版本：上游 `gradle/libs.versions.toml` 的 `agp` 一变，
+   `build.gradle.kts` 不同步就会在依赖解析期失败
+   （`Using multiple versions of the Android Gradle plugin (9.5.2, 9.5.1) in the same build is not allowed`，
+   报错落在 `:debugCompileClasspath` 上，看着像依赖坏了，其实只是版本没对齐）。
+   0.9.5-beta03 把上游 AGP 从 9.5.1 提到了 9.5.2，就是这一条。
    每轮升级的差异与结论见 `docs/os4-round*-audit.md`。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。

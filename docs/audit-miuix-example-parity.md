@@ -1,6 +1,6 @@
 # GifHelper × MIUIX 官方 example 对齐审计（基线 5ff41ba9）
 
-> 判定标准：**MIUIX 官方 example / docs demo / 组件源码本身**（`C:\Users\10487\WorkBuddy\gif\miuix`，HEAD `5ff41ba9`）。
+> 判定标准：**MIUIX 官方 example / docs demo / 组件源码本身**（`../miuix`，HEAD `5ff41ba9`）。
 > 用户已把 `miuix/example/android` 编译成 APK，作为"渲染出来的真值"对照。
 > Glacier 仅作为"同为下游应用如何落地"的旁证被引用，**不作为判定依据**。
 

@@ -65,7 +65,7 @@ fun NavDisplay(
 )
 ```
 
-🏠 GIF 助手的实际配置（`GifHelper/.../App.kt:227-240`）：
+🏠 GIF 助手的实际配置（`.../App.kt:227-240`）：
 
 ```kotlin
 val cornerRadius = rememberDeviceCornerRadius()
@@ -100,7 +100,7 @@ NavDisplay(
 | 一级页 tab == 0 | **交还系统 → `Activity.finish()`** | **不要拦** |
 
 ```kotlin
-// 🏠 GifHelper/.../App.kt:199-201
+// 🏠 .../App.kt:199-201
 BackHandler(enabled = stack.size <= 1 && tab != 0) { goTab(0) }
 ```
 
@@ -245,7 +245,7 @@ fun rememberHorizontalSafeInsets(): PaddingValues =
         .asPaddingValues()
 ```
 
-🏠 `GifHelper/.../ui/SystemInsets.kt:32-36`。
+🏠 `.../ui/SystemInsets.kt:32-36`。
 
 用途：**不在 `Scaffold` 内容槽位里的控件**（底部主操作条、页面根部自绘列表）。
 在内容槽位里的控件，横向安全区已经包含在 `innerPadding` 里了，**不要再加一遍**。
@@ -269,7 +269,7 @@ fun rememberBottomBarClearance(): Dp {
 }
 ```
 
-🏠 `GifHelper/.../ui/PageChrome.kt:67-86`。
+🏠 `.../ui/PageChrome.kt:67-86`。
 
 > ⚠️ 版本差异：`navInset <= 16.dp` 这一档在 MIUIX `3177a684` 上是 `28.dp`，
 > 从 `5ff41ba9`（提交 `9413f690`）起改成 `20.dp`。照抄旧知识库会多预留 8dp，
@@ -329,7 +329,7 @@ d = R - sqrt(2R·g - g²)
 再减去系统导航栏已占的高度，下限取 minimum（12dp）
 ```
 
-🏠 `GifHelper/.../ui/SystemInsets.kt:79-95`。
+🏠 `.../ui/SystemInsets.kt:79-95`。
 
 为什么不用固定 12dp：R=80dp 的机型需要约 32dp 的 d，而直屏机 12dp 就够 🔴（圆角分支未真正触发验证）。
 
@@ -455,7 +455,7 @@ fun rememberWideLayout(): Boolean {
 }
 ```
 
-🏠 `GifHelper/.../ui/Adaptive.kt:24-32`。
+🏠 `.../ui/Adaptive.kt:24-32`。
 
 要点：
 
@@ -491,7 +491,7 @@ fun rememberWideLayout(): Boolean {
 | 数字/时间 | 用 `LocalLayoutDirection` 判断，不要假设 LTR |
 
 ```kotlin
-// 🏠 GifHelper/.../ui/GlassScope.kt:216-221
+// 🏠 .../ui/GlassScope.kt:216-221
 Modifier.graphicsLayer { if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f }
 ```
 

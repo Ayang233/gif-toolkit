@@ -95,7 +95,7 @@ Modifier.selectable(
 )
 ```
 
-🏠 参考实现：`GifHelper/.../screens/ToolScreen.kt:378-385`。
+🏠 参考实现：`.../screens/ToolScreen.kt:378-385`。
 
 **反例**：
 
@@ -128,7 +128,7 @@ label = if (busy) "取消生成 · ${(progress * 100).toInt()}%" else text
 ```
 
 理由：用户在等一个**可以中断**的任务，禁用按钮会让他无处可点。
-（🏠 `GifHelper/.../ui/Widgets.kt:578-590`）
+（🏠 `.../ui/Widgets.kt:578-590`）
 
 ---
 
@@ -222,8 +222,8 @@ GIF 助手实测记录（🔴 模拟器，只证明"调用发生"）：
 
 ## 8. 参考
 
-- 触觉全量检索结果（23 个文件、8 个组件族）：`GifHelper/docs/os4-round8-audit.md` §4
-- 自绘色板语义修复：`GifHelper/docs/os4-round10-audit.md` §4.2 #3
+- 触觉全量检索结果（23 个文件、8 个组件族）：`docs/os4-round8-audit.md` §4
+- 自绘色板语义修复：`docs/os4-round10-audit.md` §4.2 #3
 - 官方 `RadioButton` 触发条件：`miuix-preference/.../RadioButtonPreference.kt:131`
 - 官方 `Switch` 抑制逻辑：`miuix-ui/.../basic/Switch.kt:186-208`
 - 官方 `scrollEndHaptic`：`miuix-ui/.../utils/ScrollEndHaptic.kt`
