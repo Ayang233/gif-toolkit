@@ -225,7 +225,13 @@ fun ToolScreen(
         // 套进 Card 就成了两层圆角贴在一起、还紧贴卡片边缘 —— 这是"比例不像 OS4"的来源。
         // 官方示例 `component/TextFieldSection.kt` 就是独立摆放：
         // `Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)`。
+        //
+        // 标题走 `GroupHeader`、输入框**不带 label**（同官方示例第一行那个纯 TextField）：
+        // 之前用 `label` + `useLabelAsPlaceholder` 把提示文字画在行内，而占位文字是 label 层、
+        // 光标跟输入行层，两层的行盒不一致 —— 竖杠比 CJK 字形高出一截、打字瞬间文字还会往上跳。
+        // 官方 example（拉丁占位符）看不出来只是因为字母上伸部填满了行盒。
         if (subtitleState != null && tool == Tool.GIF_EDIT) {
+            item(key = "subtitle-header") { GroupHeader("字幕内容") }
             item(key = "subtitle") { SubtitleField(state = subtitleState) }
         }
 
@@ -432,6 +438,9 @@ private fun ColorSwatches(form: ToolForm) {
 /**
  * 字幕输入：Miuix `TextField` + `TextFieldState`，失焦不丢内容。
  *
+ * 标题在调用处用 `GroupHeader("字幕内容")` 单独占一条，输入框本身**不带 label**
+ * （官方 example `component/TextFieldSection.kt` 第一行就是这个形态）。
+ *
  * 摆法照官方 `component/TextFieldSection.kt`：TextField **独立**占一条，
  * `padding(horizontal = 12.dp).padding(bottom = 12.dp)` —— 它自己就是一张卡
  * （`TextFieldDefaults.CornerRadius` 16dp、`secondaryContainer` 底色、`InsideMargin` 16dp）。
@@ -463,13 +472,12 @@ private fun SubtitleField(state: androidx.compose.foundation.text.input.TextFiel
             .padding(bottom = 12.dp)
             .bringIntoViewRequester(requester),
     ) {
-        // 摆法照官方 `component/TextFieldSection.kt`：TextField 自己就是一张卡
-        // （16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），独立占一条、外边距 12dp，
-        // 不要塞进 `GroupCard`（两层圆角会套在一起、底部会被卡片圆角截掉）。
+        // 摆法照官方 `component/TextFieldSection.kt` 的**第一行**：纯 `TextField`，
+        // 不带 `label` / `useLabelAsPlaceholder` —— 标题由上面的 `GroupHeader("字幕内容")` 提供。
+        // 行内占位符会同时引入两套文本层（label 层画提示、输入层画光标），行盒不一致，
+        // 竖杠就会比 CJK 字形高一截、开始打字时文字还会往上跳一次。
         TextField(
             state = state,
-            label = "字幕内容",
-            useLabelAsPlaceholder = true,
             modifier = Modifier.fillMaxWidth(),
             interactionSource = interactionSource,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),

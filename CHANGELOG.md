@@ -2,6 +2,27 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.13 — 2026-11-21
+
+**升级**
+
+- Miuix 基线从 `f3829d3d` 升到 `3526cfe2`（即 `v0.9.5-beta03`，tag 与 main head 同一个提交，9 个提交 / 439 个文件）。
+  差异与核对过程见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`。
+- AGP 9.5.1 → 9.5.2（上游同步抬的版本，composite build 两边的 AGP 必须一致）。
+  Compose Multiplatform 仍是 1.13.0-rc01，Kotlin 2.4.21、Gradle 9.9.2、compileSdk 37.2 都没变。
+
+**调整**
+
+- 「字幕内容」输入框换成官方示例第一条的写法：标题走 `GroupHeader`，`TextField` 不再传 `label` /
+  `useLabelAsPlaceholder`。原先提示文字由 label 层绘制、光标跟着输入层走，两层行盒不同：
+  竖杠比中文字形高出一截且整体偏上，开始打字的瞬间文字还会往上跳约 4dp。
+- 删掉「设置 → 主题」页底部的「调试（仅调试包可见）」分组与「开始按钮配色对比」页。配色方案已定，
+  调试包也不再需要这个入口；`Route.ButtonColors`、`ButtonColorPreview.kt`、`DEBUG_UI` 一并移除。
+
+**说明**
+
+- 本轮不动设计、不动功能，只跟进基线 + 收掉一个调试入口。
+
 ## 1.12 — 2026-11-20
 
 **升级**

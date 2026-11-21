@@ -39,7 +39,6 @@ import com.ayang.giftoolkit.screens.SettingsScreen
 import com.ayang.giftoolkit.screens.ThemeScreen
 import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
-import com.ayang.giftoolkit.ui.ButtonColorPreviewScreen
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
@@ -53,7 +52,6 @@ import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.pageBaseColor
 import com.ayang.giftoolkit.ui.rememberBottomBarClearance
-import com.ayang.giftoolkit.ui.rememberIsDebuggable
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import com.ayang.giftoolkit.ui.shouldExpandNavigationRail
@@ -87,8 +85,6 @@ import top.yukonga.miuix.kmp.utils.springAnimateToPage
 fun GifApp() {
     val context = LocalContext.current
     val app = remember(context) { AppState(SettingsStore(context)) }
-    // 调试页开关：debug 包才注册「按钮配色对比」目的地（见下方 NavDisplay 的 entry）。
-    val debuggable = rememberIsDebuggable()
 
     val mode = when {
         !app.monetEnabled -> when (app.themeMode) {
@@ -370,12 +366,6 @@ fun GifApp() {
                             ThemeScreen(
                                 app = app,
                                 onBack = pop,
-                                // release 里传 null：那一组入口根本不存在。
-                                onOpenButtonColors = if (debuggable) {
-                                    { stack.add(Route.ButtonColors) }
-                                } else {
-                                    null
-                                },
                             )
                         }
                         entry<Route.About> {
@@ -392,14 +382,6 @@ fun GifApp() {
                         }
                         entry<Route.License> { route ->
                             LicenseDetailScreen(index = route.index, onBack = pop)
-                        }
-                        // **仅 debug 包**：开始按钮四种禁用态配色的实机对比页。
-                        // 条件在组合期只算一次（FLAG_DEBUGGABLE 是常量），release 包里
-                        // 这个目的地根本不存在 → 没有任何入口可以进来。
-                        if (debuggable) {
-                            entry<Route.ButtonColors> {
-                                ButtonColorPreviewScreen(onBack = pop)
-                            }
                         }
                     }
 

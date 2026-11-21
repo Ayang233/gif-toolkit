@@ -4,10 +4,17 @@ build/
 .kotlin/
 local.properties
 
+# Python（push_via_api_curl.py 之类）
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 *.iml
 *.hprof
+
+# WorkBuddy 的项目数据（.workbuddy/ 里是本地记忆日志，不属于仓库内容）
+.workbuddy/
 
 # Android
 captures/

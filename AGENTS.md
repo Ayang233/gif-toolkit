@@ -296,12 +296,13 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`f3829d3d`**（2026-11-20，`perf: improve sidebar performance (#489)`），
-   对应发布版 **`v0.9.5-beta02`**（tag `66248bac`，已推 Maven Central）+ 其后 3 个 main 提交；
-   源码基线取后者，理由见 `docs/os4-round12-audit.md` §0.1。
-   **`v0.9.5-beta02` 强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
-   上上次基线是 `3177a684`（逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），
-   上一轮基线 `5ff41ba9`（见 `docs/os4-round11-audit.md`），升级前定制面清单见
+1. 基线是 Miuix **`3526cfe2`**（2026-11-21，`example: split LazyColumn cards into per-row items`），
+   对应发布版 **`v0.9.5-beta03`**（tag 就打在 `3526cfe2` 上，发布后 main 无新增提交）；
+   逐项差异见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`（9 个提交 / 439 文件，
+   工具链只动了 AGP，`src/` 零适配）。
+   **`v0.9.5-beta02` 起强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
+   上一轮基线 `f3829d3d`（见 `docs/os4-round12-audit.md`），上上次 `3177a684`
+   （逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），升级前定制面清单见
    `docs/upgrade-prep-customization-inventory.md`。
    升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
    这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
@@ -317,7 +318,11 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    `build.gradle.kts` 不同步就会在依赖解析期失败
    （`Using multiple versions of the Android Gradle plugin (9.5.2, 9.5.1) in the same build is not allowed`，
    报错落在 `:debugCompileClasspath` 上，看着像依赖坏了，其实只是版本没对齐）。
-   0.9.5-beta03 把上游 AGP 从 9.5.1 提到了 9.5.2，就是这一条。
+   0.9.5-beta03 把上游 AGP 从 9.5.1 提到了 9.5.2，`3526cfe2` 那一轮就是这么对齐的。
+   **`3526cfe2` 还删掉了 `GlassTopAppBar` 的 `visualContentOffset` 参数**，并把顶栏 band 的透明度
+   驱动源从 `maskProgress` 换成 `scrollBehavior.state.collapsedFraction`（渐进模糊沿用 `bandActive`）。
+   本项目前者没用到（零改动），后者吃默认值 —— 于是折叠/滚动时 band 的浓淡会更贴合折叠进度。
+   这是**观感变化**，升级后要真机看一眼，别当成回归。
    每轮升级的差异与结论见 `docs/os4-round*-audit.md`。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。

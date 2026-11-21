@@ -15,15 +15,17 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 f3829d3d = 当前基线（2026-11-20，`perf: improve sidebar performance (#489)`）。
-# 对应发布版 v0.9.5-beta02（66248bac，已推送 Maven Central），源码基线取其后 3 个 main 提交：
-#   b31c60f2 显式 isContentScrolled 下的过滚驱动修复（我们正走这条路径）
-#   c16dfa12 仅 example
-#   f3829d3d NavDisplay 布局尺寸延迟读取 / TabRow 量测期测量 / Rail 密度变化居中
-# 本轮升级记录见 docs/os4-round12-audit.md。
+# 上游 3526cfe2 = 当前基线（2026-11-21，`example: split LazyColumn cards into per-row items`）。
+# 对应发布版 v0.9.5-beta03（tag 3526cfe2，即 main head，发布后无新增提交）：
+#   eafb51f1 AGP 9.5.1 -> 9.5.2（宿主必须同步，否则依赖解析期失败）
+#   daa2d15f / 3f56c659 blur+glass 降低重组与分配、简化顶栏 band
+#   0320daa0 GlassTabRow 静止不透明度 / 淡出闪烁修复
+#   715ac29a 顶栏 band 渐隐恢复 + 折叠进度追踪（移除 visualContentOffset 参数）
+#   b31c60f2 过滚驱动显式 GlassTopAppBar（上一轮已含）
+# 本轮升级记录见 docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="f3829d3d"
+PINNED_REF="3526cfe2"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

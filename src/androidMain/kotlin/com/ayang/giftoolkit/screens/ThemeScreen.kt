@@ -9,12 +9,10 @@ import com.ayang.giftoolkit.BackExitDirection
 import com.ayang.giftoolkit.ThemeMode
 import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
-import com.ayang.giftoolkit.BuildConfig
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.rememberGlassScope
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 /**
  * 主题设置（独立页）。
@@ -29,8 +27,6 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 fun ThemeScreen(
     app: AppState,
     onBack: () -> Unit,
-    /** 仅 debug 包：按钮配色对比页的入口回调（release 里恒为 null，那一组不渲染）。 */
-    onOpenButtonColors: (() -> Unit)? = null,
 ) {
     val glass = rememberGlassScope()
     val modes = ThemeMode.entries
@@ -108,25 +104,6 @@ fun ThemeScreen(
                             onSelect = { app.backExitDirection = directions[it] },
                         )
                     }
-                }
-            }
-        }
-
-        // 两道门，都是编译期可折叠的：
-        //   - `BuildConfig.DEBUG_UI` 在 release 里被内联成 false（Kotlin 对 Java 编译期常量会内联），
-        //     于是 R8 把整块连同里面的文案字符串一起删掉；
-        //   - `onOpenButtonColors != null` 是给调用方的契约（release 传 null）。
-        // 只留后者时文案字符串仍会留在 dex 里（R8 不会为了一个 null 判断去内联整个页面），
-        // 验收方式是"release dex 里搜不到这些字"（docs/os4-round10-audit.md §8.3）。
-        if (BuildConfig.DEBUG_UI && onOpenButtonColors != null) {
-            item { GroupHeader("调试（仅调试包可见）") }
-            item {
-                GroupCard {
-                    ArrowPreference(
-                        title = "开始按钮配色对比",
-                        summary = "无素材禁用态 A / B / C / D 四种配色的真实按钮",
-                        onClick = onOpenButtonColors,
-                    )
                 }
             }
         }

@@ -1,7 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.application") version "9.5.1"
+    // AGP 必须与 ../miuix 的 gradle/libs.versions.toml 完全同版本：composite build 里
+    // 两个独立构建共用一个 AGP，不一致时在依赖解析期报 "Using multiple versions ..."。
+    // 0.9.5-beta03（3526cfe2）把上游 AGP 从 9.5.1 提到 9.5.2。
+    id("com.android.application") version "9.5.2"
     id("org.jetbrains.kotlin.multiplatform") version "2.4.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
     id("org.jetbrains.compose") version "1.13.0-rc01"
@@ -65,28 +68,16 @@ android {
         // 33：miuix-blur 的下限，也是 OS4 玻璃（RuntimeShader）能正常工作且不降级的起点
         minSdk = 33
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.12"
+        versionCode = 15
+        versionName = "1.13"
     }
 
     buildTypes {
-        // `DEBUG_UI` 是**字面量**布尔（不是 AGP 默认那个 `Boolean.parseBoolean("...")`），
-        // 所以 Kotlin 会把它当编译期常量内联，R8 也就能把 `if (BuildConfig.DEBUG_UI)` 的分支
-        // 连同里面的界面与文案整段删掉。release 包的验收方式是
-        // "dex 里搜不到「开始按钮配色对比」"（`docs/os4-round10-audit.md` §8.3）。
-        debug {
-            buildConfigField("boolean", "DEBUG_UI", "true")
-        }
         release {
-            buildConfigField("boolean", "DEBUG_UI", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
         }
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     compileOptions {

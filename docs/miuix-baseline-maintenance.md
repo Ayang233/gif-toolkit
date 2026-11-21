@@ -169,7 +169,7 @@ adb logcat -c && adb logcat -d -v brief | grep -E "FATAL|SIGSEGV|libhwui"
 | 玻璃 | 开 / 关 | 底栏、顶栏、Rail、弹层、GlassCard；关掉后不能塌成通栏白条 |
 | 版式 | 竖屏 / 横屏（宽屏 Rail 折叠态） | 内容不被侧栏压住、底部主操作条不贴边、末尾无空带 |
 | 页面 | 首页 / 作品 / 设置 / 主题 / 关于 / 许可 / 工具页 | 顶栏折叠、滚动、下拉、Dialog/BottomSheet |
-| 包体 | release | 能装能起；`DEBUG_UI` 分支确实被 R8 删掉 |
+| 包体 | release | 能装能起；R8 后仍能正常启动（1.12 起 `DEBUG_UI` 调试页已删除，不再有该验收项） |
 
 **自动化可行的部分**：截图对比（同一组路径跑两遍 APK，逐像素 diff）。
 本轮的采集与 diff 脚本保存在 `_archive/baseline-upgrade/`，可以直接改造成 `scripts/visual-smoke.*`（见 §7）。
@@ -348,7 +348,7 @@ git push origin main --follow-tags
 ```
 
 **发布前必须人工确认**：真机玻璃观感（顶栏模糊带、底栏/侧栏、弹层）、滚动是否掉帧、
-十个工具各跑一遍、release 包里 `DEBUG_UI` 分支确实不存在。
+十个工具各跑一遍。
 
 ---
 
