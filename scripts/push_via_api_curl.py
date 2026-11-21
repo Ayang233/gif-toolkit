@@ -77,13 +77,23 @@ commit = api("POST", f"https://api.github.com/repos/{REPO}/git/commits",
 api("PATCH", f"https://api.github.com/repos/{REPO}/git/refs/heads/main", {"sha": commit, "force": True})
 print("main ->", commit[:12])
 
-tag = api("POST", f"https://api.github.com/repos/{REPO}/git/tags",
-          {"tag": "v1.12", "message": "GIF 助手 1.12：MIUIX 基线 f3829d3d（0.9.5-beta02）",
-           "object": commit, "type": "commit"})["sha"]
-api("PATCH", f"https://api.github.com/repos/{REPO}/git/refs/tags/v1.12", {"sha": tag, "force": True})
-print("tag v1.12 updated")
+# 只有要发版时才移动 tag：发过版之后再推文档/脚本，不应把 tag 从已发布的提交上挪走。
+if os.environ.get("MOVE_TAG"):
+    tag = api("POST", f"https://api.github.com/repos/{REPO}/git/tags",
+              {"tag": os.environ["MOVE_TAG"], "message": "GIF 助手 " + os.environ["MOVE_TAG"].lstrip("v"),
+               "object": commit, "type": "commit"})["sha"]
+    api("PATCH", f"https://api.github.com/repos/{REPO}/git/refs/tags/{os.environ['MOVE_TAG']}",
+        {"sha": tag, "force": True})
+    print("tag", os.environ["MOVE_TAG"], "->", commit[:12])
+else:
+    print("未设置 MOVE_TAG，tag 保持不动")
 
-rel = [r for r in api("GET", f"https://api.github.com/repos/{REPO}/releases?per_page=5") if r["draft"]][0]
+drafts = [r for r in api("GET", f"https://api.github.com/repos/{REPO}/releases?per_page=5") if r["draft"]]
+if not drafts:
+    # 没有草稿 Release 是正常情况（例如这次只推文档/脚本）：跳过资产与正文更新。
+    print("没有草稿 Release，跳过资产更新")
+    raise SystemExit(0)
+rel = drafts[0]
 for a in rel["assets"]:
     api("DELETE", f"https://api.github.com/repos/{REPO}/releases/assets/{a['id']}")
     print("deleted asset", a["name"])
