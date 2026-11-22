@@ -402,7 +402,10 @@ fun PreviewStage(
     // 横屏窗口只有 ~410dp 高，16:9 铺满宽要 620dp —— 预览会把参数区整块顶出屏幕，
     // 空态提示语居中在视口之外，看起来就是"预览区是空的"。上限压到窗口高度的 42%。
     val density = LocalDensity.current
-    val windowHeight = LocalWindowInfo.current.containerSize.height
+    // 高度上限读**容器**尺寸（`LocalContainerSize`，由 `App` 根部注入），读不到才回退窗口。
+    // 与宽屏判定同一来源：分屏 / 自由窗口下"预览最多占多少高"要按真实可用区域算，
+    // 不是按整个窗口。迁移指南第 6 节的口径。
+    val windowHeight = (LocalContainerSize.current ?: LocalWindowInfo.current.containerSize).height
     BoxWithConstraints(modifier.fillMaxWidth()) {
         // 宽度取**实际可用宽度**（展开 Rail 时卡片更窄），高度上限取窗口高度的一个比例。
         // 横屏这种"矮窗口"（<500dp）要按更小的比例算：竖屏 42% 时预览能完整落在参数区上方，

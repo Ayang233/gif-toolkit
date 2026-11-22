@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.ayang.giftoolkit.data.SettingsStore
@@ -41,6 +43,7 @@ import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
+import com.ayang.giftoolkit.ui.LocalContainerSize
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.LocalRailInset
 import com.ayang.giftoolkit.ui.LocalTopAppBarCenterObstructionStart
@@ -83,6 +86,21 @@ import top.yukonga.miuix.kmp.utils.springAnimateToPage
 
 @Composable
 fun GifApp() {
+    // 容器尺寸基准（官方 `App.kt:89-100` 同款）：在组合根用一次 `BoxWithConstraints` 取到
+    // **这棵 UI 实际拿到的可用区域**，再经 `LocalContainerSize` 下发。
+    // 宽屏判定（840/600/1200）与预览舞台的高度上限都读它 —— 之前三处各自去问
+    // `LocalWindowInfo`，在多窗口 / 自由窗口下"窗口尺寸"和"可用区域"不是一回事。
+    // 迁移指南第 6 节把这条列成硬要求（宽屏与视口计算优先读容器尺寸，再回退窗口）。
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val containerSize = IntSize(constraints.maxWidth, constraints.maxHeight)
+        CompositionLocalProvider(LocalContainerSize provides containerSize) {
+            GifAppContent()
+        }
+    }
+}
+
+@Composable
+private fun GifAppContent() {
     val context = LocalContext.current
     val app = remember(context) { AppState(SettingsStore(context)) }
 

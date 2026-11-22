@@ -286,3 +286,50 @@
 | `Colors` 各 role 取值 | `miuix-ui/.../theme/Colors.kt:341-394`（light）、`:451-504`（dark） |
 | `TextStyles` 字号 | `miuix-ui/.../theme/TextStyles.kt:146-230` |
 | 官方 example 参照 | `example/shared/src/commonMain/kotlin/utils/PageUtils.kt`、`utils/AdaptiveUtils.kt`、`component/liquid/CombinedBackdrop.kt`、`component/effect/*`、`component/GroupedCardItems.kt`、`AppContent.kt`、`AboutPage.kt`、`component/BackNavigationIcon.kt`、`component/GlassBottomSheetDemo.kt`、`GlassPage.kt` |
+
+## 13. 补记：`b00169ba` 轮（1.14，2026-11-22）
+
+本轮先按 `docs/miuix-glass-migration.md`（YuKongA/Mishka 的 OS4 Glass 迁移指南）把 6 条工程红线
+与组件替换表逐条对了一遍，再补做三处替换。§1 的 W1–W6 在本轮之前已全部落地
+（`squircleSurface`、`rememberNavSystemCornerRadius`、`BasicComponent` 承载颜色行、
+删抄来的库默认值、`ButtonDefaults`/`ProgressIndicatorDefaults` 常量）。
+
+### 13.1 本轮新修（3 处）
+
+| # | 位置 | 修前 | 修后 | 判据 |
+| --- | --- | --- | --- | --- |
+| N1 | `screens/ToolScreen.kt` `ColorSwatches` | 自绘 5 个圆形色块（`clip(CircleShape)` + `border(2dp/1dp)` + 手调 `ToggleOn` 触觉 + 自补 `semantics`）——即 §1 W3 的"方案 B"里仍然留给自己的那一层 | 官方 `ColorPalette`，独立卡 + 16dp 内边距 + 全宽 + `showPreview = false` | 官方 `component/ColorPickerSection.kt:72` 的用法；库的官方颜色选择组件就是它（无"色卡行"组件，所以之前的自绘确实是补库缺口，但**选中语义/触觉/轮廓**不必自己写） |
+| N2 | `ui/PageChrome.kt` `isScrolled` | `computedStateOf { listState.canScrollBackward }` | 叠加 `\|\| scrollBehavior.state.overscrollOffset < -1f` | 官方 `GlassPage.kt:176` / `IconPage.kt:182` 逐字一致；指南 §5.4 要求阈值 `-1f` 防亚像素误触发 |
+| N3 | `ui/Adaptive.kt`、`App.kt`、`ui/Widgets.kt` | 三处各读 `LocalWindowInfo.current.containerSize` | `App` 根部 `BoxWithConstraints` 注入 `LocalContainerSize`，`containerSize()` 优先读它、回退窗口 | 官方 `utils/AdaptiveUtils.kt:14-46` + `App.kt:89-100`；指南 §6「容器尺寸基准」 |
+
+### 13.2 复核后仍然保留（并给出理由，防止下一轮再翻一遍）
+
+- `ui/Widgets.kt` 的 `GlassCard`：**不要**与 `miuix-glass` 新增的 `GlassCard` 混淆。
+  前者采页面背景画材质（`textureBlur`，官方 `AboutPage.kt:347-360` 同款），
+  后者是"放在玻璃面板内部的半透明卡"（KDoc 明确说它不采样、不模糊）。语义不同，不能替换。
+- `ui/ProgressButton.kt`：库无进度按钮。容器已是官方 `squircleSurface` + `semantics(Role.Button)`。
+- `ui/PageChrome.kt` `rememberBottomBarClearance()`：仍镜像 `GlassNavigationBar` 未导出的
+  `floatingMargin`。改成 `defaultWindowInsetsPadding = false` 会改变底栏视觉位置（本轮明确不动）。
+- `ui/AnimatedTheme.kt`：`LocalColorSchemeMode` 仍是 internal，主题过渡只能自己插值。
+- `ui/SubtitleField`：`bringIntoViewRequester` 是 Compose 框架 API，配合官方 `LocalBringIntoViewSpec` 使用；
+  唯一的偏差点是 `ime` insets 在组合期读取（指南 §5.2 的"禁止组合期读帧率级状态"），
+  但改成布局期读取会把 IME 逐帧 follow 的逻辑拆散，收益小于回归风险，暂列技术债。
+
+### 13.3 指南其余条目对账（本轮结论：已满足）
+
+| 指南条目 | 现状 |
+| --- | --- |
+| §2.1 录制层先铺不透明底色 | `rememberPageBackdrop(opaqueBase = true)` 里 `drawRect(pageBaseColor())` |
+| §2.1 禁止自采样 | 顶栏/底栏/Rail 都是录制层的兄弟节点（`App.kt`、`ContentBackdropBox`） |
+| §2.2 两级采样宿主 | 页面层 `LocalPageBackdrop` + 一级页 `LocalRootBackdrop`（Pager 外，真实窗口坐标） |
+| §2.3 无模糊降级 | `isGlassSupported()` → `isRuntimeShaderSupported()`，`backdrop = null` 由组件回退 |
+| §3 组件替换表 | 顶栏 / 底栏 / Rail / 图标 / 下拉 / Dialog / BottomSheet 全部官方 Glass 组件 |
+| §3 圆角与材质 | 未覆盖 `shape`；`GlassSurface` 用库默认 |
+| §4.1 Rail 层级与跨层弹窗 | Rail 在 `NavDisplay` 外层 `Box`，弹层由最外层 `Scaffold` 托管 |
+| §4.2 背景全屏、内容避让 | `LocalRailInset` / `LocalTopBarTitleAlpha` / `LocalTopAppBarCenterObstructionStart` 三个 lambda |
+| §5.1 `layerBackdrop` 先于 inset/padding | `App.kt`、`ContentBackdropBox` 都是 `.fillMaxSize().then(layerBackdrop)` |
+| §5.2 禁止组合期读逐帧状态 | 除 `SubtitleField` 的 IME 判据外，其余均走 lambda / `layout` / `graphicsLayer` |
+| §5.3 起始缩进不重复 | `pageContentPadding` 只让 start 一侧，`railStartInset` 由 `base` 带安全区 |
+| §6 `computedStateOf` / `CapturedAnimatedVisibility` | 已用 `computedStateOf`；无 `AnimatedVisibility` 调用点 |
+| §6 `TextFieldState` / `maxLength*` | `TextField` 已用 `TextFieldState`；无废弃 `maxLength` |
+| §7 图标 28dp / `GlassTextField` 于 Dialog 内 | Glass 图标统一 `IconSizes.Action = 28.dp` / `Row = 28.dp`；弹层内无输入框 |

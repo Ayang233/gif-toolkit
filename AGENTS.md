@@ -296,14 +296,15 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`3526cfe2`**（2026-11-21，`example: split LazyColumn cards into per-row items`），
-   对应发布版 **`v0.9.5-beta03`**（tag 就打在 `3526cfe2` 上，发布后 main 无新增提交）；
-   逐项差异见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`（9 个提交 / 439 文件，
-   工具链只动了 AGP，`src/` 零适配）。
-   **`v0.9.5-beta02` 起强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
-   上一轮基线 `f3829d3d`（见 `docs/os4-round12-audit.md`），上上次 `3177a684`
+1. 基线是 Miuix **`b00169ba`**（2026-11-22，`example: Add dark launcher icon background for night mode`），
+   在发布版 `v0.9.5-beta03` 之后又走了 19 个提交；
+   逐项差异见 `docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md`（19 个提交 / 100 文件，
+   工具链零变化，`src/` 升级即编译通过）。
+   上一轮基线 `3526cfe2`（= `v0.9.5-beta03`，见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`），
+   更早的 `f3829d3d`（见 `docs/os4-round12-audit.md`）、`3177a684`
    （逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），升级前定制面清单见
    `docs/upgrade-prep-customization-inventory.md`。
+   **`v0.9.5-beta02` 起强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
    升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
    这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
    已经踩过的一次：`GlassNavigationBar` 的 `floatingMargin` 在 ≤16dp 档从 28dp 变成 20dp，
@@ -323,6 +324,14 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    驱动源从 `maskProgress` 换成 `scrollBehavior.state.collapsedFraction`（渐进模糊沿用 `bandActive`）。
    本项目前者没用到（零改动），后者吃默认值 —— 于是折叠/滚动时 band 的浓淡会更贴合折叠进度。
    这是**观感变化**，升级后要真机看一眼，别当成回归。
+   **`b00169ba` 这一轮改了顶栏渐进模糊带的高度算法**（取 `max(顶栏实际高度, 状态栏+折叠高度+底栏内容)`
+   再加 `gradientOverhang`），并新增 `miuix-glass` 的 `GlassCard`、`DialogMotion.Glass`；
+   `GlassBottomSheet` 去掉了底边描边、无标题时不再占头部空间、`insideMargin` 默认从 (24,0) 收成 (12,0)。
+   本项目用到的部分：底部操作面板（有标题，行内边距变宽 12dp）、删除确认框（进出的弹簧换成官方
+   HyperOS 预设）、顶栏（band 高度算法）。**升级后要真机看一眼玻璃带厚度与弹层动效。**
+   composite build 换基线后若报
+   `The given file ... is located outside the root directory ...bundleLibRuntimeToDirAndroidMain`，
+   是 `../miuix/*/build` 里残留了旧基线的 class，删掉这些 `build/` 目录即可（不是代码问题）。
    每轮升级的差异与结论见 `docs/os4-round*-audit.md`。
 2. Miuix 的 `miuix-glass` / `miuix-glass-icons` 没有发布到 Maven Central，只能源码引入；
    且它的 `build-logic` 在配置阶段调 git，composite build 下必须补 `workingDir = rootDir`。

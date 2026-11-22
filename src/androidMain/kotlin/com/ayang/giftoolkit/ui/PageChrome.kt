@@ -258,7 +258,17 @@ fun Os4ListPage(
     // 每次读重新计算、不缓存结果，但仍然只在结果变化时让组合失效 —— 正好适合这种廉价判据，
     // 省掉派生状态的缓存簿记与失效写回。官方 `MainPage.kt:104` / `AboutPage.kt:93` /
     // `ComponentPage.kt:144` 的 `isScrolled` 就是这一行。
-    val isScrolled by remember { computedStateOf { listState.canScrollBackward } }
+    // 判据必须叠 `overscrollOffset < -1f`：页面不足一屏、继续往上拉时列表本身
+    // `canScrollBackward` 仍是 false，但内容确实在动 —— 缺这一项，顶栏的按钮材质与
+    // 渐进模糊会"拉不动"，观感上像顶栏卡住了。
+    // 与官方 `GlassPage.kt:176` / `IconPage.kt:182` 逐字一致：
+    // `canScrollBackward || scrollBehavior.state.overscrollOffset < -1f`；
+    // 阈值用 `-1f` 而不是 `< 0f`，是迁移指南第 5.4 条的要求（亚像素与回弹边缘会误触发）。
+    val isScrolled by remember {
+        computedStateOf {
+            listState.canScrollBackward || scrollBehavior.state.overscrollOffset < -1f
+        }
+    }
 
     // 头部高度：首帧用 300dp 兜底（与官方 `AboutPage.kt` 的 logoHeightDp 初值一致）。
     // 用 0 会让透明占位高度为 0 —— 首帧卡片压住图标/标题，且滚动进度恒为 0（判据 > 0 不成立）。

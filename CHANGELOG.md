@@ -2,6 +2,29 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.14 — 2026-11-22
+
+**升级**
+
+- Miuix 基线从 `3526cfe2`（v0.9.5-beta03）升到 `b00169ba`，19 个提交。
+  差异与核对过程见 `docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md`。
+  工具链零变化（AGP 9.5.2 / Kotlin 2.4.21 / CMP 1.13.0-rc01 / Gradle 9.9.2），`src/` 升级即编译通过。
+- 上游本轮新增 `miuix-glass` 的 `GlassCard`、弹层 `DialogMotion`（含 `DialogMotion.Glass`）、
+  渐进模糊带高度修正、`GlassBottomSheet` 去掉底边描边并在无标题时不再留头部空间。
+  本项目没有同名实现被替换：`GlassCard` 是"玻璃面板**内部**的半透明卡"（不采样），
+  与本项目"用 `textureBlur` 采页面背景画出的玻璃卡"不是同一件事。
+
+**调整（按 `docs/miuix-glass-migration.md` 逐条复核后修掉的自造轮子）**
+
+- 「抠图颜色」从自绘的 5 个圆形色块换成官方 `ColorPalette`。原先的选中外环、2dp/1dp 边框、
+  触觉反馈、`semantics` 语义全是自己维护的一套；现在整块只剩一次 `form.keyColor` 读写，
+  腾出约 60 行自绘 UI。摆法照官方 `component/ColorPickerSection.kt`（独立卡 + 16dp 内边距 + 全宽）。
+- 列表页的 `isScrolled` 补上 `overscrollOffset < -1f`（官方 `GlassPage.kt:176` 同款）：
+  页面不足一屏、继续上拉时顶栏的按钮材质与渐进模糊才会跟着浮起，且避开亚像素抖动误触发。
+- 新增 `LocalContainerSize`，在 `App` 组合根用 `BoxWithConstraints` 注入一次；宽屏判定
+  （840/600/1200）与预览舞台的高度上限改读它，读不到才回退 `LocalWindowInfo`
+  （官方 `utils/AdaptiveUtils.kt` 的口径）。多窗口 / 自由窗口下不再拿"窗口尺寸"当"可用区域"。
+
 ## 1.13 — 2026-11-21
 
 **升级**

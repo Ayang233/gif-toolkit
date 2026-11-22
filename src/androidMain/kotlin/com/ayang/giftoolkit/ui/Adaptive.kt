@@ -6,9 +6,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
+
+/**
+ * 应用**自身容器**的像素尺寸（官方 `utils/AdaptiveUtils.kt:14` 同款）。
+ *
+ * 由 `App.kt` 根部 `BoxWithConstraints` 注入一次，之后所有宽屏 / 视口判定都优先读它。
+ * 为什么不再直接用 `LocalWindowInfo.current.containerSize`：多窗口、自由窗口、
+ * 以及以后可能加的分屏下，"窗口有多大"和"这棵 UI 实际拿到多大"不是一回事，
+ * 官方 0.9.5-beta02 起统一改成"先读这一层、读不到才回退窗口"（迁移指南第 6 节）。
+ */
+val LocalContainerSize = compositionLocalOf<IntSize?> { null }
+
+/**
+ * 容器尺寸的**唯一读取点**：先 [LocalContainerSize]，没有才回退 `LocalWindowInfo`。
+ *
+ * 回退分支是给"没经过 `App` 组合根"的场景留的（预览、测试、弹层独立组合），
+ * 生产路径上永远命中前者。
+ */
+@Composable
+private fun containerSize(): IntSize =
+    LocalContainerSize.current ?: LocalWindowInfo.current.containerSize
 
 /**
  * 是否进入「宽屏」布局：用侧边导航栏替代底部导航栏。
@@ -22,11 +43,11 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun rememberWideLayout(): Boolean {
-    val windowInfo = LocalWindowInfo.current
+    val size = containerSize()
     val density = LocalDensity.current
     return with(density) {
-        val width = windowInfo.containerSize.width.toDp()
-        val height = windowInfo.containerSize.height.toDp()
+        val width = size.width.toDp()
+        val height = size.height.toDp()
         width >= 840.dp || (width >= 600.dp && height / width < 1.2f)
     }
 }
@@ -110,8 +131,6 @@ val LocalTopAppBarCenterObstructionStart =
  */
 @Composable
 fun shouldExpandNavigationRail(): Boolean {
-    val width = with(LocalDensity.current) {
-        LocalWindowInfo.current.containerSize.width.toDp()
-    }
+    val width = with(LocalDensity.current) { containerSize().width.toDp() }
     return width >= 1200.dp
 }

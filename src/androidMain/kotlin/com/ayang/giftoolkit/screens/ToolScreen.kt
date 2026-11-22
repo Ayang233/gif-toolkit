@@ -4,14 +4,11 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,10 +20,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -39,15 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.ToolForm
@@ -72,6 +64,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ColorPalette
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -220,6 +213,30 @@ fun ToolScreen(
             GroupCard { ParamPanel(tool, form) }
         }
 
+        // 抠图颜色：直接用官方 `ColorPalette`（`miuix-ui/basic/ColorPalette.kt`），
+        // 摆法照官方 `component/ColorPickerSection.kt`：独立一张卡、`insideMargin` 16dp、
+        // 全宽铺开、`showPreview = false`（预览色块在这里没有意义，色块本身就在网格里）。
+        //
+        // 之前是自绘的 5 个圆形色块：`clip(CircleShape)` + `border(2dp/1dp)` + 手调
+        // `HapticFeedbackType.ToggleOn` + 自补 `semantics` —— 选中环、边框粗细、触觉、
+        // 读屏语义全是我们自己维护的一套，而库本来就有官方的颜色选择组件
+        // （7×12 HSV 网格 + 灰阶列 + 选中指示 + 触觉 + squircle 轮廓）。
+        // 换掉以后这块只剩一次 `form.keyColor` 的读写，不再有第二套颜色选择实现。
+        if (form.colorKey) {
+            item(key = "keycolor-header") { GroupHeader("抠图颜色") }
+            item(key = "keycolor") {
+                GroupCard {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+                        ColorPalette(
+                            color = Color(form.keyColor),
+                            onColorChanged = { form.keyColor = it.toArgb() },
+                            showPreview = false,
+                        )
+                    }
+                }
+            }
+        }
+
         // 字幕输入**不能**塞进上面那张卡片：MIUIX 的 `TextField` 自己就是一张卡
         // （外层 12dp 边距 + 16dp 圆角 + `secondaryContainer` 底色 + 16dp 内边距），
         // 套进 Card 就成了两层圆角贴在一起、还紧贴卡片边缘 —— 这是"比例不像 OS4"的来源。
@@ -289,7 +306,6 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
                     SliderRow("容差", "${form.keyTolerance.toInt()}%", form.keyTolerance, 5f..80f) {
                         form.keyTolerance = it
                     }
-                    ColorSwatches(form)
                 }
             }
 
@@ -371,69 +387,6 @@ private fun ParamPanel(tool: Tool, form: ToolForm) {
 
 private val watermarkNames = listOf("左上角", "右上角", "中央", "左下角", "右下角")
 private val puzzleColsItems = listOf("2 列", "3 列", "4 列")
-
-/** 抠图颜色：固定几个常用色，比取色器更快。 */
-@Composable
-private fun ColorSwatches(form: ToolForm) {
-    // 色值 + 读屏用的名字。`contentDescription` 必须给：自绘色块没有文字，
-    // 不给的话 TalkBack 只会读出一个空标签（官方 `RadioButtonPreference` 的语义是
-    // `selectable(role = Role.RadioButton)` + 标题文字，这里按同一套语义补齐）。
-    val presets = listOf(
-        0xFF00B441 to "绿色",
-        0xFF3482FF to "蓝色",
-        0xFFFFFFFF to "白色",
-        0xFF000000 to "黑色",
-        0xFFFF3B30 to "红色",
-    )
-    // 触觉反馈：官方 `RadioButtonPreference` / `RadioButton` 在选中项变化时调用
-    // `HapticFeedbackType.ToggleOn`（`RadioButtonPreference.kt:131`、`RadioButton.kt:101`）。
-    // 点已经选中的颜色不发生状态变化，按迁移指南"无状态变化不加反馈"的规矩直接跳过。
-    val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
-    // 行本身走官方 `BasicComponent`（56dp 最小高、16dp 内边距、headline1 标题都是库的规格），
-    // 色块放 `endActions`。之前这里手写了同一套行规格，属于重复造轮子。
-    BasicComponent(
-        title = "抠图颜色",
-        endActions = {
-            presets.forEach { (value, name) ->
-                val selected = form.keyColor == value.toInt()
-                // **固定 28dp 槽位**：之前选中时 24→28dp，整行会跟着变宽、右侧色块一起位移。
-                Box(
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .selectable(
-                            selected = selected,
-                            role = Role.RadioButton,
-                            onClick = {
-                                if (!selected) {
-                                    hapticFeedback.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn,
-                                    )
-                                    form.keyColor = value.toInt()
-                                }
-                            },
-                        )
-                        .semantics { contentDescription = name },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Color(value))
-                            .border(
-                                width = if (selected) 2.dp else 1.dp,
-                                color = if (selected) MiuixTheme.colorScheme.primary
-                                else MiuixTheme.colorScheme.outline,
-                                shape = CircleShape,
-                            ),
-                    )
-                }
-            }
-        },
-    )
-}
 
 /**
  * 字幕输入：Miuix `TextField` + `TextFieldState`，失焦不丢内容。

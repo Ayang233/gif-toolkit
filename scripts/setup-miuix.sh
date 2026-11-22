@@ -15,17 +15,18 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 3526cfe2 = 当前基线（2026-11-21，`example: split LazyColumn cards into per-row items`）。
-# 对应发布版 v0.9.5-beta03（tag 3526cfe2，即 main head，发布后无新增提交）：
-#   eafb51f1 AGP 9.5.1 -> 9.5.2（宿主必须同步，否则依赖解析期失败）
-#   daa2d15f / 3f56c659 blur+glass 降低重组与分配、简化顶栏 band
-#   0320daa0 GlassTabRow 静止不透明度 / 淡出闪烁修复
-#   715ac29a 顶栏 band 渐隐恢复 + 折叠进度追踪（移除 visualContentOffset 参数）
-#   b31c60f2 过滚驱动显式 GlassTopAppBar（上一轮已含）
-# 本轮升级记录见 docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md。
+# 上游 b00169ba = 当前基线（2026-11-22，`example: Add dark launcher icon background for night mode`）。
+# 基于 v0.9.5-beta03 之后的 19 个提交，工具链零变化（AGP 9.5.2 / Kotlin 2.4.21 / CMP 1.13.0-rc01）：
+#   9128921c 新增 miuix-glass 的 GlassCard（玻璃面板内用的半透明卡）
+#   bf61ef44 弹层进出场动画对齐 HyperOS（新增 framework DialogMotion / DialogMotion.Glass）
+#   accff623 / 6904e7bd GlassBottomSheet：去掉底边描边、无标题时不再留头部空间
+#   234db0fe / d21e82f9 渐进模糊带高度覆盖顶栏实际高度（顶栏观感）
+#   da590171 / ee0281df / acdb4107 / de9da1d8 / c83aacd8 blur 管线性能与噪声修复
+#   8f621215 / 8fbd4a14 弹层与 Tooltip 约束在窗口内、级联弹层首项圆角
+# 本轮升级记录见 docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="3526cfe2"
+PINNED_REF="b00169ba"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

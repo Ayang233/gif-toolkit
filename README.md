@@ -6,7 +6,7 @@
 界面用 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）重写。
 支持静态配色和 Monet 动态取色，明暗双模式，底栏是 OS4 那种玻璃质感。
 
-最新版本 1.13，装 Android 13 及以上：[Releases](https://github.com/Ayang233/gif-toolkit/releases)
+最新版本 1.14，装 Android 13 及以上：[Releases](https://github.com/Ayang233/gif-toolkit/releases)
 
 改代码之前先看 [AGENTS.md](AGENTS.md)：目录地图、常用命令，还有十几条硬约束
 （玻璃录制层怎么摆、三种页面底色怎么分、图标尺寸从哪取之类）。
@@ -16,8 +16,8 @@
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
 
-截图是 1.8 拍的。关于页那张关掉了玻璃材质——开着的时候图标、名称和卡片是拿 `textureBlur`
-采样背景渐变画的，需要硬件 GPU，模拟器得用 `-gpu host` 启动才看得到。
+截图是 1.14 拍的。关于页的图标、名称和卡片是拿 `textureBlur` 采样背景渐变画的，需要硬件 GPU，
+模拟器得用 `-gpu host` 启动才看得到；软件渲染下这几块会退成实色。
 
 <details>
 <summary>深色模式</summary>
@@ -26,11 +26,18 @@
 
 </details>
 
+<details>
+<summary>色度抠图的调色板</summary>
+
+![调色板](docs/screenshots/palette.png)
+
+</details>
+
 ## 功能
 
 | 分组 | 功能 | 做什么 |
 | --- | --- | --- |
-| 创建 | 视频转 GIF | 截片段，调分辨率、帧率、色数，能防抖、能色度抠图 |
+| 创建 | 视频转 GIF | 截片段，调分辨率、帧率、色数，能防抖，色度抠图的颜色从调色板里挑 |
 | 创建 | 动态照片转 GIF | 把 Motion Photo（MVIMG）里的内嵌视频抽出来再转 |
 | 创建 | 图片合成 GIF | 多张图按顺序合成，帧间隔可调 |
 | 处理 | GIF 编辑 | 旋转、镜像、翻转、倒放、居中裁剪、字幕、去水印 |
@@ -44,7 +51,7 @@
 ## 技术栈
 
 - Kotlin Multiplatform，单模块，实现全在 `androidMain`；Compose Multiplatform 1.13.0-rc01
-- Miuix 提供全部组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 0.9.5-beta03（`3526cfe2`）
+- Miuix 提供全部组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 `b00169ba`（0.9.5-beta03 之后又走了 19 个提交）
 - AGP 9.5.2 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
 - GIF 编解码是纯 Kotlin 写的；取帧和 MP4 编码用系统的 `MediaMetadataRetriever`、`MediaCodec`
 
@@ -128,7 +135,10 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
    `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是干这个的，去掉它们会静默不渲染。
    页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（在 Scaffold 里、录制层外）。
 4. 卡片里不放分割线，靠 56dp 最小行高和 16dp 内边距区分。
-5. 不引入 `androidx.compose.material3`。设计语言会打架，包体也明显变大。
+5. 宽屏判定（840 / 600 / 1200）和预览区高度上限都读 `LocalContainerSize`，由 `App.kt` 根部
+   `BoxWithConstraints` 注入。别再各处直接读 `LocalWindowInfo`：多窗口和分屏下"窗口多大"
+   和"这棵 UI 实际有多少可用区域"不是一回事。
+6. 不引入 `androidx.compose.material3`。设计语言会打架，包体也明显变大。
 
 ## 已知限制
 
