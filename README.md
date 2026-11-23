@@ -1,15 +1,15 @@
 # GIF 助手
 
-一个纯本地的 Android GIF 工具集。转码、编辑、压缩、拼接、拼图、分解，十个功能全部在设备上跑，
-不联网，不申请业务权限（文件走 SAF），也没有广告。
+纯本地的 Android GIF 工具。转码、编辑、压缩、拼接、拼图、分解共十个功能，全部在设备上跑，
+不联网，不要权限（文件走 SAF），也没有广告。
 
-界面用 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）重写。
-支持静态配色和 Monet 动态取色，明暗双模式，底栏是 OS4 那种玻璃质感。
+界面是 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）搭的。
+静态配色和 Monet 动态取色都有，明暗双模式，底栏是 OS4 那种玻璃。
 
-最新版本 1.14，装 Android 13 及以上：[Releases](https://github.com/Ayang233/gif-toolkit/releases)
+最新版本 1.14，Android 13 及以上：[Releases](https://github.com/Ayang233/gif-toolkit/releases)
 
-改代码之前先看 [AGENTS.md](AGENTS.md)：目录地图、常用命令，还有十几条硬约束
-（玻璃录制层怎么摆、三种页面底色怎么分、图标尺寸从哪取之类）。
+要改代码先看 [AGENTS.md](AGENTS.md)：目录地图、常用命令，还有十几条硬约束
+（玻璃录制层怎么摆、三种页面底色怎么分、图标尺寸从哪取）。
 路线图和变更记录在 [ROADMAP.md](ROADMAP.md)、[CHANGELOG.md](CHANGELOG.md)。
 
 | 主页 | 工具页 | 设置 | 关于 |
@@ -118,9 +118,9 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 └── core/                  GifCodec / MediaTools / GifTasks / Stabilizer / ColorKey / MotionPhoto
 ```
 
-## 改 UI 前值得知道的几件事
+## 改 UI 前先看这几条
 
-完整的在 [AGENTS.md](AGENTS.md)，这里挑几条最容易踩的：
+完整的在 [AGENTS.md](AGENTS.md)，这里挑最容易踩的：
 
 1. 玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是它的子节点，录制层也不能上移到 `Scaffold`。
    否则玻璃采到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 会递归到栈溢出，直接闪退。
