@@ -2,54 +2,46 @@ package com.ayang.giftoolkit.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.computedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.offset
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-
-/**
- * 应用**自身容器**的像素尺寸（官方 `utils/AdaptiveUtils.kt:14` 同款）。
- *
- * 由 `App.kt` 根部 `BoxWithConstraints` 注入一次，之后所有宽屏 / 视口判定都优先读它。
- * 为什么不再直接用 `LocalWindowInfo.current.containerSize`：多窗口、自由窗口、
- * 以及以后可能加的分屏下，"窗口有多大"和"这棵 UI 实际拿到多大"不是一回事，
- * 官方 0.9.5-beta02 起统一改成"先读这一层、读不到才回退窗口"（迁移指南第 6 节）。
- */
-val LocalContainerSize = compositionLocalOf<IntSize?> { null }
-
-/**
- * 容器尺寸的**唯一读取点**：先 [LocalContainerSize]，没有才回退 `LocalWindowInfo`。
- *
- * 回退分支是给"没经过 `App` 组合根"的场景留的（预览、测试、弹层独立组合），
- * 生产路径上永远命中前者。
- */
-@Composable
-private fun containerSize(): IntSize =
-    LocalContainerSize.current ?: LocalWindowInfo.current.containerSize
+import androidx.compose.ui.unit.offset
 
 /**
  * 是否进入「宽屏」布局：用侧边导航栏替代底部导航栏。
  *
- * 阈值照抄官方 `utils/AdaptiveUtils.kt`：
+ * 阈值与官方 `utils/AdaptiveUtils.kt` 的 `shouldShowSplitPane()` 逐字相同：
  * - 宽度 ≥ 840dp 一定算宽屏；
  * - 600~840dp 之间，只有横向（高宽比 < 1.2）才算 —— 竖着拿的折叠屏展开态仍用底栏。
  *
- * 抄同一组数字，是为了让 GIF 助手和 Miuix 生态里其它应用在同一台设备上**同一时刻**切换布局，
- * 不然并排放着看会觉得两块屏幕切换时机不一致。
+ * 尺寸来源也跟官方一致：`LocalWindowInfo.current.containerSize`，包在
+ * `remember(windowInfo, density) { computedStateOf { … } }` 里 —— 容器尺寸是个 state，
+ * 旋转 / 分屏变化时只让这一个布尔失效，不带着整页重组。
+ *
+ * **不要**再自己造 `LocalContainerSize` 注入：本项目 1.14 曾在 `App` 根部用
+ * `BoxWithConstraints` 注入过一次，beta04 官方把那一层删回了 `LocalWindowInfo`，
+ * 我们跟着删掉（见 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md` §3）。
  */
 @Composable
 fun rememberWideLayout(): Boolean {
-    val size = containerSize()
+    val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
-    return with(density) {
-        val width = size.width.toDp()
-        val height = size.height.toDp()
-        width >= 840.dp || (width >= 600.dp && height / width < 1.2f)
-    }
+    return remember(windowInfo, density) {
+        computedStateOf {
+            val size = windowInfo.containerSize
+            if (size.width <= 0) return@computedStateOf false
+            with(density) {
+                val width = size.width.toDp()
+                val height = size.height.toDp()
+                width >= 840.dp || (width >= 600.dp && height / width < 1.2f)
+            }
+        }
+    }.value
 }
 
 /** 宽屏标记，页面骨架据此决定顶栏是否还允许大标题展开。 */
@@ -131,6 +123,11 @@ val LocalTopAppBarCenterObstructionStart =
  */
 @Composable
 fun shouldExpandNavigationRail(): Boolean {
-    val width = with(LocalDensity.current) { containerSize().width.toDp() }
-    return width >= 1200.dp
+    val windowInfo = LocalWindowInfo.current
+    val density = LocalDensity.current
+    return remember(windowInfo, density) {
+        computedStateOf {
+            with(density) { windowInfo.containerSize.width.toDp() >= 1200.dp }
+        }
+    }.value
 }

@@ -15,18 +15,18 @@
 set -euo pipefail
 
 MIUIX_REPO="https://github.com/compose-miuix-ui/miuix.git"
-# 上游 b00169ba = 当前基线（2026-11-22，`example: Add dark launcher icon background for night mode`）。
-# 基于 v0.9.5-beta03 之后的 19 个提交，工具链零变化（AGP 9.5.2 / Kotlin 2.4.21 / CMP 1.13.0-rc01）：
-#   9128921c 新增 miuix-glass 的 GlassCard（玻璃面板内用的半透明卡）
-#   bf61ef44 弹层进出场动画对齐 HyperOS（新增 framework DialogMotion / DialogMotion.Glass）
-#   accff623 / 6904e7bd GlassBottomSheet：去掉底边描边、无标题时不再留头部空间
-#   234db0fe / d21e82f9 渐进模糊带高度覆盖顶栏实际高度（顶栏观感）
-#   da590171 / ee0281df / acdb4107 / de9da1d8 / c83aacd8 blur 管线性能与噪声修复
-#   8f621215 / 8fbd4a14 弹层与 Tooltip 约束在窗口内、级联弹层首项圆角
-# 本轮升级记录见 docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md。
+# 上游 3c560868 = 当前基线 v0.9.5-beta04（2026-11-24，`fix(ui): release overlay touch blocking before exit tail`）。
+# 基于 b00169ba 之后的再 60 个提交，工具链零变化（AGP 9.5.2 / Kotlin 2.4.21 / CMP 1.13.0-rc01）：
+#   #495 miuix-glass 新增 GlassCard（玻璃面板/玻璃表面上放内容；官方 AboutPage 已改用它）
+#   #494 / #496 弹层进出场对齐 HyperOS（DialogMotion / SheetMotion）
+#   #486 miuix-nav 路由绑定式展开导航
+#   07d48590 SearchClearButton，统一 SearchBar / GlassSearchOverlay 的清除按钮
+#   253aee45 / 43489721 玻璃图标改名（XiaominListen→XiaomiListen、CeditSelection→CheckSelection）
+#   fced43a7 顶栏渐进模糊带高度固定；234db0fe / d21e82f9 / 0f8b4790 带高与接缝修正
+# 本轮升级记录见 docs/miuix-baseline-b00169ba-to-3c560868-diff.md。
 # 若在受限网络下（github.com:443 不可达）本机无法 fetch 到这个提交，
 # 脚本会保留当前 HEAD 继续，不会把已有源码切走。
-PINNED_REF="b00169ba"
+PINNED_REF="3c560868"
 REF="${1:-$PINNED_REF}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

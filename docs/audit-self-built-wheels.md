@@ -333,3 +333,47 @@
 | §6 `computedStateOf` / `CapturedAnimatedVisibility` | 已用 `computedStateOf`；无 `AnimatedVisibility` 调用点 |
 | §6 `TextFieldState` / `maxLength*` | `TextField` 已用 `TextFieldState`；无废弃 `maxLength` |
 | §7 图标 28dp / `GlassTextField` 于 Dialog 内 | Glass 图标统一 `IconSizes.Action = 28.dp` / `Row = 28.dp`；弹层内无输入框 |
+
+## 14. 补记：`3c560868` 轮（1.15，2026-11-24，v0.9.5-beta04）
+
+本轮按"全项目重扫 + 只认 MIUIX 官方源码/example"的口径过了一遍 36 个 `.kt`，
+不沿用 §13 的结论，只保留仍站得住的条目。**新修 7 处**，其中 3 处是 beta04 让旧结论失效
+（官方补了同名能力 / 改了做法）。
+
+### 14.1 本轮新修
+
+| # | 位置 | 修前 | 修后 | 判据 |
+| --- | --- | --- | --- | --- |
+| W7 ⭐ | `screens/AboutScreen.kt` + `ui/Widgets.kt` | 自造 `ui.GlassCard`：`Card` + `textureBlur(blurRadius=60f, surface@0.6)` 采样渐变背景 | 官方 `miuix-glass` 的 `GlassCard`；自造实现与 `colorCard` 兜底分支一并删除 | 官方 `example/AboutPage.kt:360/386`：`GlassCard(Modifier.padding(horizontal = 12.dp)) { ArrowPreference… }`。1.14 曾判定"两者语义不同"，beta04 官方的用法推翻了这条 |
+| W8 ⭐ | `App.kt` 底栏 / Rail | 手算 `selectedColor = if (app.monetEnabled) primary else onBackground/onSurface`，注释称 `LocalColorSchemeMode` 拿不到 | 吃库默认值 | `GlassNavigationBar.kt:251` / `GlassNavigationRail.kt:355` 的默认值就是这条规则；外层 `AnimatedMiuixTheme` 用 `MiuixTheme(controller)` 提供了 `LocalColorSchemeMode`，内层只覆盖颜色，`isDynamicColor` 本来就能读到 |
+| W9 ⭐ | `App.kt` + `ui/Adaptive.kt` + `ui/Widgets.kt` | 自造 `LocalContainerSize`，在组合根用 `BoxWithConstraints` 注入，三处读它 | 删除该 CompositionLocal，改回 `LocalWindowInfo.current.containerSize` + `computedStateOf`，与官方逐行同构 | 官方 `utils/AdaptiveUtils.kt` 在 `3c560868` **删除了** `LocalContainerSize`（beta03 引入、beta04 撤回）。本项目 1.14 跟着指南加的这层，现在成了分叉 |
+| W10 | `screens/LibraryScreen.kt` 文件操作面板 | 三行 `BasicComponent` 直接铺在玻璃材质上；底部手算 `Spacer(navigationBars + captionBar)` | 行包在官方 `GlassCard` 里；底部 `navigationBarsPadding().padding(bottom = 16.dp)` | 官方 `component/GlassBottomSheetDemo.kt:46-56`（"content on glass surfaces" 的官方写法） |
+| W11 | `screens/ToolScreen.kt`（预览 / 抠图颜色 / 结果卡） | `GroupCard { Box(Modifier.padding(16.dp)) { … } }` | `GroupCard(insideMargin = PaddingValues(16.dp)) { … }` | 官方 `component/CardSection.kt:43`、`ColorPickerSection.kt:55` 均用 `Card(insideMargin = …)` 表达内边距 |
+| W12 | `ui/Widgets.kt` `PreviewStage`、`screens/ToolScreen.kt` `AnimatedPreview` | `cornerRadius = 12.dp`（写死） | `CardDefaults.CornerRadius`（16dp） | 卡片 16dp 包着 12dp 画布，四角对不齐；尺寸只留一个出处 |
+| W13 | `ui/GlassScope.kt` `PageTopBar` | 显式传 `bandOverhang = GlassTopAppBarDefaults.BandOverhang`、`backgroundAlpha = { 1f }` | 删除，吃库默认值 | `GlassTopAppBar.kt:361/374` 的默认值逐字相同；`bandBrush` 保留（用 `pageBaseColor()` 而非 `surface`，AMOLED 档需要） |
+| W14 | `screens/AboutScreen.kt` 版本号 | `fontSize = 14.sp` | `style = MiuixTheme.textStyles.body2`（14sp） | 官方排版档位，上游调字号时自动跟随；标题 35sp 仍是有意偏离（注释已说明） |
+| W15 ⭐ | `ui/AnimatedTheme.kt` 的动画 key | `LaunchedEffect(target)`，target 是 `controller.currentColors()` 的返回值 | 按颜色值（background / surface / surfaceContainer / primary / onBackground）做 key | **真 bug**：Monet 档且无 `keyColor` 时 `currentColors()` 走 `platformDynamicColors()`，没有 remember，每次组合都是新实例 → effect 每帧重启、`progress.snapTo(0f)` 反复清进度 → 主题"切了不生效"，只有再动一下别的开关才刷。静态档返回稳定实例，所以一直没暴露（`ThemeController.kt:246-293`） |
+
+### 14.2 复核后仍然保留（本轮重新给理由）
+
+- `ui/ProgressButton.kt`：库没有"进度按钮"（`Button.kt` / `ProgressIndicator.kt` 都无 `progress` 形参）。
+  容器已是官方 `squircleSurface` + `semantics(Role.Button)` + `ButtonDefaults` 常量。
+- `ui/PageChrome.kt` `rememberBottomBarClearance()`：仍镜像 `GlassNavigationBar` 内部未导出的
+  `floatingMargin`（beta04 该段代码未变，公式仍为 `≤16dp→20dp / ≥28dp→跟随 / 中间→12dp+nav`）。
+  改成 `defaultWindowInsetsPadding = false` 会改底栏视觉位置，本轮不动。
+- `ui/AnimatedTheme.kt`：`MiuixTheme(colors = …)` 重载**仍不提供** `LocalContentColor`
+  （beta04 `MiuixTheme.kt:54-72` 只 provide `LocalColors` / `LocalTextStyles` / `LocalIndication` /
+  `LocalOverscrollFactory`），主题逐色插值也只能自己做（库无过渡 API）。`Colors` 字段 53 个未变。
+- `ui/CombinedBackdrop.kt`、`ui/bg/*`：官方 example 复刻，库里没有对应物；beta04 这三处源码未变。
+- `ui/BackTransitions.kt`：库只有 `NavTransitions` 三个预设，其余基于官方 `navGraphicsTransition` 积木。
+- `ui/bg/BgEffect.kt` 的 `pageColor()` 用法：`pageColor()` 是"卡内画布"的次级表面（库无此档位），
+  同一函数也给渐变背景当底色，改成 `surfaceContainerHigh` 会连带改掉关于页渐变基色，本轮不动。
+- `screens/AboutScreen.kt` 的图标 / 标题 `textureBlur`：与官方 `AboutPage.kt:273-282` 同参
+  （shape 16dp、`MaxBlurRadius`、`DstIn`、三档混合色）。官方本轮只把卡片换成 `GlassCard`，图标/标题没动。
+
+### 14.3 验证
+
+- `:assembleDebug` / `:assembleRelease` 通过（`ANDROID_HOME` 必需）。
+- 模拟器（`-gpu host`）冒烟：首页 / 工具页 / 抠图调色板 / 作品页操作面板 / 删除确认框 /
+  关于页（玻璃卡 + 渐变）/ 深色；无 FATAL、无 libhwui 栈溢出。
+- Switch 拖拽、Slider 点轨道定位是 beta04 的新交互，装机后确认可用。

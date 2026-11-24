@@ -25,7 +25,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayang.giftoolkit.R
-import com.ayang.giftoolkit.ui.GlassCard
 import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.Os4ListPage
@@ -40,6 +39,7 @@ import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
@@ -169,11 +169,18 @@ fun AboutScreen(
             // 官方 `AboutPage.kt` 与 InstallerX `MiuixAboutPage.kt:604-608` 都是这么写的。
             Box {
                 Spacer(Modifier.fillParentMaxHeight())
-                Column(Modifier.padding(bottom = 12.dp)) {
+                Column {
                     GroupHeader("关于")
-                    // 玻璃卡：卡片本体透明，材质由 textureBlur 采页面背景画出（InstallerX 同款）。
-                    // 玻璃关闭时传 null，退回不透明卡片，入口不会因为模糊失效而消失。
-                    GlassCard(backdrop = if (blurEnabled) bgBackdrop else null) {
+                    // 玻璃卡走库的 `miuix-glass` GlassCard（0.9.5-beta04 新增）：
+                    // 它给"放在玻璃/半透明表面上的内容"提供官方的半透明填充，
+                    // 官方 `AboutPage.kt:360/386` 现在就是 `GlassCard(padding(horizontal = 12.dp)) { ArrowPreference… }`。
+                    // 之前这里是自造的"Card + textureBlur 采样背景"（InstallerX 写法），
+                    // beta04 起官方有了同名组件，自造那份已删除。
+                    GlassCard(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp),
+                    ) {
                         ArrowPreference(
                             title = "查看源代码",
                             summary = "在 GitHub 上查看源代码",
@@ -298,7 +305,9 @@ private fun AboutHeader(
                 alpha = 1f - p
             },
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        fontSize = 14.sp,
+        // 字号走官方的排版档位（`body2` = 14sp），不再写裸 `fontSize = 14.sp`：
+        // 上游调整字号时这一行跟着变，和同一页其它正文保持同一套比例。
+        style = MiuixTheme.textStyles.body2,
         textAlign = TextAlign.Center,
     )
 }

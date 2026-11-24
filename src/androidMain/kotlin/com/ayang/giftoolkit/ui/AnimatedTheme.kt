@@ -40,7 +40,22 @@ fun AnimatedMiuixTheme(
     var to by remember { mutableStateOf(target) }
     val progress = remember { Animatable(1f) }
 
-    LaunchedEffect(target) {
+    // **不能把 `target` 直接当 `LaunchedEffect` 的 key。**
+    // `ThemeController.currentColors()` 在 Monet 档、且没有 `keyColor` 时走库里的
+    // `platformDynamicColors(dark)`，那条路**没有 remember** —— 每次组合都返回一个新的
+    // `Colors` 实例。用实例做 key 会让 effect 每帧重启、`progress.snapTo(0f)` 反复清进度：
+    // 现象就是"点了深色但界面不变"，只有再动一下别的开关（比如动态取色）才生效。
+    // 静态档返回控制器里 `lightColors` / `darkColors` 两个稳定实例，所以这条一直没暴露。
+    // 这里改成按**颜色值**做 key：只有真正换了配色才重启动画。
+    val targetKey = listOf(
+        target.background,
+        target.surface,
+        target.surfaceContainer,
+        target.primary,
+        target.onBackground,
+    )
+
+    LaunchedEffect(targetKey) {
         if (to != target) {
             // 从"当前看到的颜色"继续，避免连续切换时跳回上一次的终点
             from = lerpColors(from, to, progress.value)

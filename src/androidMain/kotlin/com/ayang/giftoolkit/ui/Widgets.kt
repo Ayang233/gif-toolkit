@@ -13,19 +13,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
@@ -42,10 +41,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.blur.Backdrop
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
@@ -153,69 +148,25 @@ fun pageBaseColor(): Color {
 fun GroupCard(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 12.dp,
+    /**
+     * 卡内自定义内容的内边距，默认吃库的 `CardDefaults.InsideMargin`（0）。
+     *
+     * 只有"整块自定义内容"（预览画布、结果卡）需要传 `PaddingValues(16.dp)`，
+     * 这是官方 `component/CardSection.kt:43` / `ColorPickerSection.kt:55` 的写法：
+     * 内边距交给 `Card(insideMargin = …)`，调用方不再套一层 `Box(Modifier.padding(16.dp))`。
+     * 行式内容（Preference / BasicComponent）保持 0 —— 行自己带 16dp 内边距。
+     */
+    insideMargin: PaddingValues = CardDefaults.InsideMargin,
     content: @Composable () -> Unit,
 ) {
     Card(
         modifier = modifier
             .padding(horizontal = 12.dp)
             .padding(bottom = bottomPadding),
-        // insideMargin 不再传：`CardDefaults.InsideMargin` 本来就是 `PaddingValues(0.dp)`，
-        // 之前显式写一遍等于把库的默认值抄进了调用点。行内边距由各 Preference 自己管。
+        insideMargin = insideMargin,
         // 走 cardColor() 而不是库默认的 surfaceContainer：
         // AMOLED 下卡片要单独压成近黑，否则纯黑页面上会浮出一块 #242424
         colors = CardDefaults.defaultColors(color = cardColor()),
-    ) {
-        content()
-    }
-}
-
-/**
- * **玻璃卡片**：卡片本体透明，由 `textureBlur` 采样页面背景画出材质。
- *
- * 这是参考项目 InstallerX Revived 关于页的写法（`MiuixAboutPage.kt:612-638`）：
- *
- * ```kotlin
- * Card(
- *     modifier = Modifier.textureBlur(backdrop, RoundedCornerShape(16.dp), colors = BlurColors(...)),
- *     colors = CardDefaults.defaultColors(Color.Transparent, Color.Transparent),
- * )
- * ```
- *
- * 为什么要有独立组件而不是给 `GroupCard` 加参数：玻璃卡**只能是可选的**，
- * 普通设置页仍用不透明的 [cardColor]（文字对比度更稳，也和系统设置页一致）。
- *
- * [backdrop] 为 `null`（玻璃关闭 / 页面没有录制层）时退回不透明卡片 ——
- * `textureBlur` 没有采样源时会把卡片画成一块透明板，入口会整块消失，那是功能回退。
- */
-@Composable
-fun GlassCard(
-    backdrop: Backdrop?,
-    modifier: Modifier = Modifier,
-    bottomPadding: Dp = 12.dp,
-    content: @Composable () -> Unit,
-) {
-    val glassy = backdrop != null
-    val surface = MiuixTheme.colorScheme.surface
-    Card(
-        modifier = modifier
-            .padding(horizontal = 12.dp)
-            .padding(bottom = bottomPadding)
-            .then(
-                if (glassy) {
-                    Modifier.textureBlur(
-                        backdrop = backdrop,
-                        shape = RoundedCornerShape(CardDefaults.CornerRadius),
-                        // 卡片是"薄玻璃"，半径比顶栏/底栏小一档：太大就糊成一片纯色
-                        blurRadius = 60f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.6f))),
-                        ),
-                    )
-                } else {
-                    Modifier
-                },
-            ),
-        colors = CardDefaults.defaultColors(color = if (glassy) Color.Transparent else cardColor()),
     ) {
         content()
     }
@@ -402,10 +353,10 @@ fun PreviewStage(
     // 横屏窗口只有 ~410dp 高，16:9 铺满宽要 620dp —— 预览会把参数区整块顶出屏幕，
     // 空态提示语居中在视口之外，看起来就是"预览区是空的"。上限压到窗口高度的 42%。
     val density = LocalDensity.current
-    // 高度上限读**容器**尺寸（`LocalContainerSize`，由 `App` 根部注入），读不到才回退窗口。
-    // 与宽屏判定同一来源：分屏 / 自由窗口下"预览最多占多少高"要按真实可用区域算，
-    // 不是按整个窗口。迁移指南第 6 节的口径。
-    val windowHeight = (LocalContainerSize.current ?: LocalWindowInfo.current.containerSize).height
+    // 高度上限读窗口容器尺寸（`LocalWindowInfo.containerSize`）—— 与官方 example 的
+    // `shouldShowSplitPane()` 同一来源。分屏 / 自由窗口下 containerSize 就是窗口实际拿到的区域，
+    // 不需要再自己注入一层 `LocalContainerSize`（1.15 已随上游删除那一层）。
+    val windowHeight = LocalWindowInfo.current.containerSize.height
     BoxWithConstraints(modifier.fillMaxWidth()) {
         // 宽度取**实际可用宽度**（展开 Rail 时卡片更窄），高度上限取窗口高度的一个比例。
         // 横屏这种"矮窗口"（<500dp）要按更小的比例算：竖屏 42% 时预览能完整落在参数区上方，
@@ -422,7 +373,9 @@ fun PreviewStage(
                 .height(stageHeight)
                 // 连续曲率圆角用库的 `squircleSurface`（官方 Card/Button 本体也是 squircle），
                 // 不要自己 clip(RoundedCornerShape(...)) + background()：四角会是正圆弧。
-                .squircleSurface(color = pageColor(), cornerRadius = 12.dp),
+                // 半径取 `CardDefaults.CornerRadius`（16dp）：画布与卡片同档，
+                // 之前写死 12dp，卡片 16dp 包着 12dp 的画布，四角在视觉上对不齐。
+                .squircleSurface(color = pageColor(), cornerRadius = CardDefaults.CornerRadius),
             contentAlignment = Alignment.Center,
         ) {
             if (bitmap != null) {

@@ -4,7 +4,7 @@
 > 本文是**机制与操作手册**；某一次升级的具体差异分析见
 > `docs/miuix-baseline-<旧sha>-to-<新sha>-diff.md`，定制面清单见 `docs/upgrade-prep-customization-inventory.md`。
 >
-> 适用基线：Miuix `b00169ba`（2026-11-22）。本文所有命令都在
+> 适用基线：Miuix `3c560868`（= `v0.9.5-beta04`，2026-11-24）。本文所有命令都在
 > **仓库根目录**（Git Bash / zsh / bash）与 `../miuix/` 两个目录下执行，路径以实际工作区为准。
 
 ---

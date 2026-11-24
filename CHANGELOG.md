@@ -2,6 +2,44 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.15 — 2026-11-24
+
+**升级**
+
+- Miuix 基线从 `b00169ba` 升到 `3c560868`（= `v0.9.5-beta04`），60 个提交。
+  差异与核对过程见 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md`。
+  工具链零变化（AGP 9.5.2 / Kotlin 2.4.21 / CMP 1.13.0-rc01 / Gradle 9.9.2 / compileSdk 37.2）。
+- 官方同轮变化带来的观感：弹层进出场对齐 HyperOS（`DialogMotion` / `SheetMotion`）、
+  `Switch` 可拖动、`Slider` 支持点轨道定位、模糊管线换特化 1D 着色器（观感不变、开销下降）。
+
+**调整（自造轮子换成官方组件）**
+
+- 关于页的内容卡改用官方的 `miuix-glass` `GlassCard`（官方 `AboutPage` 同款写法），
+  删掉本项目自造的「`Card` + `textureBlur` 采样背景」实现。官方组件不采样、不模糊，
+  只画一层半透明填充，玻璃关掉时也不会消失。
+- 作品页的文件操作面板：三个动作行改成包在官方 `GlassCard` 里（官方
+  `GlassBottomSheetDemo` 的结构），底部留白从手算 `navigationBars + captionBar`
+  改成 `navigationBarsPadding()`。
+- 底栏与侧栏的选中色不再手算（`if (monetEnabled) primary else onBackground/onSurface`）：
+  库的默认值就是这条规则，外层主题已经提供了 `LocalColorSchemeMode`，手算那份是重复实现。
+- 删除 `LocalContainerSize` 自造注入：官方 `utils/AdaptiveUtils.kt` 本轮把它删回了
+  `LocalWindowInfo.current.containerSize` + `computedStateOf`，本项目跟着改回，
+  宽屏判定与预览舞台高度上限读同一来源。
+- 顶栏不再显式传 `bandOverhang` / `backgroundAlpha`（值与库默认相同，抄进调用点只会脱节）；
+  `bandBrush` 仍显式传，因为要用页面真实底色而不是 `surface`（AMOLED 档）。
+- 卡片里的整块自定义内容（预览画布、抠图调色板、结果卡）改用 `Card(insideMargin = 16.dp)`，
+  不再套 `Box(Modifier.padding(16.dp))`；预览画布圆角从写死的 12dp 改成 `CardDefaults.CornerRadius`。
+- 关于页版本号改用 `body2` 排版档（14sp），不再写裸 `fontSize`。
+
+**修复**
+
+- 主题模式切换后界面不刷新（深色/浅色/跟随系统 都要再动一下别的开关才生效）。
+  原因：`ui/AnimatedTheme.kt` 把 `controller.currentColors()` 的返回值直接当 `LaunchedEffect` 的 key，
+  而 Monet 档没有 `keyColor` 时库内部走 `platformDynamicColors()`，**每次组合都新建一个 `Colors`**，
+  key 每帧变化 → 动画反复 `snapTo(0f)` → 颜色停在起点。改为按颜色值（background / surface /
+  surfaceContainer / primary / onBackground）做 key，只有真正换配色才重启动画。
+  静态档因为返回控制器里的稳定实例，所以这个缺陷只在 Monet 下暴露。
+
 ## 1.14 — 2026-11-22
 
 **升级**

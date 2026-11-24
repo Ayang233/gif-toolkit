@@ -1,5 +1,18 @@
 # GifHelper OS4 / Glass 定制面与基线耦合点清点（升级准备）
 
+> **⚠️ 部分结论已在 1.15 失效（2026-11-24，基线 `3c560868` / v0.9.5-beta04）。** 本文保留为审计原文，读时以下面几条为准：
+>
+> - `Widgets.kt` 的自造 `GlassCard`（U14）**已删除**；关于页改用 `miuix-glass` 的官方 `GlassCard`
+>   （官方 `AboutPage.kt:360` 同款，不采样、不模糊）。
+> - `App.kt` 的 `selectedColor` 补偿（U04/U07/F07）**已删除**：外层 `AnimatedMiuixTheme` 用
+>   `MiuixTheme(controller)` 提供了 `LocalColorSchemeMode`，库默认值本来就能判 `isDynamicColor`。
+> - `LocalContainerSize`（1.14 引入）已随官方 `utils/AdaptiveUtils.kt` 一起删除，改回
+>   `LocalWindowInfo.current.containerSize` + `computedStateOf`。
+> - `AnimatedTheme` 的动画 key 已改为按颜色值（修掉"Monet 下切主题不生效"的缺陷）。
+> - 卡片内自定义内容的内边距改为 `Card(insideMargin = …)`，预览画布圆角改用 `CardDefaults.CornerRadius`。
+>
+> 现状与逐条依据见 `docs/audit-self-built-wheels.md` §14 与 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md`。
+
 > 性质：**只读审计**。本报告不改任何源码、文档或 git 状态，唯一产物是本文件。
 > 审计对象：`.`（HEAD `060c804`，`versionName 1.10` / `versionCode 12`，工作区干净）。
 > 审计时间：2026-11-20。

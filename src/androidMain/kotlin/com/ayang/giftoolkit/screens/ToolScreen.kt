@@ -12,6 +12,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +64,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.ColorPalette
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -185,25 +186,23 @@ fun ToolScreen(
 
         item {
             GroupHeader("预览")
-            GroupCard {
-                // 官方自定义内容放 Card 里时用 `insideMargin = PaddingValues(16.dp)`；
-                // 这里等价：水平 16 与行标题对齐，垂直也取 16（原来是 12，比官方紧一档）。
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                    val still = form.stillPreview
-                    if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
-                        AnimatedPreview(form.preview, form.playSpeed)
-                    } else {
-                        PreviewStage(
-                            bitmap = still,
-                            // 有素材就按素材真实比例显示，不再强行套 4:3 留白；
-                            // 空态用 16:9，省下来的高度正好给下面的参数区。
-                            aspect = if (still != null) {
-                                still.width.toFloat() / still.height.coerceAtLeast(1)
-                            } else {
-                                16f / 9f
-                            },
-                        )
-                    }
+            // 整块自定义内容：内边距走官方 `Card(insideMargin = …)`（官方 `component/CardSection.kt:43`、
+            // `ColorPickerSection.kt:55` 都是这个写法），不再套 `Box(Modifier.padding(16.dp))`。
+            GroupCard(insideMargin = PaddingValues(16.dp)) {
+                val still = form.stillPreview
+                if (tool == Tool.GIF_PLAYER && form.preview.isNotEmpty()) {
+                    AnimatedPreview(form.preview, form.playSpeed)
+                } else {
+                    PreviewStage(
+                        bitmap = still,
+                        // 有素材就按素材真实比例显示，不再强行套 4:3 留白；
+                        // 空态用 16:9，省下来的高度正好给下面的参数区。
+                        aspect = if (still != null) {
+                            still.width.toFloat() / still.height.coerceAtLeast(1)
+                        } else {
+                            16f / 9f
+                        },
+                    )
                 }
             }
         }
@@ -225,14 +224,12 @@ fun ToolScreen(
         if (form.colorKey) {
             item(key = "keycolor-header") { GroupHeader("抠图颜色") }
             item(key = "keycolor") {
-                GroupCard {
-                    Box(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                        ColorPalette(
-                            color = Color(form.keyColor),
-                            onColorChanged = { form.keyColor = it.toArgb() },
-                            showPreview = false,
-                        )
-                    }
+                GroupCard(insideMargin = PaddingValues(16.dp)) {
+                    ColorPalette(
+                        color = Color(form.keyColor),
+                        onColorChanged = { form.keyColor = it.toArgb() },
+                        showPreview = false,
+                    )
                 }
             }
         }
@@ -454,8 +451,9 @@ private fun AnimatedPreview(frames: List<GifFrame>, speed: Float) {
         Modifier
             .fillMaxWidth()
             .aspectRatio(frame.bitmap.width.toFloat() / frame.bitmap.height.coerceAtLeast(1))
-            // 与预览舞台同源：连续曲率圆角走库的 squircleSurface，不自造 clip(RoundedCornerShape)。
-            .squircleSurface(color = pageColor(), cornerRadius = 12.dp),
+            // 与预览舞台同源：连续曲率圆角走库的 squircleSurface，不自造 clip(RoundedCornerShape)；
+            // 半径取卡片的 `CardDefaults.CornerRadius`，两层圆角同档。
+            .squircleSurface(color = pageColor(), cornerRadius = CardDefaults.CornerRadius),
         contentAlignment = Alignment.Center,
     ) {
         Image(
@@ -475,8 +473,8 @@ private fun ResultCard(
     onShared: () -> Unit,
     onSaved: () -> Unit,
 ) {
-    GroupCard {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+    GroupCard(insideMargin = PaddingValues(16.dp)) {
+        Column(Modifier.fillMaxWidth()) {
             if (mime == "image/gif" && previewFrames.isNotEmpty()) {
                 AnimatedPreview(previewFrames, 1f)
                 Spacer(Modifier.height(10.dp))

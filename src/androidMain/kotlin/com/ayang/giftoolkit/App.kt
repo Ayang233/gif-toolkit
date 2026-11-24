@@ -7,7 +7,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.ayang.giftoolkit.data.SettingsStore
@@ -43,7 +41,6 @@ import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
 import com.ayang.giftoolkit.ui.LocalBottomBarClearance
-import com.ayang.giftoolkit.ui.LocalContainerSize
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
 import com.ayang.giftoolkit.ui.LocalRailInset
 import com.ayang.giftoolkit.ui.LocalTopAppBarCenterObstructionStart
@@ -86,17 +83,11 @@ import top.yukonga.miuix.kmp.utils.springAnimateToPage
 
 @Composable
 fun GifApp() {
-    // 容器尺寸基准（官方 `App.kt:89-100` 同款）：在组合根用一次 `BoxWithConstraints` 取到
-    // **这棵 UI 实际拿到的可用区域**，再经 `LocalContainerSize` 下发。
-    // 宽屏判定（840/600/1200）与预览舞台的高度上限都读它 —— 之前三处各自去问
-    // `LocalWindowInfo`，在多窗口 / 自由窗口下"窗口尺寸"和"可用区域"不是一回事。
-    // 迁移指南第 6 节把这条列成硬要求（宽屏与视口计算优先读容器尺寸，再回退窗口）。
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val containerSize = IntSize(constraints.maxWidth, constraints.maxHeight)
-        CompositionLocalProvider(LocalContainerSize provides containerSize) {
-            GifAppContent()
-        }
-    }
+    // 不再在根部套 `BoxWithConstraints` 注入 `LocalContainerSize`：
+    // 官方 `utils/AdaptiveUtils.kt` 在 0.9.5-beta04 把那一层删了，宽屏判定直接读
+    // `LocalWindowInfo.current.containerSize`（见 `ui/Adaptive.kt`）。
+    // 这里保留一层函数只是为了让 `App.kt` 的组合入口名字不变，下面是真正的装配。
+    GifAppContent()
 }
 
 @Composable
@@ -351,16 +342,11 @@ private fun GifAppContent() {
                                         // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
                                         // 不会塌回通栏白底条。
                                         backdrop = rootBackdrop.takeIf { glassEnabled },
-                                        // 选中色显式传：库默认按 `MiuixTheme.isDynamicColor` 取
-                                        // primary / onBackground，而这个值来自 `LocalColorSchemeMode`，
-                                        // 我们用 `MiuixTheme(colors = …)` 的重载提供不了它
-                                        // （internal，见 `ui/AnimatedTheme.kt`），于是永远落到
-                                        // onBackground —— Monet 下选中项就不变主色了。这里按同一规则补上。
-                                        selectedColor = if (app.monetEnabled) {
-                                            MiuixTheme.colorScheme.primary
-                                        } else {
-                                            MiuixTheme.colorScheme.onBackground
-                                        },
+                                        // 选中色吃库的默认值：`if (MiuixTheme.isDynamicColor) primary else onBackground`。
+                                        // 之前这里按 `app.monetEnabled` 手算了一遍，理由是"`MiuixTheme(colors)` 重载
+                                        // 不提供 LocalColorSchemeMode"——但外层 `AnimatedMiuixTheme` 已经用
+                                        // `MiuixTheme(controller)` 提供了它，内层只覆盖颜色，所以 `isDynamicColor`
+                                        // 本来就能读到正确的模式。手算的那份是重复实现，已删除。
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
@@ -413,12 +399,7 @@ private fun GifAppContent() {
                             selectedIndex = tab,
                             onSelect = { goTab(it) },
                             backdrop = if (glassEnabled) rootBackdrop else null,
-                            // 与底栏同一条规则，只是库给 Rail 的静态档是 onSurface。
-                            selectedColor = if (app.monetEnabled) {
-                                MiuixTheme.colorScheme.primary
-                            } else {
-                                MiuixTheme.colorScheme.onSurface
-                            },
+                            // 与底栏同一条规则：选中色吃库默认（Rail 的静态档是 onSurface）。
                             state = railState,
                             // 折叠态就是官方的"顶部居中胶囊"（只显示文字），左侧那个方块按钮
                             // 是库自带的展开/收起入口 —— 交回默认值，不再用 showToggle = false 把它藏起来。

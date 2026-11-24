@@ -173,10 +173,6 @@ fun PageTopBar(
      */
     titleAlpha: (() -> Float)? = null,
     /**
-     * 顶栏背景带的透明度乘子。默认 1f（吃库的默认观感）。
-     */
-    backgroundAlpha: (() -> Float)? = null,
-    /**
      * **非玻璃档**的顶栏底色。默认吃 `TopAppBar` 的默认值（`surface`，不透明）。
      *
      * 只有"背景自己铺满不透明像素"的页面要传别的值 —— 目前只有关于页：
@@ -252,25 +248,22 @@ fun PageTopBar(
     // 量测期读取（railStartInset 内部 layout），侧栏展开动画期间不重组。
     val contentInset: Modifier = Modifier.railStartInset()
     if (glass.enabled) {
-        // 渐变带画笔与带宽必须**显式**传，不能吃默认值就走人。
+        // 渐变带画笔必须**显式**传：默认值取 `MiuixTheme.colorScheme.surface`，
+        // 而本项目 AMOLED + 深色把页面压成纯黑、surface 仍是 #131316/#000000 档，
+        // 用默认值画出来的带子会在纯黑页面上显出一条比页面亮的色带（AGENTS 第 2 条）。
         //
-        // `GlassTopAppBar` 内部（`GlassTopAppBar.kt:404-480`，f3829d3d）是二选一：
-        //   progressiveBlur && backdrop != null → 走 progressiveTextureBlur（AGSL 运行时着色器，
-        //                                          由 maskProgress 驱动，0.9.5-beta02 起带 2x bridge）
+        // `GlassTopAppBar` 内部（`GlassTopAppBar.kt:404-480`）是二选一：
+        //   progressiveBlur && backdrop != null → 走 progressiveTextureBlur（AGSL 运行时着色器）
         //   否则                                → 走 bandBrush 渐变（零 AGSL）
-        // 而 `bandBrush` 的类型决定了走哪条绘制路径：传 `TopAppBarBandBrush`（bandBrush() 的返回值）
+        // 而 `bandBrush` 的类型决定走哪条绘制路径：传 `TopAppBarBandBrush`（bandBrush() 的返回值）
         // 时库会用 `TopAppBarFadeBrush`，渐变高度 = bandOverhang + 12dp，尾部是 17 段平滑衰减，
         // **这才是"看不到边界"的关键**；传其它 Brush 就退化成 `background(brush)` 的拉伸平涂。
         //
-        // 所以哪怕当前走了 progressive 分支，也要把 bandBrush / bandOverhang 备好：
+        // 所以哪怕当前走了 progressive 分支，也要把 bandBrush 备好：
         // AGSL 在个别 GPU 上编译失败是**静默**的（图层不产出内容，不抛异常），
-        // 那时库会落回这条分支，参数不对就会露出生硬的矩形边。
-        // 官方 `AdaptiveTopAppBar`（`PageUtils.kt:249-273`）也是这么传的：bandBrush 用 remember
-        // 保持身份、bandOverhang 显式取默认常量 —— 这两行不是我们的自定义，是和官方同一个写法。
-        // 带画笔的底色用**页面真实底色**，不是 `colorScheme.surface`。
-        // 官方用 surface 是因为它没有 AMOLED 档（那边 surface 就等于页面底色）；
-        // 本项目 AMOLED + 深色会把页面压成纯黑，而 surface 仍是 #131316 / #000000，
-        // 用 surface 画出来的带子在纯黑页面上会显出一条比页面亮的色带（AGENTS 第 2 条）。
+        // 那时库会落回这条分支，画笔不对就会露出生硬的矩形边。
+        // `bandOverhang` / `backgroundAlpha` 不再显式传，直接吃库的默认值
+        // （`BandOverhang` 常量 / `{ 1f }`）—— 之前把这两个默认值抄进了调用点，上游一改就脱节。
         val bandColor = pageBaseColor()
         val bandBrush = remember(bandColor) { GlassTopAppBarDefaults.bandBrush(bandColor) }
         GlassTopAppBar(
@@ -296,11 +289,8 @@ fun PageTopBar(
             // 与官方 `AdaptiveTopAppBar` 一致 —— 它也不按明暗分档。
             // 之前用 `GlassDefaults.style(isDark)`，深色下取的是 CommonMediumRegularDark，
             // 玻璃厚度/高光与官方不同；明暗由材质内部的 `isDarkTheme()` 处理，不需要调用方判断。
-            // 背景带与标题的透明度乘子。官方在"模糊未生效"时会把它降到 0，避免
-            // progressive 与 band 两层同时上色；我们没有那层判断，恒为 1 即可。
-            backgroundAlpha = backgroundAlpha ?: { 1f },
+            // 背景带与标题的透明度乘子吃库的默认值（`{ 1f }`），不再显式传。
             bandBrush = bandBrush,
-            bandOverhang = GlassTopAppBarDefaults.BandOverhang,
             navigationIcon = backIcon,
             actions = actions,
             // 绘制期读取，折叠动画期间不重组。

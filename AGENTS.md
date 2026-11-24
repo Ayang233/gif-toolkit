@@ -224,11 +224,11 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       那样顶栏就成了录制层的子节点，采样到自己 → libhwui 栈溢出。
     - 短内容也要能滚：内容 item 外先放 `Spacer(Modifier.fillParentMaxHeight())` 撑满一屏，
       否则列表不可滚，头部永远收不回去（1.10 的 `fillParentMaxHeight`）。
-    - 卡片用 **`GlassCard(backdrop = bgBackdrop)`**：官方 `Card` + 官方 `textureBlur`，
-      卡片本体透明、圆角 `CardDefaults.CornerRadius`、半径 60f、混合色 `surface` 0.6，
-      与图标 / 标题同采 `bgBackdrop`，三者材质同源（InstallerX `MiuixAboutPage.kt:612-638` 的写法）。
-      `backdrop = null` 时退回 `cardColor()` 不透明卡 —— 玻璃关闭时入口不能消失。
-      **不要**自造卡片渐变或第二套卡片色。
+    - 卡片用 **`GlassCard`（`miuix-glass`，官方组件）**：0.9.5-beta04 起官方 `AboutPage` 用它承载
+      关于页的内容组（`GlassCard(modifier = Modifier.padding(horizontal = 12.dp)) { ArrowPreference… }`）。
+      它不采样、不模糊，只画一层官方半透明填充，所以玻璃关掉时也不会消失（不需要 `backdrop = null` 的兜底分支）。
+      **不要**退回 `Card + textureBlur` 的自造玻璃卡（1.14 之前那套已删除），
+      也不要自造卡片渐变或第二套卡片色。
     - 图标与软件名称**必须走参考项目的原生 `textureBlur`**：一份背景录制层
       （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
       `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。
@@ -247,8 +247,17 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
       不要再拆成两个 Route。
 
-## 常见改动怎么下手
+16. **"内容放在玻璃表面上"和"卡片内的自定义内容"各有一个官方槽位，不要再手写内边距/底色。**
+    - 玻璃弹层（`GlassBottomSheet` / `GlassDialog`）里的内容组用 **`miuix-glass` 的 `GlassCard`** 包住，
+      收尾用 `navigationBarsPadding() + padding(bottom = 16.dp)`。官方
+      `component/GlassBottomSheetDemo.kt:46-56` 就是这个结构；三行直接铺在材质上会让文字对比度
+      全靠玻璃自己撑，且底部 inset 要手算 `navigationBars + captionBar`（已删）。
+    - 卡片里的整块自定义内容（预览画布、结果卡）用 **`Card(insideMargin = PaddingValues(16.dp))`**
+      表达内边距（官方 `component/CardSection.kt:43`、`ColorPickerSection.kt:55`），
+      不要套 `Box(Modifier.padding(16.dp))`；`GroupCard` 已透传 `insideMargin`。
+    - 行式内容（Preference / `BasicComponent`）保持 `insideMargin = 0` —— 行自己带 16dp。
 
+## 常见改动怎么下手
 | 要做的事 | 改哪里 |
 | --- | --- |
 | 加一个工具 | `ToolCatalog` 加枚举项和图标 → `TaskRunner` 加分支 → `ToolScreen.ParamPanel` 加参数行 |
@@ -296,12 +305,14 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`b00169ba`**（2026-11-22，`example: Add dark launcher icon background for night mode`），
-   在发布版 `v0.9.5-beta03` 之后又走了 19 个提交；
-   逐项差异见 `docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md`（19 个提交 / 100 文件，
-   工具链零变化，`src/` 升级即编译通过）。
-   上一轮基线 `3526cfe2`（= `v0.9.5-beta03`，见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`），
-   更早的 `f3829d3d`（见 `docs/os4-round12-audit.md`）、`3177a684`
+1. 基线是 Miuix **`3c560868`**（= `v0.9.5-beta04`，2026-11-24，
+   `fix(ui): release overlay touch blocking before exit tail and refine motion`），
+   在 `b00169ba` 之后又走了 60 个提交；
+   逐项差异见 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md`（60 提交 / 579 文件，
+   工具链零变化，`src/` 升级只需跟随两处"官方补齐了同名能力"的替换）。
+   上一轮基线 `b00169ba`（见 `docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md`），
+   更早的 `3526cfe2`（= `v0.9.5-beta03`，见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`）、
+   `f3829d3d`（见 `docs/os4-round12-audit.md`）、`3177a684`
    （逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），升级前定制面清单见
    `docs/upgrade-prep-customization-inventory.md`。
    **`v0.9.5-beta02` 起强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
@@ -329,6 +340,12 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    `GlassBottomSheet` 去掉了底边描边、无标题时不再占头部空间、`insideMargin` 默认从 (24,0) 收成 (12,0)。
    本项目用到的部分：底部操作面板（有标题，行内边距变宽 12dp）、删除确认框（进出的弹簧换成官方
    HyperOS 预设）、顶栏（band 高度算法）。**升级后要真机看一眼玻璃带厚度与弹层动效。**
+   **`3c560868`（beta04）这一轮**：官方 `GlassCard` 被用到页面内容卡（关于页）、
+   `DialogMotion` / `SheetMotion` 全面对齐 HyperOS、`Switch` 拖拽与 `Slider` 点击定位重写、
+   `miuix-blur` 特化 1D 着色器（观感不变、开销下降）、玻璃图标两处改名。
+   **同一轮官方 `utils/AdaptiveUtils.kt` 删掉了 `LocalContainerSize`**，改回
+   `LocalWindowInfo.current.containerSize` + `computedStateOf` —— 本项目 1.14 自造的那层注入
+   已跟着删除，不要再加回来（`docs/miuix-baseline-b00169ba-to-3c560868-diff.md` §3）。
    composite build 换基线后若报
    `The given file ... is located outside the root directory ...bundleLibRuntimeToDirAndroidMain`，
    是 `../miuix/*/build` 里残留了旧基线的 class，删掉这些 `build/` 目录即可（不是代码问题）。

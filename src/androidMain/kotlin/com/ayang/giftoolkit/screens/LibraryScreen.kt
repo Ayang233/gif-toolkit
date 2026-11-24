@@ -5,10 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.captionBar
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.Spacer
@@ -54,6 +51,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
@@ -264,17 +262,23 @@ private fun FileActionSheet(
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished,
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            SheetActionRow(MiuixIcons.Glass.Download, "保存到相册", onClick = onSave)
-            SheetActionRow(MiuixIcons.Glass.Share, "分享", onClick = onShare)
-            SheetActionRow(MiuixIcons.Glass.Delete, "删除", destructive = true, onClick = onDelete)
-            // 官方 `component/BottomSheetSection.kt:258-266` 的收尾：导航条 + captionBar 留白。
-            Spacer(
-                Modifier.padding(
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                        WindowInsets.captionBar.asPaddingValues().calculateBottomPadding(),
-                ),
-            )
+        Column(
+            // 底部留白交给官方写法：`navigationBarsPadding()`（面板自己会处理 captionBar 一档）
+            // + 16dp 呼吸位，与官方 `component/GlassBottomSheetDemo.kt` 的收尾完全一致。
+            // 之前是手算 `navigationBars + captionBar` 的 Spacer —— 又一处自己复刻 inset。
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+        ) {
+            // 玻璃面板上的内容用库的 `GlassCard`（beta04 新增）：它给"放在玻璃表面上的一组行"
+            // 提供官方半透明填充，行本身保持清晰。官方 `GlassBottomSheetDemo.kt:56` 同款，
+            // 之前是三行直接铺在玻璃材质上，文字与背景的对比度全靠材质自己撑。
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                SheetActionRow(MiuixIcons.Glass.Download, "保存到相册", onClick = onSave)
+                SheetActionRow(MiuixIcons.Glass.Share, "分享", onClick = onShare)
+                SheetActionRow(MiuixIcons.Glass.Delete, "删除", destructive = true, onClick = onDelete)
+            }
         }
     }
 }

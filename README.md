@@ -1,23 +1,18 @@
 # GIF 助手
 
-纯本地的 Android GIF 工具。转码、编辑、压缩、拼接、拼图、分解共十个功能，全部在设备上跑，
-不联网，不要权限（文件走 SAF），也没有广告。
+本地运行的 Android GIF 工具。转码、编辑、压缩、拼接、拼图、分解等十个功能，全在设备上处理。不联网，不做账号，文件通过 SAF 读写，也没有广告。
 
-界面是 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）搭的。
-静态配色和 Monet 动态取色都有，明暗双模式，底栏是 OS4 那种玻璃。
+界面用 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）搭的。静态配色和 Monet 动态取色都有，明暗双模式，底栏是 OS4 玻璃。
 
-最新版本 1.14，Android 13 及以上：[Releases](https://github.com/Ayang233/gif-toolkit/releases)
+1.15 的 APK 在 [Releases](https://github.com/Ayang233/gif-toolkit/releases)，要求 Android 13 及以上。
 
-要改代码先看 [AGENTS.md](AGENTS.md)：目录地图、常用命令，还有十几条硬约束
-（玻璃录制层怎么摆、三种页面底色怎么分、图标尺寸从哪取）。
-路线图和变更记录在 [ROADMAP.md](ROADMAP.md)、[CHANGELOG.md](CHANGELOG.md)。
+改代码前先看 [AGENTS.md](AGENTS.md)，目录地图、常用命令和一组硬约束都在那里。版本变化见 [CHANGELOG.md](CHANGELOG.md)，未完成的事在 [ROADMAP.md](ROADMAP.md)。
 
 | 主页 | 工具页 | 设置 | 关于 |
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
 
-截图是 1.14 拍的。关于页的图标、名称和卡片是拿 `textureBlur` 采样背景渐变画的，需要硬件 GPU，
-模拟器得用 `-gpu host` 启动才看得到；软件渲染下这几块会退成实色。
+截图拍于 1.14。1.15 只更新了 Miuix 基线和几个组件，版式没变。关于页的图标和名字用 `textureBlur` 采背景渐变，需要硬件 GPU；模拟器加 `-gpu host` 才有模糊，软件渲染下是实色。
 
 <details>
 <summary>深色模式</summary>
@@ -50,15 +45,14 @@
 
 ## 技术栈
 
-- Kotlin Multiplatform，单模块，实现全在 `androidMain`；Compose Multiplatform 1.13.0-rc01
-- Miuix 提供全部组件（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 `b00169ba`（0.9.5-beta03 之后又走了 19 个提交）
+- Kotlin Multiplatform 单模块，实现都在 `androidMain`；Compose Multiplatform 1.13.0-rc01
+- 组件全部用 Miuix（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 `3c560868`（= 0.9.5-beta04）
 - AGP 9.5.2 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
 - GIF 编解码是纯 Kotlin 写的；取帧和 MP4 编码用系统的 `MediaMetadataRetriever`、`MediaCodec`
 
 ## 构建
 
-需要 JDK 21，Android SDK Platform **37.2**（目录名就是 `platforms/android-37.2`，只装 37.0 会在配置期
-报 `requires compile against version 37.2 or later`），以及 Build-Tools 37.0.0。shell 用 Git Bash、zsh、bash 都行。
+需要 JDK 21、Android SDK Platform **37.2**（目录名就是 `platforms/android-37.2`，只装 37.0 会在配置期报 `requires compile against version 37.2 or later`），以及 Build-Tools 37.0.0。Git Bash、zsh、bash 都行。
 
 ```bash
 git clone https://github.com/Ayang233/gif-toolkit.git
@@ -71,28 +65,13 @@ cd gif-toolkit
 ./gradlew :assembleRelease    # 发布包，R8 + 资源压缩
 ```
 
-`setup-miuix.sh` 把 Miuix 克隆到 `../miuix`，切到脚本里钉住的提交，再打一处上游补丁：
-Miuix 的 `build-logic` 在配置阶段调 git 取版本号，而 composite build 里子构建的工作目录是宿主工程
-（不是 git 仓库），不打这个补丁直接 exit 128。脚本可以重复跑，打过就跳过。
+`setup-miuix.sh` 把 Miuix 克隆到 `../miuix`，切到钉住的提交，再给上游的 `build-logic/BuildConfig.kt` 打一处补丁：`getGitVersionCode()` 和 `getGitHashShort()` 各加 `workingDir = rootDir`。上游在配置阶段跑 git 取版本号，而 composite build 里子构建的工作目录不是 git 仓库，不打补丁会直接 exit 128。脚本可以重复跑。
 
-跑完会校验三件事，有一项不过就别急着构建：
+脚本还会检查源码是不是真停在钉住的提交上（`exit 2` / `exit 3`；受限网络下要用手头那份就设 `MIUIX_OFFLINE=1`），以及宿主 AGP 和上游 `gradle/libs.versions.toml` 里的 `agp` 是否同版本（不一致只告警，会把两边版本号都打出来）。composite build 里两个构建用不同 AGP 会直接失败，报错是 `Using multiple versions of the Android Gradle plugin (9.5.2, 9.5.1)`，看着像依赖坏了。
 
-| 检查什么 | 不过时的表现 |
-|---|---|
-| 源码是不是真停在钉住的提交上 | `exit 2`（解析不到这个 ref）或 `exit 3`（停在别的提交）。受限网络下确实要用手头这份，设 `MIUIX_OFFLINE=1` 显式跳过 |
-| `workingDir = rootDir` 补丁在不在 | `exit 1`，并打印要手工补的两行 |
-| 宿主 AGP 和上游 `gradle/libs.versions.toml` 的 `agp` 是否同版本 | 只告警，但会把两个版本号摆出来，告诉你该改哪一行 |
+不想用脚本也可以手动克隆再打补丁；`MIUIX_DIR` 可以指到别的 Miuix 目录。SDK 路径写进 `local.properties`（`sdk.dir=/path/to/Android/Sdk`），或者只设 `ANDROID_HOME`，两种都验证过。
 
-最后这条不是洁癖：composite build 里两个构建用不同 AGP 会直接失败，报错还挂在
-`Using multiple versions of the Android Gradle plugin (9.5.2, 9.5.1)` 上，看着像依赖坏了。
-
-不想用脚本也行：手动克隆后给 `miuix/build-logic/src/main/kotlin/BuildConfig.kt` 的
-`getGitVersionCode()` 和 `getGitHashShort()` 各加一行 `workingDir = rootDir`。
-也可以用环境变量 `MIUIX_DIR` 指到别的 miuix 目录。
-
-SDK 路径写进 `local.properties`（`sdk.dir=/path/to/Android/Sdk`），或者只设 `ANDROID_HOME`，两种都验证过。
-
-release 用的是 debug 签名，图个装机方便。真要分发请换成自己的 keystore。
+release 用的是 debug 签名，图个装机方便。对外分发请换成自己的 keystore。
 
 ## 目录结构
 
@@ -118,26 +97,15 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 └── core/                  GifCodec / MediaTools / GifTasks / Stabilizer / ColorKey / MotionPhoto
 ```
 
-## 改 UI 前先看这几条
+## 改 UI 时注意
 
-完整的在 [AGENTS.md](AGENTS.md)，这里挑最容易踩的：
+完整清单在 [AGENTS.md](AGENTS.md) 的硬约束，下面几条最容易踩：
 
-1. 玻璃容器必须是 `layerBackdrop` 录制层的兄弟节点，不能是它的子节点，录制层也不能上移到 `Scaffold`。
-   否则玻璃采到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 会递归到栈溢出，直接闪退。
-   弹层的采样源还得录在 `HorizontalPager` 外面：Pager 的页面按页宽错位，页面内录制层上报的是槽位坐标，
-   跟弹层的真实坐标差一整页宽，采样整块落空，玻璃就只剩材质。
-2. 颜色分三层，别混。`pageBaseColor()` 是页面真正铺在屏幕上的那层（`surface`），
-   玻璃录制层垫底、底部主操作条遮挡、页面 `containerColor` 只用它；`pageColor()` 是从卡片色反推的
-   次级表面，给预览舞台这种要拉开一档的位置；`cardColor()` 才是卡片。写错的症状很具体：
-   深色下拿 `pageColor()` 当页面底色，页面上会多出一条比页面亮三十个灰阶的带子。
-   「Monet 会把 surface 和 surfaceContainer 压成同一个值」这个旧结论，在现在的 Miuix 上已经不成立。
-3. `GlassDialog` / `GlassBottomSheet` 要有 Scaffold 当宿主。`App.kt` 最外层那个
-   `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是干这个的，去掉它们会静默不渲染。
-   页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（在 Scaffold 里、录制层外）。
-4. 卡片里不放分割线，靠 56dp 最小行高和 16dp 内边距区分。
-5. 宽屏判定（840 / 600 / 1200）和预览区高度上限都读 `LocalContainerSize`，由 `App.kt` 根部
-   `BoxWithConstraints` 注入。别再各处直接读 `LocalWindowInfo`：多窗口和分屏下"窗口多大"
-   和"这棵 UI 实际有多少可用区域"不是一回事。
+1. 玻璃容器和 `layerBackdrop` 录制层是兄弟节点，不能是父子；录制层也不能上移到 `Scaffold`。否则玻璃采到自己，`libhwui` 的 `RenderNode::prepareTreeImpl` 会递归到栈溢出。弹层的采样源录在 `HorizontalPager` 外面：页面内录制层上报的是槽位坐标，跟弹层的真实坐标差一整页宽，采样会落空。
+2. 颜色分三层，别混。`pageBaseColor()` 是页面真正铺在屏幕上的那层；`pageColor()` 是次级表面，给预览舞台这种要拉开一档的位置；`cardColor()` 才是卡片。深色下拿 `pageColor()` 当页面底色，页面上会多出一条亮带。
+3. `GlassDialog` / `GlassBottomSheet` 要有 Scaffold 当宿主，`App.kt` 最外层那个 `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是。去掉会静默不渲染。页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（在 Scaffold 里、录制层外）。
+4. 玻璃表面上的内容组用官方 `GlassCard`，卡片里的自定义内容用 `Card(insideMargin = …)`，不再套 `Box(Modifier.padding(16.dp))`。卡片内不放分割线，靠 56dp 最小行高和 16dp 内边距区分。
+5. 宽屏判定（840 / 600 / 1200）和预览区高度上限读 `LocalWindowInfo.current.containerSize` + `computedStateOf`，这是官方 beta04 的写法。上游撤回了 `LocalContainerSize`，别再往里加自造注入。
 6. 不引入 `androidx.compose.material3`。设计语言会打架，包体也明显变大。
 
 ## 已知限制
@@ -147,8 +115,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 - 没有目标体积压缩，不会为了压到某个大小自动二分色数或帧率
 - 进程被杀后返回栈能恢复，但页面里的选择（素材、参数、进度）会丢
 - 玻璃在低端机上的性能没充分验证，设置里可以关掉
-- 关于页的图标和名称用原生 `textureBlur` 采样背景画，需要硬件 GPU。模拟器请用 `-gpu host`，
-  `-gpu swiftshader_indirect` 这种软件光栅化不产出模糊像素，在那儿看到的异常是渲染器的问题
+- 关于页的图标和名称用原生 `textureBlur` 采样背景画，需要硬件 GPU。模拟器请用 `-gpu host`，`-gpu swiftshader_indirect` 这类软件光栅化不产出模糊像素
 
 ## 许可证
 
