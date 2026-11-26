@@ -35,6 +35,8 @@ import com.ayang.giftoolkit.ui.GroupHeader
 import com.ayang.giftoolkit.ui.IconSizes
 import com.ayang.giftoolkit.ui.LeadingIcon
 import com.ayang.giftoolkit.ui.Os4ListPage
+import com.ayang.giftoolkit.ui.formatSize
+import com.ayang.giftoolkit.ui.formatTime
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
@@ -318,15 +320,4 @@ private fun mimeOf(file: File): String = when (file.extension.lowercase()) {
     "mp4" -> "video/mp4"
     "zip" -> "application/zip"
     else -> "image/gif"
-}
-
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
-    bytes >= 1024 -> "%.0f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}
-
-private fun formatTime(millis: Long): String {
-    val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
-    return fmt.format(java.util.Date(millis))
 }

@@ -151,7 +151,6 @@ fun AboutScreen(
         title = "关于",
         glass = glass,
         onBack = onBack,
-        reserveNavBar = false,
         extraBottom = 24.dp,
         // 整屏渐变铺在 Scaffold 外面（骨架里就是页面根部），随头部收起进度淡出。
         background = { progress ->
@@ -264,7 +263,7 @@ private fun AboutHeader(
         )
     }
     Text(
-        text = "GIF 助手",
+        text = "GifToolkit",
         modifier = Modifier
             .padding(top = 12.dp)
             .graphicsLayer {

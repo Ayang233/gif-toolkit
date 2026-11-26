@@ -44,7 +44,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 ./scripts/setup-miuix.sh                 # 首次：准备 Miuix 源码并打补丁
 ./gradlew :assembleDebug                 # 调试包
 ./gradlew :assembleRelease               # 发布包（R8，约 3MB）
-adb install -r build/outputs/apk/debug/GifHelper-debug.apk
+adb install -r build/outputs/apk/debug/GifToolkit-debug.apk
 adb shell am start -n com.ayang.giftoolkit/.MainActivity
 ```
 
@@ -132,14 +132,18 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
    正确结构：`Box { Box(fillMaxSize + padding(start = 侧栏宽) + layerBackdrop) { NavDisplay } ; Rail }`。
    官方 `AppContent` 也是这个结构（`useGlassSidebar` 分支）。
 9. **内边距只走 `pageContentPadding()`。** 页面里不要再手写 `+2.dp` 或固定 `128.dp` 底部留白：
-   底栏是浮层、不占 Scaffold 槽位，高度由 `LocalBottomBarClearance` 单点下发（`App.kt` 算）。
-   二级页（工具页 / 主题 / 关于 / 许可）要传 `reserveNavBar = false` —— 二级页根本不挂载底栏，
-   再预留 100dp 会在列表末尾留一块空带。
+   一级页底栏放进 `entry<Route.Root>` 那个 `Scaffold` 的 `bottomBar` 槽位（官方
+   `CompactScreenLayout` 结构），高度由 Scaffold 量测、以 `innerPadding` 经
+   `LocalPageBottomInset` 单点下发（`App.kt` 的 `rootPadding`）。
+   **不要再复刻 `GlassNavigationBar` 内部的 floatingMargin 公式** —— 上一版
+   `rememberBottomBarClearance()` 就是干这个的，已删除。
+   二级页（工具页 / 主题 / 关于 / 许可）不在那个 Scaffold 里，读到 0，不需要 `reserveNavBar` 之类的开关。
    **横向安全区也归它管**：左右 = `innerPadding.calculate{Left,Right}Padding + railInset()`。
    `innerPadding` 的横向部分就是 `systemBars ∪ displayCutout`，横屏时挖孔落在起始边（本机 64dp）。
    曾经只让 `railInset`、把这段丢掉，结果侧栏自己吃了安全区、内容没跟上，横屏下被压住 52dp
    （`docs/os4-round9-audit.md` §1）。**不在 Scaffold 内容槽位里的控件**（底部主操作条、
-   页面级浮层控件等）用 `rememberHorizontalSafeInsets()` 自己取，不要再写第三套算式。
+   页面级浮层控件等）用 `rememberHorizontalSafeInsets()` 自己取；贴底留白用
+   `rememberSystemBottomInset()` + 官方公式 `max(24.dp, 安全区 + 8.dp)`，不要再解屏幕圆角方程。
 10. **图标只用官方 Glass 族，不自绘、不混 `extended`。**
     `MiuixIcons.Glass.X`（定色/Regular）给主入口、底栏、核心卡片；
     `MiuixIcons.Glass.Light.X`（同族细线档）给设置、关于、作品等次级入口。
@@ -158,8 +162,9 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
     坐标差一整页宽（第 1 条），以及底栏会压住弹层。
     `GifApp` 自己那一层真要弹系统级窗口，仍然用 `WindowDialog`；页面级弹层走 `pageOverlay`（第 14 条）。
 12. **底栏属于一级页，Rail 属于 App 层，两者的在场条件不是一回事。**
-    - **底栏**（`GlassNavigationBar`）画在 `entry<Route.Root>` 里面、Pager 录制层的兄弟位置，
-      和官方 `CompactScreenLayout`（`AppContent.kt:581-627`）一样是"一级页自己的浮层"。
+    - **底栏**（`GlassNavigationBar`）放在 `entry<Route.Root>` 里那个 `Scaffold` 的 `bottomBar` 槽位
+      （`App.kt` 的 `PageNavigationBar`），和官方 `CompactScreenLayout`（`AppContent.kt:685-727`）
+      同一个结构。它在槽位里、不在录制层的子树里，所以录制层仍然与它是兄弟关系（第 1 条）。
       二级页的组合里根本没有它 —— **不要**再用 `stack.size` 去挂载/卸载它：
       那样进二级页会在新页盖上来之前就"闪没"，返回时又会浮在退出中的二级页之上。
       官方实测的行为是"被新页盖住 / 被揭开"，没有自己的进退场动画。
@@ -257,6 +262,16 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       不要套 `Box(Modifier.padding(16.dp))`；`GroupCard` 已透传 `insideMargin`。
     - 行式内容（Preference / `BasicComponent`）保持 `insideMargin = 0` —— 行自己带 16dp。
 
+17. **页面转场只映射官方 `NavTransitions` 预设，不自造动画。**
+    `ui/BackTransitions.kt` 现在只做 `BackAnimation` → `NavTransitions.MiuixDefault / Modal`
+    的映射（1.16 之前自造过 AOSP 缩放 / 经典平移 / 跟随手势缩放三套 `navGraphicsTransition`，已删除）。
+    **`BackAnimation.None` 不是"没有动画"**：它只关掉系统级预测性返回
+    （`GifApplication` 反射置 `enableOnBackInvokedCallback = false`），
+    转场仍然映射到 `MiuixDefault`；不要把它改成 `NavTransitions.None`，那会变成硬切。
+    要加新档位，先确认官方 `NavTransitions` 里有对应预设或可直接用 `navGraphicsTransition` 表达；
+    曲线、位移比例、被覆盖页处理一律照官方预设，不要手调。`NavTransitions.Expansion` 需要页面
+    用 `Modifier.navTransitionSource(route)` 绑定源，本项目没有这种入口，别硬塞进选项。
+
 ## 常见改动怎么下手
 | 要做的事 | 改哪里 |
 | --- | --- |
@@ -267,6 +282,7 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 | 加输入框 | `basic.TextField` **独立一条**，`padding(horizontal = 12.dp).padding(bottom = 12.dp)`；它自己就是一张卡（16dp 圆角 / `secondaryContainer` 底色 / 16dp 内边距），**不要塞进 `GroupCard`**（两层圆角会套在一起、底部会被卡片圆角裁掉） |
 | 改配色层次 | 只动 `pageBaseColor()` / `pageColor()` / `cardColor()`，不要在各处散写 `colorScheme.*`（分工见硬约束 2） |
 | 加离散选项（2~4 个） | `DropdownRow`（玻璃浮层下拉），不要做"点一下轮换到下一个" |
+| 加/改页面转场 | 只在 `ui/BackTransitions.kt` 映射官方 `NavTransitions` 预设（见第 17 条），不要自写 `navGraphicsTransition` |
 | 加弹层 | 页面级弹层传给 `Os4ListPage(pageOverlay = ...)`（Scaffold 内、录制层外，玻璃版可用，见第 14 条）；`GifApp` 自己那层只能用 `WindowDialog` |
 | 加一个第三方依赖 / 改许可 | `ui/LicenseCatalog.kt` 的 `thirdPartyLibraries` 补一行；正文放 `assets/licenses/`。不要新开 Route，`licenseEntries` 的下标就是 `Route.License(index)` |
 
@@ -305,23 +321,20 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
 
 ## 构建环境的两个坑
 
-1. 基线是 Miuix **`3c560868`**（= `v0.9.5-beta04`，2026-11-24，
-   `fix(ui): release overlay touch blocking before exit tail and refine motion`），
-   在 `b00169ba` 之后又走了 60 个提交；
-   逐项差异见 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md`（60 提交 / 579 文件，
-   工具链零变化，`src/` 升级只需跟随两处"官方补齐了同名能力"的替换）。
-   上一轮基线 `b00169ba`（见 `docs/miuix-baseline-3526cfe2-to-b00169ba-diff.md`），
-   更早的 `3526cfe2`（= `v0.9.5-beta03`，见 `docs/miuix-baseline-f3829d3d-to-3526cfe2-diff.md`）、
-   `f3829d3d`（见 `docs/os4-round12-audit.md`）、`3177a684`
-   （逐项差异见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），升级前定制面清单见
+1. 基线是 Miuix **`e7c108ee`**（= `v0.9.5-rc01` + 10 个提交，2026-11-26，
+   `example: Add new icon for iOS`），相对上一轮 `3c560868`（`v0.9.5-beta04`）走了 22 个提交；
+   逐项差异见 `docs/miuix-baseline-3c560868-to-e7c108ee-diff.md`。
+   上一轮基线 `3c560868`（见 `docs/miuix-baseline-b00169ba-to-3c560868-diff.md`），
+   更早的 `b00169ba`、`3526cfe2`（= `v0.9.5-beta03`）、`f3829d3d`（见 `docs/os4-round12-audit.md`）、
+   `3177a684`（见 `docs/miuix-baseline-3177a684-to-5ff41ba9-diff.md`），升级前定制面清单见
    `docs/upgrade-prep-customization-inventory.md`。
    **`v0.9.5-beta02` 起强制要求 Compose Multiplatform `1.13.0-rc01`**，不能只改 Miuix 版本。
-   升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` 的默认值有没有变 ——
-   这两处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
-   已经踩过的一次：`GlassNavigationBar` 的 `floatingMargin` 在 ≤16dp 档从 28dp 变成 20dp，
-   `ui/PageChrome.kt` 的 `rememberBottomBarClearance()` 复刻了这条公式（必须同步，见该函数注释）。
-   这条公式的输入是 `maxOf(navigationBars, captionBar)`（上游 `GlassNavigationBar.kt:309-324`），
-   只取 `navigationBars` 会在自由窗口 / 桌面模式下少让一截。
+   升级前先看上游 `GlassTopAppBar` / `GlassNavigationBar` / `GlassBottomSheet` 的默认值有没有变 ——
+   这几处我们**故意**不传参数、吃默认值，上游一改观感就跟着变。
+   刚踩过的一次（`e7c108ee`）：`BandOverhang` 36dp → 10dp、`ProgressiveBlurRadius` 80dp → 32dp、
+   渐进曲线改成线性；`GlassBottomSheet` 的 `progressiveBlur` 默认变成 false。都是官方的观感变化。
+   底栏高度不再由我们复刻库内的 `floatingMargin` 公式（那条镜像已随 1.16 的
+   `Scaffold.bottomBar` 结构删除）；若将来又要在槽位外画导航，先想清楚这条公式怎么来。
    **从 0.9.5-beta01 起上游把 `compileSdk` 提到 37.2**，下游必须同步：
    `compileSdk { version = release(37) { minorApiLevel = 2 } }`，否则 AGP 配置期直接拒绝
    （`requires ... compile against version 37.2 or later`）。`targetSdk` 可以继续停在 36。

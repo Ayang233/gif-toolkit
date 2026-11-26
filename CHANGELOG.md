@@ -2,6 +2,44 @@
 
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 随版本递增。
 
+## 1.16 — 2026-11-26
+
+**改名**
+
+- 应用名从「GIF 助手」改为 **GifToolkit**；界面标题、关于页、许可清单、应用名资源、
+  导出目录（`Pictures/GifToolkit`、`Movies/GifToolkit`）全部跟着改。
+  工程名（`settings.gradle.kts` 的 `rootProject.name`）也改成 `GifToolkit`，产物是
+  `GifToolkit-debug.apk` / `GifToolkit-release.apk`。
+  已装的旧版设置不会丢：SharedPreferences 文件名仍是 `gifhelper_settings`。
+
+**升级**
+
+- Miuix 基线从 `3c560868`（`v0.9.5-beta04`）升到 `e7c108ee`（`v0.9.5-rc01` + 10 个提交）。
+  差异见 `docs/miuix-baseline-3c560868-to-e7c108ee-diff.md`。
+- AGP 从 9.5.2 同步到 9.5.3（composite build 里两个构建只允许一个 AGP 版本）。
+- 官方同轮默认值变化：顶栏 `BandOverhang` 36dp → 10dp、`ProgressiveBlurRadius` 80dp → 32dp，
+  渐进模糊改成线性曲线；`GlassBottomSheet` 的 `progressiveBlur` 默认改为 false。
+
+**调整（自造轮子换成官方实现）**
+
+- 底栏从「一级页自己画的浮层 + 复刻 `GlassNavigationBar` 内部 floatingMargin 公式」
+  改成官方 `CompactScreenLayout` 的结构：底栏放进 `Scaffold` 的 `bottomBar` 槽位，
+  高度由 Scaffold 量测、以 `innerPadding` 下发。删掉 `rememberBottomBarClearance()`、
+  `LocalBottomBarClearance` 与那段抄自库内部的公式。
+- 底部主操作条的贴底留白改用官方公式 `max(24.dp, 安全区 + 8.dp)`，
+  删掉自造的「按屏幕圆角解方程」（`safeBottomGap`）。
+- 顶栏/主操作条的选中色、禁用色改用官方 `ButtonDefaults.buttonColorsPrimary()`，
+  不再手抄 `disabledPrimaryButton` / `disabledOnPrimaryButton` 这些角色名。
+- 页面转场只映射官方 `NavTransitions` 预设（Miuix 默认 / 底部弹出），
+  删掉自造的三套 `navGraphicsTransition`（AOSP 缩放、经典平移、跟随手势缩放）
+  与配套的「退出方向」设置 —— 它只对已删掉的缩放档有意义。
+  「无动画」档改名为「关闭预测性返回」：只关掉系统的手势预览，
+  页面切换仍走 Miuix 默认转场，不会变成硬切。
+- 列表补上 `overscrollEffect = null`（官方每个玻璃页都这么写），避免与顶栏的
+  overscroll 联动叠成两套回弹。
+- 重复实现收拢：`formatSize` / `formatTime` 三份合并为 `ui/Format.kt` 一份；
+  许可页的手写脚注改用统一的 `NoteText`。
+
 ## 1.15 — 2026-11-24
 
 **升级**

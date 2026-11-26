@@ -3,8 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     // AGP 必须与 ../miuix 的 gradle/libs.versions.toml 完全同版本：composite build 里
     // 两个独立构建共用一个 AGP，不一致时在依赖解析期报 "Using multiple versions ..."。
-    // 0.9.5-beta03（3526cfe2）把上游 AGP 从 9.5.1 提到 9.5.2。
-    id("com.android.application") version "9.5.2"
+    // 0.9.5-rc01（6d784f19）把上游 AGP 从 9.5.2 提到 9.5.3，这里同步。
+    id("com.android.application") version "9.5.3"
     id("org.jetbrains.kotlin.multiplatform") version "2.4.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
     id("org.jetbrains.compose") version "1.13.0-rc01"
@@ -68,8 +68,8 @@ android {
         // 33：miuix-blur 的下限，也是 OS4 玻璃（RuntimeShader）能正常工作且不降级的起点
         minSdk = 33
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.15"
+        versionCode = 18
+        versionName = "1.16"
     }
 
     buildTypes {

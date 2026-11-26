@@ -12,6 +12,7 @@ import com.ayang.giftoolkit.core.GifTasks
 import com.ayang.giftoolkit.core.MediaTools
 import com.ayang.giftoolkit.core.MotionPhoto
 import com.ayang.giftoolkit.ui.Tool
+import com.ayang.giftoolkit.ui.formatSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
@@ -273,8 +274,3 @@ private fun mosaicRect(pos: Int): RectF = when (pos) {
     else -> RectF(0.62f, 0.86f, 0.98f, 0.98f)
 }
 
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
-    bytes >= 1024 -> "%.0f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}

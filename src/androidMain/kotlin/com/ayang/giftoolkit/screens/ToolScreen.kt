@@ -58,6 +58,7 @@ import com.ayang.giftoolkit.ui.PrimaryActionBar
 import com.ayang.giftoolkit.ui.SliderRow
 import com.ayang.giftoolkit.ui.SwitchRow
 import com.ayang.giftoolkit.ui.Tool
+import com.ayang.giftoolkit.ui.formatSize
 import com.ayang.giftoolkit.ui.pageColor
 import com.ayang.giftoolkit.ui.rememberGlassScope
 import kotlinx.coroutines.delay
@@ -127,7 +128,6 @@ fun ToolScreen(
         glass = glass,
         subtitle = tool.summary,
         onBack = onBack,
-        reserveNavBar = false,
         // 底部主操作条自带渐变遮罩，再给结果卡留一点呼吸，别贴着按钮
         extraBottom = 20.dp,
         // 主操作放在 Scaffold 的 bottomBar 里：内容区自动让出高度，
@@ -495,8 +495,3 @@ private fun ResultCard(
     }
 }
 
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
-    bytes >= 1024 -> "%.0f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}

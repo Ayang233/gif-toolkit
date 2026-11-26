@@ -3,7 +3,7 @@ package com.ayang.giftoolkit.ui
 /**
  * 许可清单。关于页只有一个「开源许可」入口，进来是这一页，按分组列出：
  *
- * 1. **本项目** —— GIF 助手自身的 GPL-3.0 正文；
+ * 1. **本项目** —— GifToolkit自身的 GPL-3.0 正文；
  * 2. **第三方组件** —— 依赖清单，全部 Apache-2.0（正文只有一份，
  *    取自 Miuix 仓库的 LICENSE，不是手抄的）；
  * 3. **归属** —— 仓库根目录的 `NOTICE`（含 Miuix 示例代码的改编归属）。
@@ -26,7 +26,7 @@ data class LicenseGroup(
 
 /** 本项目自身许可证（GPL-3.0 全文）。 */
 val projectLicense = LicenseEntry(
-    name = "GIF 助手",
+    name = "GifToolkit",
     owner = "gif-toolkit contributors",
     license = "GPL-3.0",
     asset = "licenses/gpl-3.0.txt",

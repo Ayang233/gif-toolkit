@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.AppState
 import com.ayang.giftoolkit.BackAnimation
-import com.ayang.giftoolkit.BackExitDirection
 import com.ayang.giftoolkit.ThemeMode
 import com.ayang.giftoolkit.ui.DropdownRow
 import com.ayang.giftoolkit.ui.GroupCard
@@ -18,8 +17,10 @@ import com.ayang.giftoolkit.ui.rememberGlassScope
  * 主题设置（独立页）。
  *
  * 结构参照 KernelSU / InstallerX 的主题页，但**去掉了它们的选择项**：
- * GIF 助手只有 Miuix 一套引擎、只做 OS4 一版 UI，不做 OS3 / 引擎切换，
+ * GifToolkit 只有 Miuix 一套引擎、只做 OS4 一版 UI，不做 OS3 / 引擎切换，
  * 所以这里没有「UI 引擎」「Miuix UI 版本」两行。
+ *
+ * 转场档位只映射 MIUIX 官方 `NavTransitions` 预设，没有任何自造动画。
  *
  * 预测性返回整组只在 API 34+ 显示：低版本系统没有这个交互，露出来只会让人困惑。
  */
@@ -36,7 +37,6 @@ fun ThemeScreen(
         title = "主题设置",
         glass = glass,
         onBack = onBack,
-        reserveNavBar = false,
         extraBottom = 24.dp,
     ) {
         item { GroupHeader("Miuix") }
@@ -93,17 +93,6 @@ fun ThemeScreen(
                         summary = app.backAnimation.summary,
                         onSelect = { app.backAnimation = animations[it] },
                     )
-                    // 退出方向只对「缩放」有意义：其余档位要么跟随手势物理方向，
-                    // 要么根本没有横向位移，给了选项也不会生效。
-                    if (app.backAnimation == BackAnimation.Scale) {
-                        val directions = BackExitDirection.entries
-                        DropdownRow(
-                            items = directions.map { it.label },
-                            selectedIndex = directions.indexOf(app.backExitDirection).coerceAtLeast(0),
-                            title = "退出方向",
-                            onSelect = { app.backExitDirection = directions[it] },
-                        )
-                    }
                 }
             }
         }

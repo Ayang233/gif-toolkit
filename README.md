@@ -1,10 +1,12 @@
-# GIF 助手
+# GifToolkit
 
 本地运行的 Android GIF 工具。转码、编辑、压缩、拼接、拼图、分解等十个功能，全在设备上处理。不联网，不做账号，文件通过 SAF 读写，也没有广告。
 
+> 1.16 起应用名从「GIF 助手」改为 **GifToolkit**，功能与设置不变（旧版本的设置会继续沿用）。
+
 界面用 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）搭的。静态配色和 Monet 动态取色都有，明暗双模式，底栏是 OS4 玻璃。
 
-1.15 的 APK 在 [Releases](https://github.com/Ayang233/gif-toolkit/releases)，要求 Android 13 及以上。
+1.16 的 APK 在 [Releases](https://github.com/Ayang233/gif-toolkit/releases)，要求 Android 13 及以上。
 
 改代码前先看 [AGENTS.md](AGENTS.md)，目录地图、常用命令和一组硬约束都在那里。版本变化见 [CHANGELOG.md](CHANGELOG.md)，未完成的事在 [ROADMAP.md](ROADMAP.md)。
 
@@ -12,7 +14,7 @@
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
 
-截图拍于 1.14。1.15 只更新了 Miuix 基线和几个组件，版式没变。关于页的图标和名字用 `textureBlur` 采背景渐变，需要硬件 GPU；模拟器加 `-gpu host` 才有模糊，软件渲染下是实色。
+截图拍于 1.16。关于页的图标和名字用 `textureBlur` 采背景渐变，需要硬件 GPU；模拟器加 `-gpu host` 才有模糊，软件渲染下是实色。
 
 <details>
 <summary>深色模式</summary>
@@ -46,8 +48,8 @@
 ## 技术栈
 
 - Kotlin Multiplatform 单模块，实现都在 `androidMain`；Compose Multiplatform 1.13.0-rc01
-- 组件全部用 Miuix（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 `3c560868`（= 0.9.5-beta04）
-- AGP 9.5.2 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
+- 组件全部用 Miuix（`miuix-ui` / `-preference` / `-icons` / `-glass` / `-glass-icons` / `-nav` / `-material` / `-squircle`），基线钉在 `e7c108ee`（= 0.9.5-rc01 + 10 个提交）
+- AGP 9.5.3 / Kotlin 2.4.21 / JDK 21 / minSdk 33 / targetSdk 36
 - GIF 编解码是纯 Kotlin 写的；取帧和 MP4 编码用系统的 `MediaMetadataRetriever`、`MediaCodec`
 
 ## 构建
@@ -90,6 +92,8 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── GlassSupport.kt    玻璃开关与能力检测（唯一决策点）
 │   ├── Adaptive.kt        宽屏判定与侧栏让位
 │   ├── ProgressButton.kt  带进度填充的按钮（移植，Apache-2.0）
+│   ├── BackTransitions.kt 页面转场：只映射官方 NavTransitions 预设
+│   ├── Format.kt          文件大小 / 时间的唯一格式化出处
 │   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例）
 │   └── LicenseCatalog.kt  第三方组件清单
 ├── screens/               主页 / 工具页 / 作品页 / 设置 / 关于 / 开源许可
@@ -105,8 +109,10 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 2. 颜色分三层，别混。`pageBaseColor()` 是页面真正铺在屏幕上的那层；`pageColor()` 是次级表面，给预览舞台这种要拉开一档的位置；`cardColor()` 才是卡片。深色下拿 `pageColor()` 当页面底色，页面上会多出一条亮带。
 3. `GlassDialog` / `GlassBottomSheet` 要有 Scaffold 当宿主，`App.kt` 最外层那个 `Scaffold(containerColor = Transparent, contentWindowInsets = 0)` 就是。去掉会静默不渲染。页面级弹层走 `Os4ListPage` 的 `pageOverlay` 槽位（在 Scaffold 里、录制层外）。
 4. 玻璃表面上的内容组用官方 `GlassCard`，卡片里的自定义内容用 `Card(insideMargin = …)`，不再套 `Box(Modifier.padding(16.dp))`。卡片内不放分割线，靠 56dp 最小行高和 16dp 内边距区分。
-5. 宽屏判定（840 / 600 / 1200）和预览区高度上限读 `LocalWindowInfo.current.containerSize` + `computedStateOf`，这是官方 beta04 的写法。上游撤回了 `LocalContainerSize`，别再往里加自造注入。
-6. 不引入 `androidx.compose.material3`。设计语言会打架，包体也明显变大。
+5. 宽屏判定（840 / 1200）和预览区高度上限读 `LocalWindowInfo.current.containerSize` + `computedStateOf`，这是官方写法。上游撤回了 `LocalContainerSize`，别再往里加自造注入。
+6. 一级页底栏在 `entry<Route.Root>` 那个 `Scaffold` 的 `bottomBar` 槽位（官方 `CompactScreenLayout` 结构），高度经 `LocalPageBottomInset` 下发。不要再去复刻 `GlassNavigationBar` 内部的 floatingMargin 公式。
+7. 页面转场只映射官方 `NavTransitions` 预设（`ui/BackTransitions.kt`），不要自己写 `navGraphicsTransition`。
+8. 不引入 `androidx.compose.material3`。设计语言会打架，包体也明显变大。
 
 ## 已知限制
 

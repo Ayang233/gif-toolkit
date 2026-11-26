@@ -17,7 +17,7 @@ import time
 # 环境变量：
 #   MOVE_TAG      要指向本次提交的 tag，没有就新建、有就移动
 #   RELEASE_NOTES 发布说明 md 路径，不设就跳过 Release 那一段
-#   ASSET_NAME    Release 里的文件名，默认按 tag 拼成 GifHelper-<版本>-release.apk
+#   ASSET_NAME    Release 里的文件名，默认按 tag 拼成 GifToolkit-<版本>-release.apk
 #   PUBLISH=1     资产和正文写好后把草稿 Release 正式发布
 REPO = "Ayang233/gif-toolkit"
 CWD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -103,7 +103,7 @@ print("main ->", commit[:12])
 tag_name = os.environ.get("MOVE_TAG")
 if tag_name:
     tag_obj = api("POST", f"https://api.github.com/repos/{REPO}/git/tags",
-                  {"tag": tag_name, "message": "GIF 助手 " + tag_name.lstrip("v"),
+                  {"tag": tag_name, "message": "GifToolkit " + tag_name.lstrip("v"),
                    "object": commit, "type": "commit"})["sha"]
     # 404 时响应体里没有 object 字段，直接看这个比解析状态码省事
     exists = "object" in api("GET", f"https://api.github.com/repos/{REPO}/git/ref/tags/{tag_name}")
@@ -125,14 +125,14 @@ if not notes_path:
 
 body = open(os.path.join(CWD, notes_path), encoding="utf-8").read()
 version = (tag_name or "").lstrip("v") or "release"
-asset_name = os.environ.get("ASSET_NAME") or f"GifHelper-{version}-release.apk"
+asset_name = os.environ.get("ASSET_NAME") or f"GifToolkit-{version}-release.apk"
 
 # 优先找这个 tag 的草稿；没有就建一个，省得每次都去网页点「新建草稿」。
 data = api("GET", f"https://api.github.com/repos/{REPO}/releases?per_page=20")
 rel = next((r for r in data if r["draft"] and r["tag_name"] == (tag_name or "")), None)
 if rel is None:
     rel = api("POST", f"https://api.github.com/repos/{REPO}/releases",
-              {"tag_name": tag_name, "name": "GIF 助手 " + version,
+              {"tag_name": tag_name, "name": "GifToolkit " + version,
                "body": body, "draft": True, "prerelease": False})
     print("draft release created:", rel["id"])
 
@@ -140,7 +140,7 @@ for a in rel["assets"]:
     api("DELETE", f"https://api.github.com/repos/{REPO}/releases/assets/{a['id']}")
     print("deleted asset", a["name"])
 
-apk = open(os.path.join(CWD, "build/outputs/apk/release/GifHelper-release.apk"), "rb").read()
+apk = open(os.path.join(CWD, "build/outputs/apk/release/GifToolkit-release.apk"), "rb").read()
 asset = api("POST",
             f"https://uploads.github.com/repos/{REPO}/releases/{rel['id']}/assets?name={asset_name}",
             binary=apk, content_type="application/vnd.android.package-archive", timeout=600)

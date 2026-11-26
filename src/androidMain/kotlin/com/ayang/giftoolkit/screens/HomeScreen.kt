@@ -21,7 +21,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 fun HomeScreen(onOpen: (Tool) -> Unit) {
     val glass = rememberGlassScope()
     Os4ListPage(
-        title = "GIF 助手",
+        title = "GifToolkit",
         glass = glass,
     ) {
         Tool.grouped.forEach { (group, tools) ->

@@ -7,8 +7,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,10 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.core.view.WindowCompat
 import com.ayang.giftoolkit.data.SettingsStore
 import com.ayang.giftoolkit.screens.AboutScreen
@@ -40,8 +45,8 @@ import com.ayang.giftoolkit.screens.ThemeScreen
 import com.ayang.giftoolkit.screens.ToolScreen
 import com.ayang.giftoolkit.ui.AnimatedMiuixTheme
 import com.ayang.giftoolkit.ui.LocalAmoled
-import com.ayang.giftoolkit.ui.LocalBottomBarClearance
 import com.ayang.giftoolkit.ui.LocalGlassEnabled
+import com.ayang.giftoolkit.ui.LocalPageBottomInset
 import com.ayang.giftoolkit.ui.LocalRailInset
 import com.ayang.giftoolkit.ui.LocalTopAppBarCenterObstructionStart
 import com.ayang.giftoolkit.ui.LocalTopBarTitleAlpha
@@ -51,12 +56,13 @@ import com.ayang.giftoolkit.ui.Tool
 import com.ayang.giftoolkit.ui.backTransition
 import com.ayang.giftoolkit.ui.isGlassSupported
 import com.ayang.giftoolkit.ui.pageBaseColor
-import com.ayang.giftoolkit.ui.rememberBottomBarClearance
 import com.ayang.giftoolkit.ui.rememberPageBackdrop
+import com.ayang.giftoolkit.ui.rememberSystemBottomInset
 import com.ayang.giftoolkit.ui.rememberWideLayout
 import com.ayang.giftoolkit.ui.shouldExpandNavigationRail
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
@@ -118,8 +124,6 @@ private fun GifAppContent() {
     // 宽屏：≥840dp（或横向 ≥600dp）改用侧边 Rail，底栏让位。
     // 阈值与官方 utils/AdaptiveUtils.kt 一致，保证和生态里其它应用同时切换。
     val wide = rememberWideLayout()
-    // 底栏占位高度由这里单点计算、单点下发；宽屏没有底栏，所以是 0。
-    val bottomClearance = rememberBottomBarClearance()
 
     // 页面栈与一级导航的在场条件在这里就定，供下面的 CompositionLocal 使用。
     val stack: NavBackStack = remember { navBackStackOf(Route.Root) }
@@ -164,8 +168,7 @@ private fun GifAppContent() {
         // 折叠态（顶部居中胶囊）与居中标题抢同一条位置：标题透明度跟着折叠进度走，
         // 官方 `AppContent.kt:208-214` 就是这么接的。二级页没有 Rail，标题恒为 1。
         LocalTopBarTitleAlpha provides { if (railVisible) railState.progress else 1f },
-        LocalTopAppBarCenterObstructionStart provides centerObstructionStart,
-        LocalBottomBarClearance provides if (wide) 0.dp else bottomClearance,
+        LocalTopAppBarCenterObstructionStart provides { if (railVisible) centerObstructionStart else Dp.Unspecified },
     ) {
         AnimatedMiuixTheme(controller) {
             val view = LocalView.current
@@ -211,7 +214,7 @@ private fun GifAppContent() {
             // 回到 tab 0 之后**不再拦**（enabled 里带上 tab != 0）：交还给系统，
             // 预测性返回 → Activity finish → 回桌面。官方示例 `MainScreenBackHandler`
             // （AppContent.kt:910）就是这么写的：`isBackEnabled` 带 `selectedPage != 0`，
-            // 一级页按返回直接退到桌面，没有二次确认。之前那句「退出 GIF 助手？」确认弹窗
+            // 一级页按返回直接退到桌面，没有二次确认。之前那句「退出 GifToolkit？」确认弹窗
             // 是本项目自己加的拦截，与官方行为不一致，本轮移除（见 docs/os4-round5-audit.md）。
             BackHandler(enabled = stack.size <= 1 && tab != 0) {
                 goTab(0)
@@ -238,8 +241,8 @@ private fun GifAppContent() {
                     // 用库的 `rememberNavSystemCornerRadius()`（官方 example `AppContent.kt:267` 同款），
                     // 不再自己读 RoundedCorner / framework dimen。
                     val pageBackground = pageBaseColor()
-                    val pageTransition = remember(app.backAnimation, app.backExitDirection) {
-                        backTransition(app.backAnimation, app.backExitDirection)
+                    val pageTransition = remember(app.backAnimation) {
+                        backTransition(app.backAnimation)
                     }
                     val cornerRadius = rememberNavSystemCornerRadius()
                     val navEffects = remember(cornerRadius, pageBackground) {
@@ -256,17 +259,32 @@ private fun GifAppContent() {
                         effects = navEffects,
                     ) {
                         entry<Route.Root> {
-                            // 一级页 = Pager + 底栏，两者都在这一层。
+                            // 一级页 = Pager + 底栏，结构照官方 `CompactScreenLayout`
+                            // （AppContent.kt:685-727）：底栏进 `Scaffold` 的 `bottomBar` 槽位，
+                            // 内容（Pager 与它的录制层）在槽位之外的 content 里。
                             //
-                            // 这是官方 `CompactScreenLayout`（AppContent.kt:581-627）的结构：
-                            // 底栏属于一级页，二级页压栈时它跟着一级页一起被新页面**盖住**
-                            // （官方实测：进入二级页的过渡帧里底栏原地不动、随后被新页覆盖，
-                            // 没有任何自己的缩放/淡出动画；退出时也是被"揭开"）。
-                            // 之前底栏画在 NavDisplay 外面并靠 `stack.size` 挂载/卸载：
-                            // 进二级页它在新页盖上来之前就消失，返回时又立刻冒在退出中的二级页之上。
-                            Box(Modifier.fillMaxSize()) {
-                                // 录制层只包 Pager，底栏做它的**兄弟** —— 底栏采样它、又不在它里面，
-                                // 才不会采样到自己（AGENTS.md 第 1 条）。
+                            // 这样底栏高度由 Scaffold 自己量、以 `innerPadding` 下发，
+                            // 不再复刻 `GlassNavigationBar` 内部的 floatingMargin 公式
+                            // （上一版 `rememberBottomBarClearance()` 干的就是这件事）。
+                            // 底栏仍然与录制层是**兄弟**节点：它在 bottomBar 槽位、不在录制层里，
+                            // 所以不会采样到自己（AGENTS.md 第 1 条）。
+                            //
+                            // 底栏属于一级页：二级页压栈时它跟着一级页一起被**盖住**，
+                            // 没有任何自己的进退场动画（官方实测行为）。
+                            Scaffold(
+                                containerColor = Color.Transparent,
+                                contentWindowInsets = WindowInsets(0),
+                                bottomBar = {
+                                    if (!wide) {
+                                        PageNavigationBar(
+                                            items = navItems,
+                                            selectedIndex = tab,
+                                            onSelect = goTab,
+                                            backdrop = rootBackdrop.takeIf { glassEnabled },
+                                        )
+                                    }
+                                },
+                            ) { rootPadding ->
                                 Box(
                                     Modifier
                                         .fillMaxSize()
@@ -278,6 +296,9 @@ private fun GifAppContent() {
                                     // 而弹层上报的是真实坐标 —— 两者相减正好差一页宽，采样全落在外面。
                                     CompositionLocalProvider(
                                         LocalRootBackdrop provides rootBackdrop.takeIf { glassEnabled },
+                                        // 一级页正文要给底栏让位：高度就是上面那个 Scaffold 的
+                                        // bottomBar 实测值，页面不再自己算。
+                                        LocalPageBottomInset provides rootPadding.calculateBottomPadding(),
                                     ) {
                                         // 吸附曲线与手势接管器必须共用**同一个** flingBehavior 实例，
                                         // 否则松手后的吸附和手势识别器算出来的目标页会是两套物理参数。
@@ -328,31 +349,6 @@ private fun GifAppContent() {
                                             }
                                         }
                                     }
-                                }
-
-                                // 底栏：一级页自己的浮层。宽屏没有它（用 Rail），
-                                // 二级页也不用管它 —— 它根本不在那些页面的组合里。
-                                // 参数一律吃库的默认值（高度 54dp、指示器色、悬浮外边距），
-                                // 几何不该我们维护。
-                                if (!wide) {
-                                    GlassNavigationBar(
-                                        items = navItems,
-                                        selectedIndex = tab,
-                                        onSelect = { goTab(it) },
-                                        // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器，
-                                        // 不会塌回通栏白底条。
-                                        backdrop = rootBackdrop.takeIf { glassEnabled },
-                                        // 选中色吃库的默认值：`if (MiuixTheme.isDynamicColor) primary else onBackground`。
-                                        // 之前这里按 `app.monetEnabled` 手算了一遍，理由是"`MiuixTheme(colors)` 重载
-                                        // 不提供 LocalColorSchemeMode"——但外层 `AnimatedMiuixTheme` 已经用
-                                        // `MiuixTheme(controller)` 提供了它，内层只覆盖颜色，所以 `isDynamicColor`
-                                        // 本来就能读到正确的模式。手算的那份是重复实现，已删除。
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            // 左右各留 24dp：胶囊必须退进屏幕圆角里，否则大圆角机型两端的
-                                            // 圆弧会被屏幕边缘切掉；间距也不能太窄，否则三条 tab 挤成一条长带。
-                                            .padding(horizontal = 24.dp),
-                                    )
                                 }
                             }
                         }
@@ -424,3 +420,50 @@ private val navItems = listOf(
     GlassNavigationItem(icon = MiuixIcons.Glass.SettingsOutline, label = "设置", contentDescription = "设置"),
 )
 
+
+/**
+ * 一级页底栏容器。
+ *
+ * 结构照官方 `GlassPage.kt:294-356`：横向 24dp 留白 + 底部留白自己量
+ * `max(24dp, 安全区 + 8dp)`，并把这段留白并进 `bottomBar` 槽位高度 ——
+ * 于是"列表末尾该空多少"由 Scaffold 的 `innerPadding` 精确给出，
+ * 不再由我们复刻 `GlassNavigationBar` 内部的 `floatingMargin` 公式。
+ *
+ * `defaultWindowInsetsPadding = false`：底部安全区已经在上面量过了，
+ * 交给库再吃一遍会多让一截（官方同一个写法）。
+ */
+@Composable
+private fun PageNavigationBar(
+    items: List<GlassNavigationItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    backdrop: LayerBackdrop?,
+) {
+    // 底部安全区 = max(navigationBars, captionBar)：自由窗口 / 桌面模式下 captionBar 非 0，
+    // 只取 navigationBars 会少让一截（上游 `GlassNavigationBar` 内部也是取这两者的较大值）。
+    val bottomInset = rememberSystemBottomInset()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .layout { measurable, constraints ->
+                val bottom = maxOf(24.dp, bottomInset + 8.dp)
+                    .roundToPx()
+                    .coerceIn(0, constraints.maxHeight)
+                val placeable = measurable.measure(constraints.offset(vertical = -bottom))
+                layout(placeable.width, placeable.height + bottom) {
+                    placeable.placeRelative(0, 0)
+                }
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        GlassNavigationBar(
+            items = items,
+            selectedIndex = selectedIndex,
+            onSelect = onSelect,
+            // 关掉玻璃时由库的 fallback 兜底：仍然是浮起胶囊 + 阴影 + 指示器。
+            backdrop = backdrop,
+            defaultWindowInsetsPadding = false,
+        )
+    }
+}

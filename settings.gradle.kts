@@ -25,7 +25,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GifHelper"
+rootProject.name = "GifToolkit"
 
 // Miuix 以 composite build 引入。
 //

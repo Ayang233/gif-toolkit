@@ -295,7 +295,7 @@ fun PageTopBar(
             actions = actions,
             // 绘制期读取，折叠动画期间不重组。
             titleAlpha = effectiveTitleAlpha,
-            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current,
+            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current(),
         )
     } else {
         TopAppBar(
@@ -314,7 +314,7 @@ fun PageTopBar(
             navigationIcon = backIcon,
             actions = actions,
             // 两档顶栏都吃同一个绕行偏移：折叠态顶部胶囊不该压住居中标题（官方同款参数）。
-            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current,
+            centerObstructionStart = LocalTopAppBarCenterObstructionStart.current(),
         )
     }
 }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
@@ -439,10 +439,6 @@ fun PrimaryActionBar(
     // 展开态玻璃侧栏叠在内容之上，底部主操作条也要跟着让位，否则按钮左端会被面板压住。
     // 折叠态（手机横屏 / 竖屏）让位为 0，与之前完全一致。
     // 让位宽度逐帧变化 → 走 railStartInset()（量测期读取），不在组合期解包。
-    // 通栏控件左右留白要参与圆角安全区推导：屏幕圆角是圆弧，
-    // 距离底部越近，水平方向的可用宽度越窄，贴边会被切掉一角。
-    // 24dp 是官方 `bottomBar` 的下限（`maxOf(24.dp, insets + 8.dp)`），
-    // 大圆角机型上 safeBottomGap 会算出比它更大的值。
     //
     // 系统安全区（横屏挖孔、侧边系统栏）也要算进来：这一层不在 Scaffold 的内容槽位里，
     // 拿不到 `innerPadding`，必须自己取（`rememberHorizontalSafeInsets`）。之前完全没算，
@@ -451,17 +447,17 @@ fun PrimaryActionBar(
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
     val safeStart = safeInsets.calculateLeftPadding(layoutDirection)
     val safeEnd = safeInsets.calculateRightPadding(layoutDirection)
-    val bottomGap = maxOf(
-        safeBottomGap(corner = rememberNavSystemCornerRadius(), sideGap = sideGap + safeStart + 4.dp),
-        24.dp,
-    )
+    // 底部留白吃官方那一条（`GlassPage.kt:301`）：`max(24.dp, 安全区 + 8.dp)`。
+    // 上一版按屏幕圆角解方程自己算（`safeBottomGap`），属于自造几何，已删除。
+    val bottomGap = maxOf(24.dp, rememberSystemBottomInset() + 8.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             // 遮挡穿透用的必须是**页面真实底色**，不是次级表面 pageColor()：
             // 写错时深色下这条操作条会比页面亮一档，横屏时尤其明显（本轮 §2.2 实测 #1E1E1E vs #000000）。
             .background(pageBaseColor())
-            .navigationBarsPadding()
+            // 不再额外挂 `navigationBarsPadding()`：底部安全区已经由上面那条官方公式
+            // （`max(24.dp, 安全区 + 8.dp)`）算进 bottomGap，两层会重复让出一截。
             .padding(end = sideGap + safeEnd, top = 20.dp)
             .padding(bottom = bottomGap)
             // base = 常规边距 + 起始边安全区；railStartInset 再加侧栏让位（量测期读）。
@@ -520,19 +516,17 @@ private fun ActionButton(
             },
         )
     } else {
+        // 空闲态直接用官方主按钮配色 `ButtonDefaults.buttonColorsPrimary()`：
+        // 蓝底 / onPrimary 字 / `disabledPrimaryButton` + `disabledOnPrimaryButton` 禁用配对。
+        // 上一版手抄了这四个角色的名字，等于把库的默认值搬进了调用点，上游一改就脱节。
+        val primaryColors = ButtonDefaults.buttonColorsPrimary()
         ProgressButtonDefaults.progressButtonColors(
-            trackColor = primary,
-            progressColor = primary,
-            contentColor = MiuixTheme.colorScheme.onPrimary,
-            // 禁用态配色（**方案 A**，2026-11-18 敲定）：MIUIX 主按钮禁用态的标准配对
-            // `disabledPrimaryButton` + `disabledOnPrimaryButton`，保留"这是主操作按钮"的蓝底语义。
-            // 修前的默认配对是 `disabledSecondaryVariant` + `disabledOnPrimaryButton`，
-            // 浅色下灰底白字只有 1.12:1（几乎读不出字）。
-            // 三套配色的对比度实测：浅色 1.43:1 / 深色 2.40:1 / Monet 浅色 1.47:1，
-            // 完整对比页见 `docs/os4-round10-audit.md` §3。
-            disabledTrackColor = MiuixTheme.colorScheme.disabledPrimaryButton,
-            disabledProgressColor = MiuixTheme.colorScheme.disabledPrimaryButton,
-            disabledContentColor = MiuixTheme.colorScheme.disabledOnPrimaryButton,
+            trackColor = primaryColors.color,
+            progressColor = primaryColors.color,
+            contentColor = primaryColors.contentColor,
+            disabledTrackColor = primaryColors.disabledColor,
+            disabledProgressColor = primaryColors.disabledColor,
+            disabledContentColor = primaryColors.disabledContentColor,
         )
     }
 

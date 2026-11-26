@@ -108,10 +108,13 @@ val LocalTopBarTitleAlpha = androidx.compose.runtime.staticCompositionLocalOf<()
  * 官方 `AppContent.kt:226-232` 算好后下发给两档顶栏的 `centerObstructionStart`
  * （`GlassTopAppBar` / `TopAppBar` 同名参数）：横屏折叠态下标题会绕开这块宽度居中。
  * 未在宽屏 / 侧栏展开 / 还没量到胶囊宽度时给 [Dp.Unspecified]（= 不绕开）。
+ *
+ * **类型是函数**（官方 `utils/PageUtils.kt:59` 的 `LocalTopAppBarCenterObstructionStart` 同款）：
+ * 胶囊宽度是逐帧变化的动画值，组合期解包会让顶栏在折叠动画期间每帧重组。
  */
 val LocalTopAppBarCenterObstructionStart =
-    androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.ui.unit.Dp> {
-        androidx.compose.ui.unit.Dp.Unspecified
+    androidx.compose.runtime.staticCompositionLocalOf<() -> androidx.compose.ui.unit.Dp> {
+        { androidx.compose.ui.unit.Dp.Unspecified }
     }
 
 /**

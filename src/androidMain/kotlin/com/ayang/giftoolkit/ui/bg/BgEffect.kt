@@ -39,7 +39,7 @@ import kotlin.math.sin
  * `BgEffectBackground.kt` / `BgEffectPainter.kt` / `BgEffectModifier.kt` / `BgEffectConfig.kt`。
  *
  * 只保留关于页实际要用的那一支：OS3 效果、PHONE/PAD 两套预设、明暗两档。
- * 示例里 OS2 分支和"背景效果"设置面板是演示用的可切换项，GIF 助手没有对应设置，一并删掉。
+ * 示例里 OS2 分支和"背景效果"设置面板是演示用的可切换项，GifToolkit没有对应设置，一并删掉。
  *
  * 三处与示例的差异（都是取本项目自己的约定，不是随手改）：
  * 1. 底色铺 `pageColor()` 而不是 `surface` —— 项目里页面底色统一由它推导，见 Widgets.kt。

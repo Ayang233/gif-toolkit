@@ -22,22 +22,17 @@ enum class ThemeMode(val label: String) {
 /**
  * 预测性返回动画档位。
  *
- * [None] 不只是"不做动画"：它同时会把系统级预测性返回关掉（`enableOnBackInvokedCallback` 置 false），
- * 让返回变成和传统系统一致的行为。其余档位只改页面转场的视觉，系统手势由系统自己画。
+ * 只提供 MIUIX 官方 `NavTransitions` 预设，不自造转场（见 `ui/BackTransitions.kt`）。
+ * [Miuix] 与 [Modal] 只改页面转场的观感，系统手势由系统自己画。
+ *
+ * [None] 是**"关闭预测性返回"**，不是"没有页面动画"：它把系统级预测性返回
+ * （手势跟手预览 / 返回预览）关掉，页面切换仍然走 MIUIX 默认转场。
+ * 系统那层由 `GifApplication` 反射置 `enableOnBackInvokedCallback = false` 实现。
  */
 enum class BackAnimation(val label: String, val summary: String) {
-    Miuix("Miuix", "左右滑入，下层后退"),
-    Aosp("AOSP", "进入页缩放淡入，当前页轻微后退"),
-    Scale("缩放", "按手势方向缩放并平移"),
-    Classic("经典", "通栏平移，下层不动"),
-    None("无", "关闭手势预览，页面切换仍用默认转场"),
-}
-
-/** 缩放档位下页面退出的方向。 */
-enum class BackExitDirection(val label: String) {
-    FollowGesture("跟随手势"),
-    AlwaysRight("始终向右"),
-    AlwaysLeft("始终向左"),
+    Miuix("Miuix 默认", "新页从右侧滑入，下层视差后退"),
+    Modal("底部弹出", "新页从屏幕底部升起，下层不动"),
+    None("关闭手势预览", "页面转场不变，重启后生效"),
 }
 
 /**
@@ -53,7 +48,6 @@ class AppState(private val store: SettingsStore) {
     private var glassEnabledState by mutableStateOf(store.glassEnabled)
     private var amoledEnabledState by mutableStateOf(store.amoledEnabled)
     private var backAnimationState by mutableStateOf(store.backAnimation)
-    private var backExitDirectionState by mutableStateOf(store.backExitDirection)
 
     var themeMode: ThemeMode
         get() = themeModeState
@@ -88,15 +82,6 @@ class AppState(private val store: SettingsStore) {
             if (value != backAnimationState) {
                 backAnimationState = value
                 store.backAnimation = value
-            }
-        }
-
-    var backExitDirection: BackExitDirection
-        get() = backExitDirectionState
-        set(value) {
-            if (value != backExitDirectionState) {
-                backExitDirectionState = value
-                store.backExitDirection = value
             }
         }
 

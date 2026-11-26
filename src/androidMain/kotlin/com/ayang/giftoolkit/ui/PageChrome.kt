@@ -7,19 +7,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -51,60 +46,19 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 /**
- * 底栏在内容区上占掉的**视觉**高度：胶囊 + 它的悬浮外边距 + 一点呼吸空间。
+ * 一级页底栏在内容区上占掉的高度，由 `App.kt` 里那个真正装着底栏的 `Scaffold` 测出来。
  *
- * 为什么不用 `Scaffold` 的 innerPadding：底栏是画在录制层**外面**的浮层（见 AGENTS.md 第 1 条），
- * 不占 Scaffold 的 bottomBar 槽位，所以 Scaffold 不知道它存在。这个值由 `App.kt` 单点算、
- * 单点下发 —— 高度公式一变（比如以后调胶囊高度），也只改一处。
+ * 底栏现在放在 `Scaffold` 的 `bottomBar` 槽位（与官方 `CompactScreenLayout` /
+ * `GlassPage` 同一个结构），高度由 Scaffold 自己量、以 `innerPadding` 形式下发，
+ * 不再由我们复刻库内部的 `floatingMargin` 公式 —— 这正是上一版唯一的"抄库内部实现"处。
+ *
+ * 二级页（工具页 / 主题 / 关于 / 许可）不在这个 Scaffold 里，读到的就是默认 0。
  */
-val LocalBottomBarClearance = compositionLocalOf { 0.dp }
-
-
-/**
- * 底栏占位高度。
- *
- * 胶囊高度直接取库的 `GlassNavigationBarDefaults.Height`（54dp），不再本地留一份 54.dp ——
- * 之前硬编码过，上游一改这个值，顶栏高度和内容末尾留白就对不上了。
- *
- * 外边距规则仍要镜像 `GlassNavigationBar` 内部那套（导航栏 ≤16dp → **20dp**；≥28dp → 跟随；
- * 中间 → 12dp + 导航栏），因为库**没有把这个 margin 暴露出来**（`floatingMargin` 是函数内
- * 局部变量）。这是全项目唯一"复刻库内部公式"的地方，上游若改规则这里要跟着改。
- *
- * 基线迁移记录：Miuix `5ff41ba9`（提交 `9413f690`）把 ≤16dp 档从 28dp 改成 20dp，
- * 底栏胶囊因此整体下沉 8dp。镜像公式要跟着改，否则内容末尾会多预留 8dp 空带。
- * 本机（420dpi、手势导航，导航栏 24dp）走的是「12dp + 导航栏」档，不受这次改动影响 ——
- * 也就是说这个 bug 在模拟器上看不出来，只有导航栏 ≤16dp 的真机（部分全屏手势机型）才会暴露。
- */
-@Composable
-fun rememberBottomBarClearance(): Dp {
-    // 与上游 `GlassNavigationBar.kt:309-324`（f3829d3d）逐字一致的取值顺序：
-    // 底部安全区 = max(navigationBars, captionBar)，再套那三档。
-    // 手机上没有 captionBar（恒 0），但自由窗口 / 桌面模式下它非 0，
-    // 只取 navigationBars 会少让一截，内容末尾会被底栏压住。
-    val navInset = maxOf(
-        WindowInsets.navigationBars
-            .only(WindowInsetsSides.Bottom)
-            .asPaddingValues()
-            .calculateBottomPadding(),
-        WindowInsets.captionBar
-            .only(WindowInsetsSides.Bottom)
-            .asPaddingValues()
-            .calculateBottomPadding(),
-    )
-    val floatingMargin = when {
-        navInset <= 16.dp -> 20.dp
-        navInset >= 28.dp -> navInset
-        else -> 12.dp + navInset
-    }
-    return remember(navInset, floatingMargin) {
-        GlassNavigationBarDefaults.Height + floatingMargin + 12.dp
-    }
-}
+val LocalPageBottomInset = compositionLocalOf { 0.dp }
 
 /**
  * 页面滚动修饰符，对齐官方 `utils.pageScrollModifiers`。
@@ -142,13 +96,12 @@ fun pageContentPadding(
     extraTop: Dp = 2.dp,
     extraBottom: Dp = 12.dp,
     horizontal: Dp = 0.dp,
-    reserveNavBar: Boolean = true,
     /** 底栏高度：已作为真实 padding 施加在列表上（见 `Os4ListPage`），这里不再重复计入。 */
     barReserved: Dp = 0.dp,
 ): PaddingValues {
-    // 二级页没有底栏（进入子页面时它已淡出），此时不该为它预留高度，
-    // 否则列表末尾会多出一块 100dp 左右的空白。
-    val clearance = if (reserveNavBar) LocalBottomBarClearance.current else 0.dp
+    // 一级页底栏由外层 Scaffold 的 bottomBar 槽位占据，它的高度经 `innerPadding` 传到这里。
+    // 二级页不在那个 Scaffold 里，读到 0 —— 不会在列表末尾留出一块空带。
+    val clearance = LocalPageBottomInset.current
     // 宽屏玻璃侧栏叠在内容之上，内容靠内边距让位（随展开进度变化，折叠态为 0）。
     // 官方 `AppContent.kt:219-229` 也是让页面内容让位，而不是把录制层挤窄。
     //
@@ -210,7 +163,6 @@ fun Os4ListPage(
     bottomBar: (@Composable () -> Unit)? = null,
     extraBottom: Dp = 12.dp,
     horizontalPadding: Dp = 0.dp,
-    reserveNavBar: Boolean = true,
     /**
      * 页面级弹层槽位（Dialog / BottomSheet）。
      *
@@ -355,7 +307,6 @@ fun Os4ListPage(
                         innerPadding = padding,
                         extraBottom = extraBottom,
                         horizontal = horizontalPadding,
-                        reserveNavBar = reserveNavBar,
                         barReserved = barHeight,
                     )
                     // 用官方 `LocalBringIntoViewSpec` 把"底栏遮挡"告诉框架：
@@ -389,6 +340,10 @@ fun Os4ListPage(
                             .fillMaxSize()
                             .padding(bottom = barHeight)
                             .pageScrollModifiers(scrollBehavior),
+                        // 顶栏自己画 overscroll 的联动效果（band / 按钮材质），
+                        // 列表再叠一层库的 overscroll 会出现两套回弹。官方每个玻璃页都这样做：
+                        // `MainPage.kt:142`、`GlassPage.kt:544`、`AboutPage.kt:317`。
+                        overscrollEffect = null,
                         // 顶部改用 contentPadding：内容才能滚到顶栏下面被玻璃采样到。
                         contentPadding = contentPadding,
                     ) {

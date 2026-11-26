@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayang.giftoolkit.ui.GroupCard
 import com.ayang.giftoolkit.ui.GroupHeader
+import com.ayang.giftoolkit.ui.NoteText
 import com.ayang.giftoolkit.ui.Os4ListPage
 import com.ayang.giftoolkit.ui.licenseEntries
 import com.ayang.giftoolkit.ui.licenseGroups
@@ -38,7 +39,6 @@ fun LicensesScreen(
         glass = glass,
         subtitle = "GPL-3.0 · ${licenseEntries.size} 项许可与声明",
         onBack = onBack,
-        reserveNavBar = false,
     ) {
         // 分组下标要落到扁平清单上，才能直接当 Route.License 的参数用。
         var index = 0
@@ -59,12 +59,9 @@ fun LicensesScreen(
             }
         }
         item(key = "note") {
-            Text(
-                text = "第三方组件按各自的原始许可分发，其许可不因本工程的整体许可而改变。",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp),
-            )
+            // 说明段落走统一的 NoteText（左边线 28dp、footnote1、onSurfaceVariantSummary），
+            // 不再在这里手写一份同样的 Text。
+            NoteText("第三方组件按各自的原始许可分发，其许可不因本工程的整体许可而改变。")
         }
     }
 }
@@ -118,7 +115,6 @@ fun LicenseTextScreen(
         extraBottom = 24.dp,
         // 与其它页面的正文同一条左边线：卡片外边距 12dp + 行内边距 16dp = 28dp。
         horizontalPadding = 28.dp,
-        reserveNavBar = false,
     ) {
         item {
             Text(

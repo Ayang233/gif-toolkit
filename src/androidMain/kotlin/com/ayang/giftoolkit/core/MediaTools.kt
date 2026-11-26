@@ -175,7 +175,7 @@ object MediaTools {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, mime)
             if (Build.VERSION.SDK_INT >= 29) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, if (video) "Movies/GIF助手" else "Pictures/GIF助手")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, if (video) "Movies/GifToolkit" else "Pictures/GifToolkit")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         }

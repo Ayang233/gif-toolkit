@@ -4,16 +4,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import kotlin.math.sqrt
 
 /**
  * 横向系统安全区（挖孔、侧边系统栏），与页面 Scaffold 的 `contentWindowInsets` 同一套来源：
@@ -34,31 +32,20 @@ fun rememberHorizontalSafeInsets(): PaddingValues =
         .asPaddingValues()
 
 /**
- * 通栏按钮贴底时需要的底部留白。
+ * 底部系统安全区（导航栏 / captionBar 的较大值）。
  *
- * 屏幕圆角是一段半径 R 的圆弧，距屏幕底部 d 处的水平侵入量是
- * `R - sqrt(2Rd - d²)`。按钮左右各留 [sideGap]，只要侵入量不超过它就切不到按钮，
- * 于是解出最小 d：
- *
- *     d = R - sqrt(2R·sideGap - sideGap²)
- *
- * 再减掉系统导航栏已经占掉的高度，就是这一层自己还要补的留白。
- * 这比"给个固定 12dp 再祈祷"可靠：R=80dp 的机型需要 32dp 的 d，而直屏机 12dp 就够。
+ * 官方对"贴着屏幕底的控件该留多少"只有一条公式（`GlassPage.kt:301`、`AppContent.kt`）：
+ * `max(24.dp, 安全区 + 8.dp)`。上一版这里用屏幕圆角解方程算侵入量（`safeBottomGap`），
+ * 属于自己造了一套几何，已删除，统一回到官方这一条。
  */
 @Composable
-fun safeBottomGap(
-    corner: Dp,
-    sideGap: Dp,
-    minimum: Dp = 12.dp,
-): Dp {
-    val navBottom = with(LocalDensity.current) {
-        WindowInsets.navigationBars.getBottom(this).toDp()
-    }
-    if (corner <= sideGap) return minimum
-    val r = corner.value
-    val g = sideGap.value
-    val discriminant = 2f * r * g - g * g
-    if (discriminant <= 0f) return minimum
-    val needed = r - sqrt(discriminant)
-    return (needed - navBottom.value).coerceAtLeast(minimum.value).dp
-}
+fun rememberSystemBottomInset(): Dp = maxOf(
+    WindowInsets.navigationBars
+        .only(WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding(),
+    WindowInsets.captionBar
+        .only(WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding(),
+)
