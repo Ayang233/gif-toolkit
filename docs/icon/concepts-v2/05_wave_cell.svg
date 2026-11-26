@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 72 72">
+  <rect width="72" height="72" fill="#2E6BFF"/>
+  <rect x="9.48" y="11.04" width="53.04" height="49.92" rx="14.04" fill="#FFFFFF"/>
+  <polyline points="18.06,39.12 26.64,28.98 33.66,39.12 40.68,28.98 47.7,39.12 54.72,32.1" fill="none" stroke="#2E6BFF" stroke-width="4.68" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="16.81" y="15.88" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="16.81" y="52.54" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="26.95" y="15.88" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="26.95" y="52.54" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="37.09" y="15.88" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="37.09" y="52.54" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="47.23" y="15.88" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+  <rect x="47.23" y="52.54" width="5.62" height="3.43" rx="1.09" fill="#2E6BFF"/>
+</svg>

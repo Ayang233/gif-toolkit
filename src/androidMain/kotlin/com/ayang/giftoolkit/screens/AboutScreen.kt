@@ -1,20 +1,19 @@
 package com.ayang.giftoolkit.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -48,17 +47,19 @@ import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 private const val SOURCE_URL = "https://github.com/Ayang233/gif-toolkit"
 
 /**
- * 图标容器与主体尺寸，**严格取官方** `AboutPage.kt:249-262`：容器 `88.dp`、圆角
- * `RoundedCornerShape(24.dp)`、`clip = true`，主体 `Image`。
+ * 图标容器与主体尺寸，照 MIUIX 官方 `AboutPage.kt:243-262`：
+ * 容器 `88.dp`、`RoundedCornerShape(24.dp)`、`clip = true`、白底，主体 `Image` 88dp。
  *
- * 主体尺寸这里取 88dp 而不是官方的 74dp，原因只在资源：官方那张是 launcher 图，画面几乎铺满；
- * 本项目的 `ic_app_mark` 是 108 画布、可见图形只占 x=14..94（74.1%），
- * 取 88dp 后可见主体约 65dp，和官方 74dp 图的可见主体（约 66–70dp）同一档。
- * 换成不留白的图之后，把这里改回 74dp 即是逐数字对齐。
+ * **图标是普通静态图标，不走 `textureBlur`。** 官方 AboutPage 的图标就是
+ * 白底圆角盒 + launcher 图，只有标题采样背景；这里与官方保持一致。
+ * 主体用完整的 `ic_app_badge`（72dp 可视区，白底黑主体），直接按 88dp 放进盒子，
+ * 可视区正好铺满，主体与桌面图标**等比例**（76%，约 67dp）。
+ * 不要换成 `ic_launcher_foreground` 或 74dp 的整张 launcher：前者是 108 画布，
+ * 直接放进 88dp 盒子主体只剩约 38dp；后者也会再叠一层安全留白，都会显小。
  */
-private val MarkSampleSize = 88.dp
+private val MarkSize = 88.dp
 
-/** 图标外层容器：官方 `88.dp`（`AboutPage.kt:249`）。 */
+/** 图标外层容器：官方 `88.dp`（`AboutPage.kt:246`）。 */
 private val MarkBoxSize = 88.dp
 
 /**
@@ -77,22 +78,21 @@ private val MarkBoxSize = 88.dp
  * 整屏动态渐变 + 大图标 + 35sp 标题 + 版本号，上滑时这三块按不同斜率淡出并缩到 0.95，
  * 内容列表盖着它们往上走；内容末尾用一块撑满父高度的空白保证"总能滑动"，头部才收得干净。
  *
- * 图标与软件名称走参考项目**同一套原生机制**，没有第二套绘制路径：
+ * 图标与软件名称的处理跟官方拆开：
  *
- * ```
- * textureBlur(backdrop = 背景录制层,
- *             blurRadius = 150f,
- *             colors = BlurColors(blendColors = logoBlend),
- *             contentBlendMode = DstIn)   ← 采样背景 → 混色 → 按内容 alpha 裁形
- * ```
+ * - **图标是普通图标**：88dp 白底圆角盒 + 88dp `ic_app_badge`（72dp 可视区的完整图标），
+ *   不采样、不模糊，和 MIUIX 官方 `AboutPage` 的图标一致；主体与桌面图标等比例。
+ * - **标题仍走官方 `textureBlur`**：采样背景 → 混色 → 按字形 alpha 裁形，
+ *   这是官方 AboutPage 里唯一做模糊的头部元素。
  *
- * 背景录制层只录 `BgEffectBackground` 那层渐变（`bgModifier`），所以图标、标题、背景三者同源。
+ * 背景录制层只录 `BgEffectBackground` 那层渐变（`bgModifier`），所以标题与背景同源。
  *
- * **不要改成 `gradientFilled` / `SrcIn` / ShaderBrush 之类的自制渐变**（第九轮做过，已删除）。
+ * **不要给图标加回 `gradientFilled` / `SrcIn` / ShaderBrush / `textureBlur`**：
+ * 它现在就是正常应用图标，跟随渐变是上一版的行为，已经去掉。
  *
  * 玻璃能力只看库的 `isRenderEffectSupported()`（见 `ui/GlassSupport.kt`）：之前这里还叠了一条
  * "软件渲染器就跳过 textureBlur"的判据，把 `-gpu host` 的硬件加速模拟器也一起判掉了，
- * 结果图标/标题退化成纯色剪影、不跟随渐变。现在不做渲染器猜判，能力交给库；
+ * 结果标题退化成纯色实字、不跟随渐变。现在不做渲染器猜判，能力交给库；
  * 观感验证请用 `-gpu host` 启动的模拟器或真机。
  */
 @Composable
@@ -108,9 +108,10 @@ fun AboutScreen(
     val blurEnabled = glassEnabled
     val version = rememberAppVersion()
 
-    // 背景录制层：只录渐变那一层，给图标/标题的 textureBlur 当采样源。
+    // 背景录制层：只录渐变那一层，给标题的 textureBlur 当采样源。
     // 官方 `AboutPage.kt:141` 的 `backdrop = rememberBlurBackdrop()` + `bgModifier = layerBackdrop(backdrop)`
     // 是同一处接线；KSU 在内容里另建一份 `rememberLayerBackdrop()` 挂在 BgEffectBackground 上。
+    // 图标是普通静态图标，不读这一层。
     // **不能**把录制层套到内容外面：内容是渐变层的兄弟，套进去就成"采样到自己"（AGENTS.md 第 1 条）。
     val bgBackdrop = rememberLayerBackdrop()
 
@@ -227,39 +228,18 @@ private fun AboutHeader(
             .size(MarkBoxSize)
             .graphicsLayer {
                 val p = ((progress() - 0.35f) / 0.15f).coerceIn(0f, 1f)
+                clip = true
+                shape = RoundedCornerShape(24.dp)
                 alpha = 1f - p
                 scaleX = 1f - p * 0.05f
                 scaleY = 1f - p * 0.05f
-                // 与 KSU 的 `clipToBounds()` 同义：主体溢出容器的部分是透明的，
-                // 但裁一下更稳（换图标资源时不会突然露到外面）。
-                clip = true
-            },
+            }
+            .background(Color.White),
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_app_mark),
+            painter = painterResource(R.drawable.ic_app_badge),
             contentDescription = null,
-            // 与 KSU `AboutMiuix.kt:313` 一致：始终 tint。
-            colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onBackground),
-            modifier = Modifier
-                .requiredSize(MarkSampleSize)
-                .then(
-                    if (blurEnabled) {
-                        Modifier.textureBlur(
-                            backdrop = bgBackdrop,
-                            // 采样区形状与图标容器的圆角观感一致（官方图标容器是 RoundedCornerShape(24.dp)）。
-                            shape = RoundedCornerShape(24.dp),
-                            // 100f 就是 `BlurDefaults.MaxBlurRadius`，与官方 AboutPage 同值
-                            // （写 150f 也会被库夹紧到这个上限）。
-                            blurRadius = BlurDefaults.MaxBlurRadius,
-                            noiseCoefficient = BlurDefaults.NoiseCoefficient,
-                            colors = logoColors,
-                            contentBlendMode = ComposeBlendMode.DstIn,
-                            enabled = true,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ),
+            modifier = Modifier.size(MarkSize),
         )
     }
     Text(

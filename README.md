@@ -3,10 +3,12 @@
 本地运行的 Android GIF 工具。转码、编辑、压缩、拼接、拼图、分解等十个功能，全在设备上处理。不联网，不做账号，文件通过 SAF 读写，也没有广告。
 
 > 1.16 起应用名从「GIF 助手」改为 **GifToolkit**，功能与设置不变（旧版本的设置会继续沿用）。
+>
+> 1.17 起应用图标换成白底黑主体的「胶片环」；关于页图标改为普通静态图标，不再跟随背景渐变。
 
 界面用 [Miuix](https://github.com/compose-miuix-ui/miuix)（MIUI / HyperOS 风格的 Compose 组件库）搭的。静态配色和 Monet 动态取色都有，明暗双模式，底栏是 OS4 玻璃。
 
-1.16 的 APK 在 [Releases](https://github.com/Ayang233/gif-toolkit/releases)，要求 Android 13 及以上。
+1.17 的 APK 在 [Releases](https://github.com/Ayang233/gif-toolkit/releases)，要求 Android 13 及以上。
 
 改代码前先看 [AGENTS.md](AGENTS.md)，目录地图、常用命令和一组硬约束都在那里。版本变化见 [CHANGELOG.md](CHANGELOG.md)，未完成的事在 [ROADMAP.md](ROADMAP.md)。
 
@@ -14,7 +16,7 @@
 | --- | --- | --- | --- |
 | ![主页](docs/screenshots/home.png) | ![工具页](docs/screenshots/tool.png) | ![设置](docs/screenshots/settings.png) | ![关于](docs/screenshots/about.png) |
 
-截图拍于 1.16。关于页的图标和名字用 `textureBlur` 采背景渐变，需要硬件 GPU；模拟器加 `-gpu host` 才有模糊，软件渲染下是实色。
+截图拍于 1.17。关于页的图标是普通白底黑主体图标，不跟随渐变；软件名称仍用 `textureBlur` 采背景渐变，需要硬件 GPU，模拟器加 `-gpu host` 才有模糊。
 
 <details>
 <summary>深色模式</summary>
@@ -121,7 +123,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 - 没有目标体积压缩，不会为了压到某个大小自动二分色数或帧率
 - 进程被杀后返回栈能恢复，但页面里的选择（素材、参数、进度）会丢
 - 玻璃在低端机上的性能没充分验证，设置里可以关掉
-- 关于页的图标和名称用原生 `textureBlur` 采样背景画，需要硬件 GPU。模拟器请用 `-gpu host`，`-gpu swiftshader_indirect` 这类软件光栅化不产出模糊像素
+- 关于页的图标是普通静态图标；软件名称用原生 `textureBlur` 采样背景画，需要硬件 GPU。模拟器请用 `-gpu host`，`-gpu swiftshader_indirect` 这类软件光栅化不产出模糊像素
 
 ## 许可证
 

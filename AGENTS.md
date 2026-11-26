@@ -24,7 +24,7 @@ src/androidMain/kotlin/com/ayang/giftoolkit/
 │   ├── GlassSupport.kt   玻璃开关与能力检测的**唯一决策点**
 │   ├── AppInfo.kt        版本号串（关于页与设置页副标题共用）
 │   ├── bg/                关于页的 OS3 动态渐变背景（移植自 miuix 示例，Apache-2.0）
-│   │                      + BgEffectBackground 的 bgModifier：给关于页的 textureBlur 挂录制层
+│   │                      + BgEffectBackground 的 bgModifier：给关于页标题的 textureBlur 挂录制层
 │   ├── ProgressButton.kt 自带进度填充的按钮（移植自 miuix 生态，Apache-2.0；容器形状走官方 Button 的 squircleSurface + clickable）
 │   └── LicenseCatalog.kt 许可清单：本项目 / 第三方组件 / NOTICE
 ├── screens/              主页 / 工具页 / 作品页 / 设置 / 主题 / 关于 / 开源许可
@@ -234,20 +234,24 @@ adb shell am start -n com.ayang.giftoolkit/.MainActivity
       它不采样、不模糊，只画一层官方半透明填充，所以玻璃关掉时也不会消失（不需要 `backdrop = null` 的兜底分支）。
       **不要**退回 `Card + textureBlur` 的自造玻璃卡（1.14 之前那套已删除），
       也不要自造卡片渐变或第二套卡片色。
-    - 图标与软件名称**必须走参考项目的原生 `textureBlur`**：一份背景录制层
+    - 图标是**普通静态图标，不走 `textureBlur`**：88dp 白底圆角盒（`RoundedCornerShape(24.dp)`、
+      `clip = true`，官方 `AboutPage.kt:243-262`）+ 88dp `ic_app_badge`（完整 72dp 可视区图标），
+      不 tint、不采样、不跟背景渐变。官方 AboutPage 的图标就是白底盒 + launcher 图，
+      我们直接放完整图标，让主体与桌面图标等比例；不要换成透明前景层或 74dp 整图，都会显小。
+    - **标题**才走官方原生 `textureBlur`：一份背景录制层
       （`rememberLayerBackdrop()` 挂在 `BgEffectBackground` 的 `bgModifier` 上）、
       `BlurColors(blendColors = logoBlend)`、`contentBlendMode = DstIn`、`blurRadius = 150f`。
       三档混合色与 KSU `AboutMiuix.kt:189-203` / InstallerX `MiuixAboutPage.kt:420-431` 逐字相同。
-      图标容器 **88dp**（官方 `AboutPage.kt:249`，`clip = true`）、主体 `requiredSize(88dp)`、`ColorFilter.tint(onBackground)`；
       标题 35sp Bold、同 backdrop 同混合色。
-      **不要**改成 `gradientFilled` / `SrcIn` / ShaderBrush / 任何自制渐变（第九轮做过，第十轮已删除）。
+      **不要**把图标改回 `textureBlur` / `gradientFilled` / `SrcIn` / ShaderBrush / 自制渐变，
+      也不要给图标加 `ColorFilter.tint`：它现在是正常应用图标，跟随渐变是 1.16 及之前的行为。
     - 本机模拟器**必须用 `-gpu host` 启动**（`emulator -avd android16 -gpu host`）：
-      此时 `textureBlur` / AGSL 渐进模糊与真机一致，图标、标题会真的跟随背景渐变。
+      此时 `textureBlur` / AGSL 渐进模糊与真机一致，**标题**会真的跟随背景渐变。
       早先用 `-gpu swiftshader_indirect` 时 `textureBlur` 不产出像素，一度在代码里加了
       "软件渲染器就跳过模糊"的判据 —— 那条判据把 `-gpu host` 也误判掉，导致图标/标题退化成纯色、
       顶栏关掉渐进模糊，**已删除**。能力判断一律交给库（`isRuntimeShaderSupported()`），
       不要在业务代码里猜渲染器。
-    - 图标**不带白底/底板**，只有单色剪影。第九轮那块 `cardColor(alpha = 0.72f)` 底板已删除。
+    - 图标外层的 88dp 白底圆角盒是官方结构，不要删成透明底；图标也不再是单色剪影。
     - 入口行**不带前置图标**，描述写在 `ArrowPreference` 的 `summary`（InstallerX 同款）；
       许可只有一个入口，本项目 GPL-3.0 / 第三方 Apache-2.0 / NOTICE 都在同一页分组里，
       不要再拆成两个 Route。
